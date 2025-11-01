@@ -1,0 +1,27 @@
+-- Criar tabela proposta_contratos
+CREATE TABLE IF NOT EXISTS proposta_contratos (
+  id VARCHAR(36) PRIMARY KEY,
+  numero VARCHAR(50) UNIQUE NOT NULL,
+  cliente_id VARCHAR(36) NOT NULL,
+  visita_id VARCHAR(36) NULL,
+  tipo ENUM('conservacao', 'servicos', 'manutencao', 'bimestral') NOT NULL DEFAULT 'conservacao',
+  frequencia ENUM('mensal', 'quinzenal', 'semanal', 'bimestral') NOT NULL DEFAULT 'mensal',
+  valor_equipamentos DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  valor_desconto DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  valor_deslocamento DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  valor_visitas DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  valor_total_proposta DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  forma_pagamento ENUM('mensal', 'bimestral', 'trimestral', 'semestral', 'anual') NOT NULL DEFAULT 'mensal',
+  prazo_contrato INT(11) NOT NULL DEFAULT 12,
+  garantia INT(11) NOT NULL DEFAULT 90,
+  observacoes TEXT NULL,
+  status ENUM('rascunho', 'enviada', 'aprovada', 'rejeitada') NOT NULL DEFAULT 'rascunho',
+  data_proposta DATE NOT NULL,
+  data_validade DATE NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_proposta_numero (numero),
+  INDEX idx_proposta_cliente (cliente_id),
+  INDEX idx_proposta_status (status),
+  INDEX idx_proposta_tipo (tipo)
+);
