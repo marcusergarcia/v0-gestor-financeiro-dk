@@ -25,13 +25,16 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     console.log("[v0] ===== WEBHOOK POST RECEBIDO =====")
-    console.log("[v0] Body:", JSON.stringify(body, null, 2))
+    console.log("[v0] Body completo:", JSON.stringify(body, null, 2))
 
     // Extrair dados da mensagem
     const entry = body.entry?.[0]
     const changes = entry?.changes?.[0]
     const value = changes?.value
     const messages = value?.messages?.[0]
+
+    const metadata = value?.metadata
+    console.log("[v0] Metadata:", JSON.stringify(metadata, null, 2))
 
     if (!messages) {
       console.log("[v0] Nenhuma mensagem encontrada")
@@ -41,8 +44,11 @@ export async function POST(request: NextRequest) {
     const from = messages.from
     const messageBody = messages.text?.body || ""
 
-    console.log("[v0] Mensagem de:", from)
-    console.log("[v0] Texto:", messageBody)
+    console.log("[v0] ===== DETALHES DA MENSAGEM =====")
+    console.log("[v0] Mensagem RECEBIDA de (from):", from)
+    console.log("[v0] Texto da mensagem:", messageBody)
+    console.log("[v0] Tipo de mensagem:", messages.type)
+    console.log("[v0] ID da mensagem:", messages.id)
 
     await sendSimpleMessage(from)
 
@@ -59,9 +65,9 @@ async function sendSimpleMessage(to: string) {
   const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN
 
   console.log("[v0] ===== ENVIANDO MENSAGEM =====")
-  console.log("[v0] Para:", to)
-  console.log("[v0] PHONE_NUMBER_ID:", PHONE_NUMBER_ID || "NÃO CONFIGURADO")
-  console.log("[v0] ACCESS_TOKEN:", ACCESS_TOKEN ? "CONFIGURADO" : "NÃO CONFIGURADO")
+  console.log("[v0] Enviando PARA o número (to):", to)
+  console.log("[v0] PHONE_NUMBER_ID (de onde sai):", PHONE_NUMBER_ID || "NÃO CONFIGURADO")
+  console.log("[v0] ACCESS_TOKEN:", ACCESS_TOKEN ? `${ACCESS_TOKEN.substring(0, 20)}...` : "NÃO CONFIGURADO")
 
   if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
     console.error("[v0] ❌ Credenciais não configuradas!")
