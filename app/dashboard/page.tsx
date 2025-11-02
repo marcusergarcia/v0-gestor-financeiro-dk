@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   DollarSign,
@@ -20,8 +18,6 @@ import {
   EyeOff,
   Plus,
   LucideContrast as FileContract,
-  MoreHorizontal,
-  ExternalLink,
   Wrench,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
@@ -202,7 +198,25 @@ export default function DashboardPage() {
         const boletos = boletosData.data || []
         const orcamentos = orcamentosData.data || []
 
-        // Calcular estatísticas
+        console.log("[v0] === DEBUG BOLETOS VENCIDOS ===")
+        console.log("[v0] Total de boletos:", boletos.length)
+
+        const boletosVencidos = boletos.filter((b: any) => {
+          const isVencido = b.status === "vencido"
+          if (isVencido) {
+            console.log("[v0] Boleto vencido encontrado:", {
+              numero: b.numero,
+              status: b.status,
+              vencimento: b.data_vencimento,
+              valor: b.valor,
+            })
+          }
+          return isVencido
+        })
+
+        console.log("[v0] Total de boletos vencidos:", boletosVencidos.length)
+        console.log("[v0] Boletos vencidos:", boletosVencidos)
+
         const dashboardStats: DashboardStats = {
           totalClientes: clientes.length,
           clientesComContrato: clientes.filter((c: any) => c.tem_contrato).length,
@@ -210,10 +224,10 @@ export default function DashboardPage() {
           totalBoletos: boletos.length,
           valorTotalBoletos: boletos.reduce((acc: number, b: any) => acc + Number(b.valor || 0), 0),
           boletosPendentes: boletos.filter((b: any) => b.status === "pendente").length,
-          boletosVencidos: boletos.filter((b: any) => b.status === "vencido").length,
+          boletosVencidos: boletosVencidos.length,
           totalOrcamentos: orcamentos.length,
-          orcamentosAbertos: orcamentos.filter((o: any) => o.status === "pendente").length,
-          orcamentosAprovados: orcamentos.filter((o: any) => o.status === "aprovado").length,
+          orcamentosAbertos: orcamentos.filter((o: any) => o.situacao === "pendente").length,
+          orcamentosAprovados: orcamentos.filter((o: any) => o.situacao === "concluido").length,
           valorTotalOrcamentos: orcamentos.reduce((acc: number, o: any) => acc + Number(o.valor_total || 0), 0),
         }
 
@@ -236,7 +250,7 @@ export default function DashboardPage() {
           cliente_nome: o.cliente_nome || "Cliente não encontrado",
           valor: Number(o.valor_total || 0),
           data: o.created_at,
-          status: o.status,
+          status: o.situacao,
           tipo: "orcamento" as const,
         }))
 
@@ -421,9 +435,9 @@ export default function DashboardPage() {
             </div>
             <p className="text-[10px] lg:text-xs text-purple-600 mt-0.5 lg:mt-1">
               <span className="hidden lg:inline">
-                {stats.orcamentosAbertos} abertos • {stats.orcamentosAprovados} aprovados
+                {stats.orcamentosAbertos} pendentes • {stats.orcamentosAprovados} concluídos
               </span>
-              <span className="lg:hidden">{stats.orcamentosAbertos} abertos</span>
+              <span className="lg:hidden">{stats.orcamentosAbertos} pendentes</span>
             </p>
           </CardContent>
         </Card>
@@ -434,7 +448,7 @@ export default function DashboardPage() {
             <AlertTriangle className="h-3 w-3 lg:h-5 lg:w-5 text-yellow-600" />
           </CardHeader>
           <CardContent className="p-3 lg:p-6 pt-0">
-            <div className="text-lg lg:text-3xl font-bold text-yellow-800">{stats.boletosVencidos}</div>
+            <div className="text-lg lg:text-3xl font-bold text-red-600">{stats.boletosVencidos}</div>
             <p className="text-[10px] lg:text-xs text-yellow-600 mt-0.5 lg:mt-1">
               <span className="hidden lg:inline">Boletos vencidos • {stats.boletosPendentes} pendentes</span>
               <span className="lg:hidden">Vencidos</span>
@@ -445,7 +459,6 @@ export default function DashboardPage() {
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
-        {/* Atividade Recente - Oculta no mobile */}
         <Card className="border-0 shadow-lg bg-white hidden md:block">
           <CardHeader className="p-4 lg:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -469,23 +482,20 @@ export default function DashboardPage() {
                 <p className="text-gray-600">Nenhuma atividade recente</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="font-semibold text-xs lg:text-sm w-20">Tipo</TableHead>
-                      <TableHead className="font-semibold text-xs lg:text-sm w-24">Número</TableHead>
-                      <TableHead className="font-semibold text-xs lg:text-sm min-w-32">Cliente</TableHead>
-                      <TableHead className="font-semibold text-xs lg:text-sm w-24 text-right">Valor</TableHead>
-                      <TableHead className="font-semibold text-xs lg:text-sm w-20">Status</TableHead>
-                      <TableHead className="font-semibold text-xs lg:text-sm w-16 hidden sm:table-cell">Data</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+              <div className="w-full">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 border-b">
+                      <th className="text-left p-3 text-xs lg:text-sm font-semibold text-gray-700 w-[80px]">Tipo</th>
+                      <th className="text-left p-3 text-xs lg:text-sm font-semibold text-gray-700 w-[100px]">Número</th>
+                      <th className="text-left p-3 text-xs lg:text-sm font-semibold text-gray-700">Cliente</th>
+                      <th className="text-right p-3 text-xs lg:text-sm font-semibold text-gray-700 w-[120px]">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {recentItems.map((item) => (
-                      <TableRow key={`${item.tipo}-${item.id}`} className="hover:bg-gray-50">
-                        <TableCell className="p-2 lg:p-4">
+                      <tr key={`${item.tipo}-${item.id}`} className="border-b hover:bg-gray-50">
+                        <td className="p-3">
                           <Badge
                             variant="outline"
                             className={`text-xs ${item.tipo === "boleto" ? "text-green-600 border-green-200" : "text-blue-600 border-blue-200"}`}
@@ -498,59 +508,25 @@ export default function DashboardPage() {
                             <span className="hidden sm:inline">{item.tipo === "boleto" ? "Boleto" : "Orçamento"}</span>
                             <span className="sm:hidden">{item.tipo === "boleto" ? "B" : "O"}</span>
                           </Badge>
-                        </TableCell>
-                        <TableCell className="font-medium text-xs lg:text-sm p-2 lg:p-4">{item.numero}</TableCell>
-                        <TableCell className="text-xs lg:text-sm p-2 lg:p-4">
-                          <div className="max-w-32 lg:max-w-48 truncate" title={item.cliente_nome}>
+                        </td>
+                        <td className="p-3 font-medium text-xs lg:text-sm">{item.numero}</td>
+                        <td className="p-3 text-xs lg:text-sm">
+                          <div className="max-w-[200px] truncate" title={item.cliente_nome}>
                             {item.cliente_nome}
                           </div>
-                        </TableCell>
-                        <TableCell className="font-semibold text-green-600 text-xs lg:text-sm text-right p-2 lg:p-4">
-                          {showValues ? (
-                            <>
-                              <span className="hidden sm:inline">{formatCurrency(item.valor)}</span>
-                              <span className="sm:hidden">
-                                {formatCurrency(item.valor).replace("R$", "R$").replace(".00", "")}
-                              </span>
-                            </>
-                          ) : (
-                            <span>R$ ••••</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="p-2 lg:p-4">{getStatusBadge(item.status, item.tipo)}</TableCell>
-                        <TableCell className="text-xs text-gray-500 p-2 lg:p-4 hidden sm:table-cell">
-                          {formatDate(item.data)}
-                        </TableCell>
-                        <TableCell className="p-2">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link
-                                  href={item.tipo === "boleto" ? `/financeiro` : `/orcamentos/${item.numero}`}
-                                  className="flex items-center"
-                                >
-                                  <ExternalLink className="h-4 w-4 mr-2" />
-                                  Ver Detalhes
-                                </Link>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                        <td className="p-3 font-semibold text-green-600 text-xs lg:text-sm text-right">
+                          {showValues ? formatCurrency(item.valor) : "R$ ••••"}
+                        </td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Ações Rápidas */}
         <Card className="border-0 shadow-lg bg-white">
           <CardHeader className="p-4 lg:p-6">
             <CardTitle className="text-lg lg:text-xl font-bold text-gray-900">Ações Rápidas</CardTitle>
@@ -559,61 +535,61 @@ export default function DashboardPage() {
           <CardContent className="space-y-2 lg:space-y-3 p-4 lg:p-6">
             <div className="grid grid-cols-1 gap-2">
               <Button
-                className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white justify-start h-9 lg:h-12 text-sm lg:text-base"
+                className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white justify-start h-9 text-sm"
                 asChild
               >
                 <Link href="/ordem-servico/nova">
-                  <Wrench className="h-4 w-4 mr-2 lg:mr-3" />
+                  <Wrench className="h-3 w-3 mr-2" />
                   Nova OS
                 </Link>
               </Button>
 
               <Button
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white justify-start h-9 lg:h-12 text-sm lg:text-base"
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white justify-start h-9 text-sm"
                 asChild
               >
                 <Link href="/orcamentos/novo">
-                  <Plus className="h-4 w-4 mr-2 lg:mr-3" />
+                  <Plus className="h-3 w-3 mr-2" />
                   Novo Orçamento
                 </Link>
               </Button>
 
               <Button
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white justify-start h-9 lg:h-12 text-sm lg:text-base"
+                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white justify-start h-9 text-sm"
                 asChild
               >
                 <Link href="/financeiro/novo">
-                  <Plus className="h-4 w-4 mr-2 lg:mr-3" />
+                  <Plus className="h-3 w-3 mr-2" />
                   Novo Boleto
                 </Link>
               </Button>
 
               <Button
-                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white justify-start h-9 lg:h-12 text-sm lg:text-base"
+                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white justify-start h-9 text-sm"
                 asChild
               >
                 <Link href="/clientes/novo">
-                  <Plus className="h-4 w-4 mr-2 lg:mr-3" />
+                  <Plus className="h-3 w-3 mr-2" />
                   Novo Cliente
                 </Link>
               </Button>
 
               <Button
-                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white justify-start h-9 lg:h-12 text-sm lg:text-base"
+                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white justify-start h-9 text-sm"
                 asChild
               >
                 <Link href="/produtos/novo">
-                  <Plus className="h-4 w-4 mr-2 lg:mr-3" />
+                  <Plus className="h-3 w-3 mr-2" />
                   Novo Produto
                 </Link>
               </Button>
 
               <Button
-                className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white justify-start h-9 lg:h-12 text-sm lg:text-base"
+                className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white justify-start h-9 text-sm"
                 asChild
               >
                 <Link href="/contratos/proposta/nova">
-                  <FileContract className="h-4 w-4 mr-2 lg:mr-3" />
+                  <FileContract className="h-3 w-3 mr-2" />
                   Nova Proposta
                 </Link>
               </Button>

@@ -13,7 +13,11 @@ export async function GET() {
     const [totalClientesResult] = await pool.execute("SELECT COUNT(*) as total FROM clientes WHERE ativo = true")
     const totalClientes = (totalClientesResult as any[])[0]?.total || 0
 
-    const [boletosVencidosResult] = await pool.execute("SELECT COUNT(*) as total FROM boletos WHERE status = 'vencido'")
+    const [boletosVencidosResult] = await pool.execute(`
+      SELECT COUNT(*) as total 
+      FROM boletos 
+      WHERE (status = 'vencido' OR (status = 'pendente' AND data_vencimento < CURDATE()))
+    `)
     const boletosVencidos = (boletosVencidosResult as any[])[0]?.total || 0
 
     const [orcamentosAbertosResult] = await pool.execute(
