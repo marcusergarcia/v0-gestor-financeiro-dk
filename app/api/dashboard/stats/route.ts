@@ -13,13 +13,29 @@ export async function GET() {
     const [totalClientesResult] = await pool.execute("SELECT COUNT(*) as total FROM clientes WHERE ativo = true")
     const totalClientes = (totalClientesResult as any[])[0]?.total || 0
 
-    const [boletosVencidosResult] = await pool.execute(`
-      SELECT COUNT(*) as total 
+    const [boletosResult] = await pool.execute(`
+      SELECT id, status, data_vencimento 
       FROM boletos 
-      WHERE status = 'vencido' 
-         OR (status = 'pendente' AND DATE(data_vencimento) < CURDATE())
+      WHERE status IN ('pendente', 'vencido')
     `)
-    const boletosVencidos = (boletosVencidosResult as any[])[0]?.total || 0
+    const boletos = boletosResult as any[]
+
+    // Calcular boletos vencidos usando a mesma lógica da página Financeiro
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+
+    const boletosVencidos = boletos.filter((b) => {
+      if (b.status === "vencido") return true
+      if (b.status === "pendente" && b.data_vencimento) {
+        const vencimento = new Date(b.data_vencimento)
+        vencimento.setHours(0, 0, 0, 0)
+        return vencimento < hoje
+      }
+      return false
+    }).length
+
+    console.log("[v0] DEBUG: Boletos vencidos calculados:", boletosVencidos)
+    console.log("[v0] DEBUG: Total de boletos pendentes/vencidos:", boletos.length)
 
     const [orcamentosAbertosResult] = await pool.execute(
       "SELECT COUNT(*) as total FROM orcamentos WHERE status = 'pendente'",

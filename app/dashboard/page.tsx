@@ -198,24 +198,35 @@ export default function DashboardPage() {
         const boletos = boletosData.data || []
         const orcamentos = orcamentosData.data || []
 
-        console.log("[v0] === DEBUG BOLETOS VENCIDOS ===")
-        console.log("[v0] Total de boletos:", boletos.length)
+        const hoje = new Date()
+        hoje.setHours(0, 0, 0, 0)
 
         const boletosVencidos = boletos.filter((b: any) => {
-          const isVencido = b.status === "vencido"
-          if (isVencido) {
-            console.log("[v0] Boleto vencido encontrado:", {
-              numero: b.numero,
-              status: b.status,
-              vencimento: b.data_vencimento,
-              valor: b.valor,
-            })
+          if (b.status === "vencido") {
+            return true
           }
-          return isVencido
+
+          if (b.status === "pendente" && b.data_vencimento) {
+            const vencimento = new Date(b.data_vencimento)
+            vencimento.setHours(0, 0, 0, 0)
+            return vencimento < hoje
+          }
+
+          return false
         })
 
+        console.log("[v0] === DEBUG BOLETOS VENCIDOS ===")
+        console.log("[v0] Total de boletos:", boletos.length)
         console.log("[v0] Total de boletos vencidos:", boletosVencidos.length)
-        console.log("[v0] Boletos vencidos:", boletosVencidos)
+        console.log(
+          "[v0] Boletos vencidos:",
+          boletosVencidos.map((b: any) => ({
+            numero: b.numero,
+            status: b.status,
+            vencimento: b.data_vencimento,
+            valor: b.valor,
+          })),
+        )
 
         const dashboardStats: DashboardStats = {
           totalClientes: clientes.length,
