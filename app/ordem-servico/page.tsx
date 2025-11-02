@@ -44,6 +44,61 @@ export default function OrdemServicoPage() {
   })
   const router = useRouter()
 
+  const filterByPeriod = (ordens: OrdemServico[]) => {
+    if (periodoFilter === "todos") return ordens
+
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+
+    return ordens.filter((os) => {
+      if (!os.data_atual) {
+        return false
+      }
+
+      try {
+        const dataOS = new Date(os.data_atual)
+
+        if (isNaN(dataOS.getTime())) {
+          return false
+        }
+
+        dataOS.setHours(0, 0, 0, 0)
+
+        switch (periodoFilter) {
+          case "mes-anterior": {
+            const mesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)
+            const fimMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth(), 0)
+            return dataOS >= mesAnterior && dataOS <= fimMesAnterior
+          }
+          case "mes-atual": {
+            const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+            const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
+            return dataOS >= inicioMes && dataOS <= fimMes
+          }
+          case "mes-posterior": {
+            const mesPosterior = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1)
+            const fimMesPosterior = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0)
+            return dataOS >= mesPosterior && dataOS <= fimMesPosterior
+          }
+          case "trimestre": {
+            const inicioTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1)
+            const fimTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
+            return dataOS >= inicioTrimestre && dataOS <= fimTrimestre
+          }
+          case "semestre": {
+            const inicioSemestre = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1)
+            const fimSemestre = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
+            return dataOS >= inicioSemestre && dataOS <= fimSemestre
+          }
+          default:
+            return true
+        }
+      } catch (error) {
+        return false
+      }
+    })
+  }
+
   const ordensFiltered = useMemo(() => {
     let filtered = ordensServico
 
@@ -118,48 +173,6 @@ export default function OrdemServicoPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const filterByPeriod = (ordens: OrdemServico[]) => {
-    if (periodoFilter === "todos") return ordens
-
-    const hoje = new Date()
-    hoje.setHours(0, 0, 0, 0)
-
-    return ordens.filter((os) => {
-      const dataOS = new Date(os.data_atual)
-      dataOS.setHours(0, 0, 0, 0)
-
-      switch (periodoFilter) {
-        case "mes-anterior": {
-          const mesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)
-          const fimMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth(), 0)
-          return dataOS >= mesAnterior && dataOS <= fimMesAnterior
-        }
-        case "mes-atual": {
-          const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-          const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
-          return dataOS >= inicioMes && dataOS <= fimMes
-        }
-        case "mes-posterior": {
-          const mesPosterior = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1)
-          const fimMesPosterior = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0)
-          return dataOS >= mesPosterior && dataOS <= fimMesPosterior
-        }
-        case "trimestre": {
-          const inicioTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1)
-          const fimTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
-          return dataOS >= inicioTrimestre && dataOS <= fimTrimestre
-        }
-        case "semestre": {
-          const inicioSemestre = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1)
-          const fimSemestre = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
-          return dataOS >= inicioSemestre && dataOS <= fimSemestre
-        }
-        default:
-          return true
-      }
-    })
   }
 
   const handleDelete = async (id: number) => {
