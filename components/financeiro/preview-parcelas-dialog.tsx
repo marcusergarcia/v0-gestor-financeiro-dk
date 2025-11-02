@@ -63,58 +63,58 @@ export function PreviewParcelasDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto border-0 shadow-2xl">
-        <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white -m-6 mb-6 p-6 rounded-t-lg">
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <div className="p-2 bg-white/20 rounded-lg">
-              <FileText className="h-5 w-5" />
+      <DialogContent className="max-w-[95vw] w-[1400px] border-0 shadow-2xl">
+        <DialogHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white -m-6 mb-4 p-5 rounded-t-lg">
+          <DialogTitle className="text-lg font-bold flex items-center gap-2">
+            <div className="p-1.5 bg-white/20 rounded-lg">
+              <FileText className="h-4 w-4" />
             </div>
             Preview das Parcelas
           </DialogTitle>
-          <DialogDescription className="text-blue-100">
+          <DialogDescription className="text-blue-100 text-sm">
             Confirme as parcelas antes de emitir os boletos
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Informações do Cliente e Resumo */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card className="bg-blue-50 border-blue-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg text-blue-800 flex items-center gap-2">
-                  <User className="h-5 w-5" />
+              <CardHeader className="pb-2 pt-3 px-4">
+                <CardTitle className="text-base text-blue-800 flex items-center gap-2">
+                  <User className="h-4 w-4" />
                   Informações do Cliente
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <p className="font-medium">{cliente?.nome || "Não informado"}</p>
-                {cliente?.cnpj && <p className="text-sm text-gray-600">CNPJ: {cliente.cnpj}</p>}
-                {cliente?.cpf && <p className="text-sm text-gray-600">CPF: {cliente.cpf}</p>}
-                {cliente?.email && <p className="text-sm text-gray-600">Email: {cliente.email}</p>}
+              <CardContent className="space-y-1.5 px-4 pb-3">
+                <p className="font-medium text-sm">{cliente?.nome || "Não informado"}</p>
+                {cliente?.cnpj && <p className="text-xs text-gray-600">CNPJ: {cliente.cnpj}</p>}
+                {cliente?.cpf && <p className="text-xs text-gray-600">CPF: {cliente.cpf}</p>}
+                {cliente?.email && <p className="text-xs text-gray-600">Email: {cliente.email}</p>}
               </CardContent>
             </Card>
 
             <Card className="bg-green-50 border-green-200">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg text-green-800 flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
+              <CardHeader className="pb-2 pt-3 px-4">
+                <CardTitle className="text-base text-green-800 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
                   Resumo Financeiro
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between">
+              <CardContent className="space-y-1.5 px-4 pb-3">
+                <div className="flex justify-between text-sm">
                   <span>Número da Nota:</span>
                   <span className="font-medium">{numeroNota}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span>Valor Total:</span>
                   <span className="font-bold text-green-700">{formatarMoeda(valorTotal)}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span>Forma de Pagamento:</span>
                   <span className="font-medium">{formaPagamento}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-sm">
                   <span>Total de Parcelas:</span>
                   <span className="font-medium">{parcelas.length}</span>
                 </div>
@@ -124,34 +124,38 @@ export function PreviewParcelasDialog({
 
           {/* Tabela de Parcelas */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
+            <CardHeader className="pb-2 pt-3 px-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Calendar className="h-4 w-4" />
                 Detalhamento das Parcelas
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <div className="rounded-lg border border-gray-200">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50">
-                      <TableHead className="font-semibold">Parcela</TableHead>
-                      <TableHead className="font-semibold">Número do Boleto</TableHead>
-                      <TableHead className="font-semibold">Valor</TableHead>
-                      <TableHead className="font-semibold">Vencimento</TableHead>
-                      <TableHead className="font-semibold">Situação</TableHead>
+                      <TableHead className="font-semibold w-20 text-xs">Parcela</TableHead>
+                      <TableHead className="font-semibold w-44 text-xs">Número do Boleto</TableHead>
+                      <TableHead className="font-semibold w-32 text-xs">Valor</TableHead>
+                      <TableHead className="font-semibold w-28 text-xs">Vencimento</TableHead>
+                      <TableHead className="font-semibold w-24 text-xs">Situação</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {parcelas.map((parcela) => (
                       <TableRow key={parcela.parcela} className="hover:bg-gray-50">
-                        <TableCell className="font-medium">
-                          <Badge variant="outline">{parcela.parcela}</Badge>
+                        <TableCell className="font-medium py-2">
+                          <Badge variant="outline" className="text-xs">
+                            {parcela.parcela}
+                          </Badge>
                         </TableCell>
-                        <TableCell className="font-mono">{parcela.numero_boleto}</TableCell>
-                        <TableCell className="font-semibold text-green-600">{formatarMoeda(parcela.valor)}</TableCell>
-                        <TableCell>{formatarData(parcela.vencimento)}</TableCell>
-                        <TableCell>{getStatusBadge(parcela.status)}</TableCell>
+                        <TableCell className="font-mono text-xs py-2">{parcela.numero_boleto}</TableCell>
+                        <TableCell className="font-semibold text-green-600 text-xs py-2">
+                          {formatarMoeda(parcela.valor)}
+                        </TableCell>
+                        <TableCell className="text-xs py-2">{formatarData(parcela.vencimento)}</TableCell>
+                        <TableCell className="py-2">{getStatusBadge(parcela.status)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -162,13 +166,13 @@ export function PreviewParcelasDialog({
 
           {/* Resumo Final */}
           <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5 text-green-600" />
-                  <span className="font-medium">Total Geral:</span>
+                  <span className="font-medium text-sm">Total Geral:</span>
                 </div>
-                <span className="text-2xl font-bold text-green-700">
+                <span className="text-xl font-bold text-green-700">
                   {formatarMoeda(parcelas.reduce((acc, p) => acc + p.valor, 0))}
                 </span>
               </div>
@@ -176,12 +180,12 @@ export function PreviewParcelasDialog({
           </Card>
 
           {/* Botões de Ação */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex justify-end gap-3 pt-2 border-t">
             <Button
               variant="outline"
               onClick={onVoltar}
               disabled={loading}
-              className="border-gray-200 hover:bg-gray-50 bg-transparent"
+              className="border-gray-200 hover:bg-gray-50 bg-transparent text-sm"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar
@@ -189,7 +193,7 @@ export function PreviewParcelasDialog({
             <Button
               onClick={onEmitir}
               disabled={loading}
-              className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
+              className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200 text-sm"
             >
               {loading ? (
                 <>
