@@ -187,70 +187,82 @@ export default function ProdutosPage() {
   }
 
   const renderProdutoTable = (produtosList: Produto[]) => (
-    <div className="overflow-x-auto">
+    <div>
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50">
-            <TableHead className="font-semibold">Código</TableHead>
-            <TableHead className="font-semibold">NCM</TableHead>
-            <TableHead className="font-semibold">Descrição</TableHead>
-            <TableHead className="font-semibold">Categoria</TableHead>
-            <TableHead className="font-semibold">Marca</TableHead>
-            <TableHead className="font-semibold">Valor</TableHead>
-            <TableHead className="font-semibold">Estoque</TableHead>
-            <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="text-right font-semibold">Ações</TableHead>
+            <TableHead className="font-semibold w-[100px]">Código</TableHead>
+            <TableHead className="font-semibold w-[90px]">NCM</TableHead>
+            <TableHead className="font-semibold min-w-[200px]">Descrição</TableHead>
+            <TableHead className="font-semibold w-[120px]">Categoria</TableHead>
+            <TableHead className="font-semibold w-[110px]">Marca</TableHead>
+            <TableHead className="font-semibold w-[100px]">Valor</TableHead>
+            <TableHead className="font-semibold w-[110px]">Estoque</TableHead>
+            <TableHead className="font-semibold w-[80px]">Status</TableHead>
+            <TableHead className="text-right font-semibold w-[100px]">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {produtosList.map((produto) => (
             <TableRow key={produto.id} className="hover:bg-gray-50 transition-colors">
-              <TableCell className="font-mono font-medium">
-                <Badge variant="outline" className="font-mono">
+              <TableCell className="font-mono text-xs">
+                <Badge variant="outline" className="font-mono text-xs">
                   {produto.codigo}
                 </Badge>
               </TableCell>
               <TableCell>
                 {produto.ncm ? (
-                  <Badge className="bg-purple-100 text-purple-800 font-mono text-xs">{produto.ncm}</Badge>
+                  <Badge className="bg-purple-100 text-purple-800 font-mono text-[10px]">{produto.ncm}</Badge>
                 ) : (
-                  <Badge variant="outline" className="text-gray-500 border-gray-300 text-xs">
+                  <Badge variant="outline" className="text-gray-500 border-gray-300 text-[10px]">
                     Sem NCM
                   </Badge>
                 )}
               </TableCell>
-              <TableCell className="font-medium">{produto.descricao}</TableCell>
+              <TableCell className="font-medium text-sm max-w-[200px] truncate" title={produto.descricao}>
+                {produto.descricao}
+              </TableCell>
               <TableCell>
                 {produto.categoria_nome && produto.categoria_nome !== "0" ? (
-                  <Badge className="bg-blue-100 text-blue-800">{produto.categoria_nome}</Badge>
+                  <Badge
+                    className="bg-blue-100 text-blue-800 text-xs truncate max-w-[110px]"
+                    title={produto.categoria_nome}
+                  >
+                    {produto.categoria_nome}
+                  </Badge>
                 ) : (
-                  <Badge variant="outline" className="text-gray-500 border-gray-300">
-                    Nenhuma categoria
+                  <Badge variant="outline" className="text-gray-500 border-gray-300 text-xs">
+                    Sem cat.
                   </Badge>
                 )}
               </TableCell>
               <TableCell>
                 {produto.marca_nome && produto.marca_nome !== "0" ? (
-                  <Badge className="bg-green-100 text-green-800">{produto.marca_nome}</Badge>
+                  <Badge
+                    className="bg-green-100 text-green-800 text-xs truncate max-w-[100px]"
+                    title={produto.marca_nome}
+                  >
+                    {produto.marca_nome}
+                  </Badge>
                 ) : (
-                  <Badge variant="outline" className="text-gray-500 border-gray-300">
-                    Nenhuma marca
+                  <Badge variant="outline" className="text-gray-500 border-gray-300 text-xs">
+                    Sem marca
                   </Badge>
                 )}
               </TableCell>
-              <TableCell className="font-semibold text-green-600">{formatCurrency(produto.valor_unitario)}</TableCell>
+              <TableCell className="font-semibold text-green-600 text-sm">
+                {formatCurrency(produto.valor_unitario)}
+              </TableCell>
               <TableCell>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{produto.estoque}</span>
+                <div className="flex items-center gap-1">
+                  <span className="font-medium text-sm">{produto.estoque}</span>
                   {produto.estoque <= produto.estoque_minimo && produto.estoque_minimo > 0 ? (
-                    <Badge className="bg-red-100 text-red-800 animate-pulse">
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      Baixo
+                    <Badge className="bg-red-100 text-red-800 animate-pulse text-[10px] px-1">
+                      <AlertTriangle className="h-3 w-3" />
                     </Badge>
                   ) : (
-                    <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      OK
+                    <Badge className="bg-green-100 text-green-800 text-[10px] px-1">
+                      <CheckCircle className="h-3 w-3" />
                     </Badge>
                   )}
                 </div>
@@ -258,13 +270,13 @@ export default function ProdutosPage() {
               <TableCell>
                 <Badge
                   variant={produto.ativo ? "default" : "secondary"}
-                  className={produto.ativo ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
+                  className={`text-xs ${produto.ativo ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
                 >
                   {produto.ativo ? "Ativo" : "Inativo"}
                 </Badge>
               </TableCell>
               <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-end gap-1">
                   <Button
                     variant="outline"
                     size="sm"
@@ -283,9 +295,9 @@ export default function ProdutosPage() {
                         router.push(`/produtos/${produto.id}/editar`)
                       }
                     }}
-                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent"
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-8 w-8 p-0"
                   >
-                    <Edit className="h-4 w-4" />
+                    <Edit className="h-3 w-3" />
                   </Button>
                   <ProdutoDeleteDialog
                     produto={produto}
@@ -320,44 +332,48 @@ export default function ProdutosPage() {
   )
 
   const renderServicoTable = (servicosList: Produto[]) => (
-    <div className="overflow-x-auto">
+    <div>
       <Table>
         <TableHeader>
           <TableRow className="bg-gray-50">
-            <TableHead className="font-semibold">Código</TableHead>
-            <TableHead className="font-semibold">Descrição</TableHead>
-            <TableHead className="font-semibold">Categoria</TableHead>
-            <TableHead className="font-semibold">Valor Mão de Obra</TableHead>
-            <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="text-right font-semibold">Ações</TableHead>
+            <TableHead className="font-semibold w-[100px]">Código</TableHead>
+            <TableHead className="font-semibold min-w-[250px]">Descrição</TableHead>
+            <TableHead className="font-semibold w-[120px]">Categoria</TableHead>
+            <TableHead className="font-semibold w-[140px]">Valor Mão de Obra</TableHead>
+            <TableHead className="font-semibold w-[80px]">Status</TableHead>
+            <TableHead className="text-right font-semibold w-[100px]">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {servicosList.map((servico) => (
             <TableRow key={servico.id} className="hover:bg-gray-50 transition-colors">
-              <TableCell className="font-mono font-medium">
-                <Badge variant="outline" className="font-mono">
+              <TableCell className="font-mono text-xs">
+                <Badge variant="outline" className="font-mono text-xs">
                   {servico.codigo}
                 </Badge>
               </TableCell>
-              <TableCell className="font-medium">{servico.descricao}</TableCell>
+              <TableCell className="font-medium text-sm max-w-[250px] truncate" title={servico.descricao}>
+                {servico.descricao}
+              </TableCell>
               <TableCell>
-                <Badge className="bg-orange-100 text-orange-800">
+                <Badge className="bg-orange-100 text-orange-800 text-xs">
                   <Wrench className="h-3 w-3 mr-1" />
                   Serviços
                 </Badge>
               </TableCell>
-              <TableCell className="font-semibold text-orange-600">{formatCurrency(servico.valor_mao_obra)}</TableCell>
+              <TableCell className="font-semibold text-orange-600 text-sm">
+                {formatCurrency(servico.valor_mao_obra)}
+              </TableCell>
               <TableCell>
                 <Badge
                   variant={servico.ativo ? "default" : "secondary"}
-                  className={servico.ativo ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
+                  className={`text-xs ${servico.ativo ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
                 >
                   {servico.ativo ? "Ativo" : "Inativo"}
                 </Badge>
               </TableCell>
               <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-end gap-1">
                   <Button
                     variant="outline"
                     size="sm"
@@ -372,9 +388,9 @@ export default function ProdutosPage() {
                       })
                       setServicoDialogOpen(true)
                     }}
-                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent"
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-8 w-8 p-0"
                   >
-                    <Edit className="h-4 w-4" />
+                    <Edit className="h-3 w-3" />
                   </Button>
                   <ProdutoDeleteDialog
                     produto={servico}
@@ -399,6 +415,146 @@ export default function ProdutosPage() {
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Cadastrar Primeiro Serviço
+                </Button>
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  )
+
+  const renderCategoriaTable = (categoriasList: Categoria[]) => (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-gray-50">
+            <TableHead className="font-semibold w-[100px]">Código</TableHead>
+            <TableHead className="font-semibold min-w-[200px]">Nome</TableHead>
+            <TableHead className="font-semibold w-[100px]">Status</TableHead>
+            <TableHead className="text-right font-semibold w-[100px]">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {categoriasList.map((categoria) => (
+            <TableRow key={categoria.id} className="hover:bg-gray-50 transition-colors">
+              <TableCell className="font-mono font-medium">
+                <Badge variant="outline" className="font-mono">
+                  {categoria.codigo}
+                </Badge>
+              </TableCell>
+              <TableCell className="font-medium max-w-[200px] truncate" title={categoria.nome}>
+                {categoria.nome}
+              </TableCell>
+              <TableCell>
+                <Badge
+                  variant={categoria.ativo ? "default" : "secondary"}
+                  className={`text-xs ${categoria.ativo ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
+                >
+                  {categoria.ativo ? "Ativo" : "Inativo"}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/produtos/categorias/${categoria.id}/editar`)}
+                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-8 w-8 p-0"
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
+                  <CategoriaDeleteDialog categoria={categoria} onSuccess={fetchCategorias} />
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+          {categoriasList.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center py-12">
+                <Tag className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma categoria encontrada</h3>
+                <p className="text-gray-600 mb-4">Comece cadastrando sua primeira categoria</p>
+                <Button
+                  onClick={() => router.push("/produtos/categorias/nova")}
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Cadastrar Primeira Categoria
+                </Button>
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  )
+
+  const renderMarcaTable = (marcasList: Marca[]) => (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-gray-50">
+            <TableHead className="font-semibold min-w-[200px]">Nome</TableHead>
+            <TableHead className="font-semibold w-[100px]">Sigla</TableHead>
+            <TableHead className="font-semibold w-[100px]">Contador</TableHead>
+            <TableHead className="font-semibold w-[100px]">Status</TableHead>
+            <TableHead className="text-right font-semibold w-[100px]">Ações</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {marcasList.map((marca) => (
+            <TableRow key={marca.id} className="hover:bg-gray-50 transition-colors">
+              <TableCell className="font-medium max-w-[200px] truncate" title={marca.nome}>
+                {marca.nome}
+              </TableCell>
+              <TableCell className="font-mono">
+                {marca.sigla ? (
+                  <Badge variant="outline" className="font-mono">
+                    {marca.sigla}
+                  </Badge>
+                ) : (
+                  <span className="text-gray-400">-</span>
+                )}
+              </TableCell>
+              <TableCell>
+                <Badge className="bg-purple-100 text-purple-800 text-xs">{marca.contador}</Badge>
+              </TableCell>
+              <TableCell>
+                <Badge
+                  variant={marca.ativo ? "default" : "secondary"}
+                  className={`text-xs ${marca.ativo ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
+                >
+                  {marca.ativo ? "Ativo" : "Inativo"}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/produtos/marcas/${marca.id}/editar`)}
+                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 bg-transparent h-8 w-8 p-0"
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
+                  <MarcaDeleteDialog marca={marca} onSuccess={fetchMarcas} />
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+          {marcasList.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center py-12">
+                <Award className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma marca encontrada</h3>
+                <p className="text-gray-600 mb-4">Comece cadastrando sua primeira marca</p>
+                <Button
+                  onClick={() => router.push("/produtos/marcas/nova")}
+                  className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Cadastrar Primeira Marca
                 </Button>
               </TableCell>
             </TableRow>
@@ -601,69 +757,7 @@ export default function ProdutosPage() {
                   />
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50">
-                        <TableHead className="font-semibold">Código</TableHead>
-                        <TableHead className="font-semibold">Nome</TableHead>
-                        <TableHead className="font-semibold">Status</TableHead>
-                        <TableHead className="text-right font-semibold">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {categorias.map((categoria) => (
-                        <TableRow key={categoria.id} className="hover:bg-gray-50 transition-colors">
-                          <TableCell className="font-mono font-medium">
-                            <Badge variant="outline" className="font-mono">
-                              {categoria.codigo}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">{categoria.nome}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={categoria.ativo ? "default" : "secondary"}
-                              className={categoria.ativo ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
-                            >
-                              {categoria.ativo ? "Ativo" : "Inativo"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => router.push(`/produtos/categorias/${categoria.id}/editar`)}
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <CategoriaDeleteDialog categoria={categoria} onSuccess={fetchCategorias} />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {categorias.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center py-12">
-                            <Tag className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma categoria encontrada</h3>
-                            <p className="text-gray-600 mb-4">Comece cadastrando sua primeira categoria</p>
-                            <Button
-                              onClick={() => router.push("/produtos/categorias/nova")}
-                              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Cadastrar Primeira Categoria
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
+              <CardContent className="p-0">{renderCategoriaTable(categorias)}</CardContent>
             </Card>
           </TabsContent>
 
@@ -695,77 +789,7 @@ export default function ProdutosPage() {
                   />
                 </div>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50">
-                        <TableHead className="font-semibold">Nome</TableHead>
-                        <TableHead className="font-semibold">Sigla</TableHead>
-                        <TableHead className="font-semibold">Contador</TableHead>
-                        <TableHead className="font-semibold">Status</TableHead>
-                        <TableHead className="text-right font-semibold">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {marcas.map((marca) => (
-                        <TableRow key={marca.id} className="hover:bg-gray-50 transition-colors">
-                          <TableCell className="font-medium">{marca.nome}</TableCell>
-                          <TableCell className="font-mono">
-                            {marca.sigla ? (
-                              <Badge variant="outline" className="font-mono">
-                                {marca.sigla}
-                              </Badge>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className="bg-purple-100 text-purple-800">{marca.contador}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={marca.ativo ? "default" : "secondary"}
-                              className={marca.ativo ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}
-                            >
-                              {marca.ativo ? "Ativo" : "Inativo"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => router.push(`/produtos/marcas/${marca.id}/editar`)}
-                                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 bg-transparent"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <MarcaDeleteDialog marca={marca} onSuccess={fetchMarcas} />
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {marcas.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-12">
-                            <Award className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma marca encontrada</h3>
-                            <p className="text-gray-600 mb-4">Comece cadastrando sua primeira marca</p>
-                            <Button
-                              onClick={() => router.push("/produtos/marcas/nova")}
-                              className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white"
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Cadastrar Primeira Marca
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
+              <CardContent className="p-0">{renderMarcaTable(marcas)}</CardContent>
             </Card>
           </TabsContent>
         </Tabs>
