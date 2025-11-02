@@ -468,7 +468,11 @@ export default function OrdemServicoPage() {
                       <TableCell>{os.cliente_nome}</TableCell>
                       <TableCell>{getTipoServicoLabel(os.tipo_servico)}</TableCell>
                       <TableCell>{os.tecnico_name}</TableCell>
-                      <TableCell>{new Date(os.data_atual).toLocaleDateString("pt-BR")}</TableCell>
+                      <TableCell>
+                        {os.data_atual
+                          ? new Date(os.data_atual.split("T")[0] + "T12:00:00").toLocaleDateString("pt-BR")
+                          : "Não informada"}
+                      </TableCell>
                       <TableCell>{getStatusBadge(os.situacao)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -516,7 +520,9 @@ export default function OrdemServicoPage() {
                           <span className="font-bold text-orange-600 text-sm">OS {os.numero}</span>
                         </div>
                         <div className="text-xs text-gray-500">
-                          {new Date(os.data_atual).toLocaleDateString("pt-BR")}
+                          {os.data_atual
+                            ? new Date(os.data_atual.split("T")[0] + "T12:00:00").toLocaleDateString("pt-BR")
+                            : "Não informada"}
                         </div>
                       </div>
                       <div className="flex-shrink-0">{getStatusBadge(os.situacao)}</div>
