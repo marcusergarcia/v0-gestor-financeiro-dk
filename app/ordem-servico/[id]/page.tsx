@@ -278,35 +278,35 @@ export default function VisualizarOrdemServicoPage() {
   }
 
   const getClienteNome = () => {
-    return cliente?.nome || ordemServico?.cliente_nome || "Cliente não informado"
+    return cliente?.nome || ordemServico?.cliente?.nome || ordemServico?.cliente_nome || "Cliente não informado"
   }
 
   const getClienteTelefone = () => {
-    return cliente?.telefone || ordemServico?.cliente_telefone || null
+    return cliente?.telefone || ordemServico?.cliente?.telefone || ordemServico?.cliente_telefone || null
   }
 
   const getClienteEmail = () => {
-    return cliente?.email || ordemServico?.cliente_email || null
+    return cliente?.email || ordemServico?.cliente?.email || ordemServico?.cliente_email || null
   }
 
   const getClienteEndereco = () => {
-    return cliente?.endereco || ordemServico?.cliente_endereco || null
+    return cliente?.endereco || ordemServico?.cliente?.endereco || ordemServico?.cliente_endereco || null
   }
 
   const getClienteBairro = () => {
-    return cliente?.bairro || null
+    return cliente?.bairro || ordemServico?.cliente?.bairro || null
   }
 
   const getClienteCidade = () => {
-    return cliente?.cidade || ordemServico?.cliente_cidade || null
+    return cliente?.cidade || ordemServico?.cliente?.cidade || ordemServico?.cliente_cidade || null
   }
 
   const getClienteEstado = () => {
-    return cliente?.estado || ordemServico?.cliente_estado || null
+    return cliente?.estado || ordemServico?.cliente?.estado || ordemServico?.cliente_estado || null
   }
 
   const getClienteCep = () => {
-    return cliente?.cep || null
+    return cliente?.cep || ordemServico?.cliente?.cep || null
   }
 
   const getEnderecoCompleto = () => {

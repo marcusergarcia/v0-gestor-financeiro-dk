@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,9 +32,10 @@ export default function OrdemServicoPage() {
   const [loading, setLoading] = useState(true)
   const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([])
   const [logoMenu, setLogoMenu] = useState<string | null>(null)
-  const [search, setSearch] = useState("")
+  const [searchInput, setSearchInput] = useState("")
   const [situacaoFilter, setSituacaoFilter] = useState("todas")
   const [periodoFilter, setPeriodoFilter] = useState("todos")
+  const [tipoServicoFilter, setTipoServicoFilter] = useState("todos")
   const [stats, setStats] = useState({
     total: 0,
     abertas: 0,
@@ -43,15 +44,43 @@ export default function OrdemServicoPage() {
   })
   const router = useRouter()
 
+  const ordensFiltered = useMemo(() => {
+    let filtered = ordensServico
+
+    // Apply search filter
+    if (searchInput.trim()) {
+      const searchLower = searchInput.toLowerCase()
+      filtered = filtered.filter((os) => {
+        return (
+          os.numero?.toLowerCase().includes(searchLower) ||
+          os.cliente_nome?.toLowerCase().includes(searchLower) ||
+          os.tecnico_name?.toLowerCase().includes(searchLower) ||
+          os.tipo_servico?.toLowerCase().includes(searchLower)
+        )
+      })
+    }
+
+    // Apply tipo de serviço filter
+    if (tipoServicoFilter !== "todos") {
+      filtered = filtered.filter((os) => os.tipo_servico === tipoServicoFilter)
+    }
+
+    // Apply período filter
+    if (periodoFilter !== "todos") {
+      filtered = filterByPeriod(filtered)
+    }
+
+    return filtered
+  }, [ordensServico, searchInput, tipoServicoFilter, periodoFilter])
+
   useEffect(() => {
     carregarDados()
-  }, [search, situacaoFilter, periodoFilter])
+  }, [situacaoFilter])
 
   const carregarDados = async () => {
     try {
       setLoading(true)
 
-      // Carregar logo do menu
       const logoResponse = await fetch("/api/configuracoes/logos")
       const logoResult = await logoResponse.json()
 
@@ -62,9 +91,7 @@ export default function OrdemServicoPage() {
         }
       }
 
-      // Carregar ordens de serviço
       const params = new URLSearchParams()
-      if (search) params.append("search", search)
       if (situacaoFilter && situacaoFilter !== "todas") params.append("situacao", situacaoFilter)
       params.append("limit", "50")
 
@@ -72,14 +99,8 @@ export default function OrdemServicoPage() {
       const data = await response.json()
 
       if (data.success) {
-        // Aplicar filtro de período no frontend
-        let ordensFiltered = data.data
-        if (periodoFilter !== "todos") {
-          ordensFiltered = filterByPeriod(ordensFiltered)
-        }
-        setOrdensServico(ordensFiltered)
+        setOrdensServico(data.data)
 
-        // Calcular estatísticas (sempre baseado no total, não no filtro)
         const statsResponse = await fetch("/api/ordens-servico?limit=1000")
         const statsData = await statsResponse.json()
 
@@ -99,7 +120,6 @@ export default function OrdemServicoPage() {
     }
   }
 
-  // Função para filtrar por período
   const filterByPeriod = (ordens: OrdemServico[]) => {
     if (periodoFilter === "todos") return ordens
 
@@ -278,7 +298,6 @@ export default function OrdemServicoPage() {
         </div>
       </div>
 
-      {/* Cards de Estatísticas - Versão compacta mobile */}
       <div className="grid gap-2 md:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card
           className={`bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 cursor-pointer transition-all hover:shadow-lg hover:scale-105 ${
@@ -372,9 +391,24 @@ export default function OrdemServicoPage() {
               <Input
                 placeholder="Buscar..."
                 className="pl-8 text-sm"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-gray-400 flex-shrink-0" />
+              <Select value={tipoServicoFilter} onValueChange={setTipoServicoFilter}>
+                <SelectTrigger className="w-full md:w-48 text-sm">
+                  <SelectValue placeholder="Tipo de Serviço" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os tipos</SelectItem>
+                  <SelectItem value="manutencao">Manutenção</SelectItem>
+                  <SelectItem value="preventiva">Preventiva</SelectItem>
+                  <SelectItem value="orcamento">Orçamento</SelectItem>
+                  <SelectItem value="vistoria_contrato">Vistoria para Contrato</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
@@ -394,7 +428,6 @@ export default function OrdemServicoPage() {
             </div>
           </div>
 
-          {/* Versão Desktop - Tabela */}
           <div className="hidden md:block rounded-lg border border-slate-200 overflow-hidden">
             <Table>
               <TableHeader className="bg-slate-50">
@@ -409,14 +442,14 @@ export default function OrdemServicoPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {ordensServico.length === 0 ? (
+                {ordensFiltered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                       Nenhuma ordem de serviço encontrada
                     </TableCell>
                   </TableRow>
                 ) : (
-                  ordensServico.map((os) => (
+                  ordensFiltered.map((os) => (
                     <TableRow key={os.id} className="hover:bg-slate-50/50 transition-colors">
                       <TableCell className="font-medium">{os.numero}</TableCell>
                       <TableCell>{os.cliente_nome}</TableCell>
@@ -453,18 +486,16 @@ export default function OrdemServicoPage() {
             </Table>
           </div>
 
-          {/* Versão Mobile - Cards */}
           <div className="md:hidden space-y-4">
-            {ordensServico.length === 0 ? (
+            {ordensFiltered.length === 0 ? (
               <div className="text-center py-8 text-gray-500 text-sm">Nenhuma ordem de serviço encontrada</div>
             ) : (
-              ordensServico.map((os) => (
+              ordensFiltered.map((os) => (
                 <Card
                   key={os.id}
                   className="border-2 border-slate-300 shadow-md hover:shadow-lg transition-shadow overflow-hidden"
                 >
                   <CardContent className="p-3">
-                    {/* Header do Card */}
                     <div className="flex items-start justify-between mb-3 pb-2 border-b-2 border-orange-100">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -478,7 +509,6 @@ export default function OrdemServicoPage() {
                       <div className="flex-shrink-0">{getStatusBadge(os.situacao)}</div>
                     </div>
 
-                    {/* Informações */}
                     <div className="space-y-2 mb-3 text-sm">
                       <div className="flex items-start gap-2">
                         <User className="h-3.5 w-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
@@ -498,7 +528,6 @@ export default function OrdemServicoPage() {
                       )}
                     </div>
 
-                    {/* Botões de Ação */}
                     <div className="grid grid-cols-3 gap-2 pt-3 border-t-2 border-slate-200">
                       <Link href={`/ordem-servico/${os.id}`} className="w-full">
                         <Button
