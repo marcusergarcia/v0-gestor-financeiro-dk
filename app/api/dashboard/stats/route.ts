@@ -16,7 +16,8 @@ export async function GET() {
     const [boletosVencidosResult] = await pool.execute(`
       SELECT COUNT(*) as total 
       FROM boletos 
-      WHERE (status = 'vencido' OR (status = 'pendente' AND data_vencimento < CURDATE()))
+      WHERE status = 'vencido' 
+         OR (status = 'pendente' AND DATE(data_vencimento) < CURDATE())
     `)
     const boletosVencidos = (boletosVencidosResult as any[])[0]?.total || 0
 
