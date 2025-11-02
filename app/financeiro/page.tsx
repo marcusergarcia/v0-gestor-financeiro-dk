@@ -408,28 +408,47 @@ export default function FinanceiroPage() {
     valorTotal: recibos.reduce((acc, r) => acc + r.valor, 0),
   }
 
-  // Calcular estatísticas totais (sem filtro)
-  const boletosStatsTotais = {
-    total: boletos.length,
-    pendentes: boletos.filter((b) => {
+  // Isso permite que os cards sempre mostrem todos os status, mas filtrados pelo período
+  const boletosFiltradosPorPeriodo = boletos.filter(filterByPeriod)
+
+  const boletosStatsPorPeriodo = {
+    total: boletosFiltradosPorPeriodo.length,
+    pendentes: boletosFiltradosPorPeriodo.filter((b) => {
       const hoje = new Date()
       const vencimento = new Date(b.data_vencimento)
       hoje.setHours(0, 0, 0, 0)
       vencimento.setHours(0, 0, 0, 0)
       return b.status === "pendente" && vencimento >= hoje
     }).length,
-    pagos: boletos.filter((b) => b.status === "pago").length,
-    vencidos: boletos.filter((b) => {
+    pagos: boletosFiltradosPorPeriodo.filter((b) => b.status === "pago").length,
+    vencidos: boletosFiltradosPorPeriodo.filter((b) => {
       const hoje = new Date()
       const vencimento = new Date(b.data_vencimento)
       hoje.setHours(0, 0, 0, 0)
       vencimento.setHours(0, 0, 0, 0)
       return (b.status === "pendente" && vencimento < hoje) || b.status === "vencido"
     }).length,
-    valorTotal: boletos.reduce((acc, b) => {
-      const valor = typeof b.valor === "number" && !isNaN(b.valor) ? b.valor : 0
-      return acc + valor
-    }, 0),
+    valorPagos: boletosFiltradosPorPeriodo
+      .filter((b) => b.status === "pago")
+      .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
+    valorPendentes: boletosFiltradosPorPeriodo
+      .filter((b) => {
+        const hoje = new Date()
+        const vencimento = new Date(b.data_vencimento)
+        hoje.setHours(0, 0, 0, 0)
+        vencimento.setHours(0, 0, 0, 0)
+        return b.status === "pendente" && vencimento >= hoje
+      })
+      .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
+    valorVencidos: boletosFiltradosPorPeriodo
+      .filter((b) => {
+        const hoje = new Date()
+        const vencimento = new Date(b.data_vencimento)
+        hoje.setHours(0, 0, 0, 0)
+        vencimento.setHours(0, 0, 0, 0)
+        return (b.status === "pendente" && vencimento < hoje) || b.status === "vencido"
+      })
+      .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
   }
 
   if (loading) {
@@ -498,8 +517,8 @@ export default function FinanceiroPage() {
             <FileText className="h-3 w-3 lg:h-5 lg:w-5 text-blue-600" />
           </CardHeader>
           <CardContent className="p-3 lg:p-6 pt-0">
-            <div className="text-lg lg:text-3xl font-bold text-blue-800">{boletosStatsTotais.total}</div>
-            <p className="text-[10px] lg:text-xs text-blue-600 mt-0.5 lg:mt-1">boletos cadastrados</p>
+            <p className="text-[10px] lg:text-xs text-blue-600 mb-1">boletos cadastrados</p>
+            <div className="text-lg lg:text-3xl font-bold text-blue-800">{boletosStatsPorPeriodo.total}</div>
           </CardContent>
         </Card>
 
@@ -514,13 +533,10 @@ export default function FinanceiroPage() {
             <CheckCircle className="h-3 w-3 lg:h-5 lg:w-5 text-green-600" />
           </CardHeader>
           <CardContent className="p-3 lg:p-6 pt-0">
-            <div className="text-lg lg:text-3xl font-bold text-green-800">{boletosStatsTotais.pagos}</div>
-            <p className="text-[10px] lg:text-xs text-green-600 mt-0.5 lg:mt-1">
-              {formatarValor(
-                boletos
-                  .filter((b) => b.status === "pago")
-                  .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
-              )}
+            <p className="text-[10px] lg:text-xs text-green-600 mb-1">quantidade</p>
+            <div className="text-lg lg:text-3xl font-bold text-green-800">{boletosStatsPorPeriodo.pagos}</div>
+            <p className="text-[10px] lg:text-xs text-green-600 mt-1 font-semibold">
+              {formatarValor(boletosStatsPorPeriodo.valorPagos)}
             </p>
           </CardContent>
         </Card>
@@ -536,8 +552,11 @@ export default function FinanceiroPage() {
             <Clock className="h-3 w-3 lg:h-5 lg:w-5 text-yellow-600" />
           </CardHeader>
           <CardContent className="p-3 lg:p-6 pt-0">
-            <div className="text-lg lg:text-3xl font-bold text-yellow-800">{boletosStatsTotais.pendentes}</div>
-            <p className="text-[10px] lg:text-xs text-yellow-600 mt-0.5 lg:mt-1">Aguardando pagamento</p>
+            <p className="text-[10px] lg:text-xs text-yellow-600 mb-1">aguardando pagamento</p>
+            <div className="text-lg lg:text-3xl font-bold text-yellow-800">{boletosStatsPorPeriodo.pendentes}</div>
+            <p className="text-[10px] lg:text-xs text-yellow-600 mt-1 font-semibold">
+              {formatarValor(boletosStatsPorPeriodo.valorPendentes)}
+            </p>
           </CardContent>
         </Card>
 
@@ -552,8 +571,11 @@ export default function FinanceiroPage() {
             <AlertTriangle className="h-3 w-3 lg:h-5 lg:w-5 text-red-600" />
           </CardHeader>
           <CardContent className="p-3 lg:p-6 pt-0">
-            <div className="text-lg lg:text-3xl font-bold text-red-800">{boletosStatsTotais.vencidos}</div>
-            <p className="text-[10px] lg:text-xs text-red-600 mt-0.5 lg:mt-1">Requer atenção</p>
+            <p className="text-[10px] lg:text-xs text-red-600 mb-1">requer atenção</p>
+            <div className="text-lg lg:text-3xl font-bold text-red-800">{boletosStatsPorPeriodo.vencidos}</div>
+            <p className="text-[10px] lg:text-xs text-red-600 mt-1 font-semibold">
+              {formatarValor(boletosStatsPorPeriodo.valorVencidos)}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -568,7 +590,7 @@ export default function FinanceiroPage() {
                 className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white"
               >
                 <FileText className="h-4 w-4" />
-                Boletos ({boletosStatsTotais.total})
+                Boletos ({boletosStatsPorPeriodo.total})
               </TabsTrigger>
               <TabsTrigger
                 value="recibos"
