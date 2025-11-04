@@ -41,6 +41,8 @@ export default function OrdemServicoPage() {
     abertas: 0,
     em_andamento: 0,
     concluidas: 0,
+    preventivas: 0,
+    manutencoes: 0,
   })
   const router = useRouter()
 
@@ -164,8 +166,10 @@ export default function OrdemServicoPage() {
           const abertas = statsData.data.filter((os: OrdemServico) => os.situacao === "aberta").length
           const em_andamento = statsData.data.filter((os: OrdemServico) => os.situacao === "em_andamento").length
           const concluidas = statsData.data.filter((os: OrdemServico) => os.situacao === "concluida").length
+          const preventivas = statsData.data.filter((os: OrdemServico) => os.tipo_servico === "preventiva").length
+          const manutencoes = statsData.data.filter((os: OrdemServico) => os.tipo_servico === "manutencao").length
 
-          setStats({ total, abertas, em_andamento, concluidas })
+          setStats({ total, abertas, em_andamento, concluidas, preventivas, manutencoes })
         }
       }
     } catch (error) {
@@ -198,6 +202,11 @@ export default function OrdemServicoPage() {
 
   const handleCardClick = (situacao: string) => {
     setSituacaoFilter(situacao)
+  }
+
+  const handleTipoServicoCardClick = (tipo: string) => {
+    setTipoServicoFilter(tipo)
+    setSituacaoFilter("todas") // Reset situação filter quando filtrar por tipo
   }
 
   const getStatusBadge = (situacao: string) => {
@@ -276,7 +285,7 @@ export default function OrdemServicoPage() {
         </div>
 
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <Skeleton className="h-4 w-24" />
@@ -373,6 +382,38 @@ export default function OrdemServicoPage() {
           <CardContent className="p-3 md:p-4 pt-0">
             <div className="text-xl md:text-2xl font-bold text-green-800">{stats.concluidas}</div>
             <p className="text-[10px] md:text-xs text-green-600">finalizadas</p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className={`bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 cursor-pointer transition-all hover:shadow-lg hover:scale-105 ${
+            tipoServicoFilter === "preventiva" ? "ring-2 ring-purple-500" : ""
+          }`}
+          onClick={() => handleTipoServicoCardClick("preventiva")}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium text-purple-700">Preventivas</CardTitle>
+            <Wrench className="h-3 w-3 md:h-4 md:w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-xl md:text-2xl font-bold text-purple-800">{stats.preventivas}</div>
+            <p className="text-[10px] md:text-xs text-purple-600">manutenções preventivas</p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className={`bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200 cursor-pointer transition-all hover:shadow-lg hover:scale-105 ${
+            tipoServicoFilter === "manutencao" ? "ring-2 ring-indigo-500" : ""
+          }`}
+          onClick={() => handleTipoServicoCardClick("manutencao")}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium text-indigo-700">Manutenções</CardTitle>
+            <Wrench className="h-3 w-3 md:h-4 md:w-4 text-indigo-600" />
+          </CardHeader>
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-xl md:text-2xl font-bold text-indigo-800">{stats.manutencoes}</div>
+            <p className="text-[10px] md:text-xs text-indigo-600">manutenções corretivas</p>
           </CardContent>
         </Card>
       </div>
