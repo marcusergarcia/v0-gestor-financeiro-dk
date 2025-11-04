@@ -34,7 +34,7 @@ export default function OrdemServicoPage() {
   const [logoMenu, setLogoMenu] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState("")
   const [situacaoFilter, setSituacaoFilter] = useState("todas")
-  const [periodoFilter, setPeriodoFilter] = useState("todos")
+  const [periodoFilter, setPeriodoFilter] = useState("mes-atual")
   const [tipoServicoFilter, setTipoServicoFilter] = useState("todos")
   const [stats, setStats] = useState({
     total: 0,
