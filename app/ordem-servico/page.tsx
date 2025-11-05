@@ -39,6 +39,7 @@ export default function OrdemServicoPage() {
   const [stats, setStats] = useState({
     total: 0,
     abertas: 0,
+    agendadas: 0,
     em_andamento: 0,
     concluidas: 0,
     preventivas: 0,
@@ -164,12 +165,13 @@ export default function OrdemServicoPage() {
         if (statsData.success) {
           const total = statsData.data.length
           const abertas = statsData.data.filter((os: OrdemServico) => os.situacao === "aberta").length
+          const agendadas = statsData.data.filter((os: OrdemServico) => os.situacao === "agendada").length
           const em_andamento = statsData.data.filter((os: OrdemServico) => os.situacao === "em_andamento").length
           const concluidas = statsData.data.filter((os: OrdemServico) => os.situacao === "concluida").length
           const preventivas = statsData.data.filter((os: OrdemServico) => os.tipo_servico === "preventiva").length
           const manutencoes = statsData.data.filter((os: OrdemServico) => os.tipo_servico === "manutencao").length
 
-          setStats({ total, abertas, em_andamento, concluidas, preventivas, manutencoes })
+          setStats({ total, abertas, agendadas, em_andamento, concluidas, preventivas, manutencoes })
         }
       }
     } catch (error) {
@@ -223,6 +225,13 @@ export default function OrdemServicoPage() {
           <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
             <Clock className="w-3 h-3 mr-1" />
             Aberta
+          </Badge>
+        )
+      case "agendada":
+        return (
+          <Badge className="bg-cyan-100 text-cyan-800 hover:bg-cyan-200">
+            <Calendar className="w-3 h-3 mr-1" />
+            Agendada
           </Badge>
         )
       case "em_andamento":
@@ -285,7 +294,7 @@ export default function OrdemServicoPage() {
         </div>
 
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 6 }).map((_, i) => (
+          {Array.from({ length: 7 }).map((_, i) => (
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <Skeleton className="h-4 w-24" />
@@ -350,6 +359,22 @@ export default function OrdemServicoPage() {
           <CardContent className="p-3 md:p-4 pt-0">
             <div className="text-xl md:text-2xl font-bold text-yellow-800">{stats.abertas}</div>
             <p className="text-[10px] md:text-xs text-yellow-600">aguardando</p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className={`bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200 cursor-pointer transition-all hover:shadow-lg hover:scale-105 ${
+            situacaoFilter === "agendada" ? "ring-2 ring-cyan-500" : ""
+          }`}
+          onClick={() => handleCardClick("agendada")}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 md:p-4 pb-2">
+            <CardTitle className="text-xs md:text-sm font-medium text-cyan-700">Agendadas</CardTitle>
+            <Calendar className="h-3 w-3 md:h-4 md:w-4 text-cyan-600" />
+          </CardHeader>
+          <CardContent className="p-3 md:p-4 pt-0">
+            <div className="text-xl md:text-2xl font-bold text-cyan-800">{stats.agendadas}</div>
+            <p className="text-[10px] md:text-xs text-cyan-600">visitas agendadas</p>
           </CardContent>
         </Card>
 

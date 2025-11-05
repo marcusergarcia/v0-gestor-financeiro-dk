@@ -194,6 +194,8 @@ export function OrdemServicoPrint({ ordemServico, itens, fotos, assinaturas, onC
         return "Rascunho"
       case "aberta":
         return "Aberta"
+      case "agendada":
+        return "Agendada"
       case "em_andamento":
         return "Em Andamento"
       case "concluida":

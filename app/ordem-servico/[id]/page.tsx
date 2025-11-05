@@ -186,6 +186,13 @@ export default function VisualizarOrdemServicoPage() {
             Aberta
           </Badge>
         )
+      case "agendada":
+        return (
+          <Badge className="bg-cyan-100 text-cyan-800 hover:bg-cyan-200">
+            <Calendar className="w-3 h-3 mr-1" />
+            Agendada
+          </Badge>
+        )
       case "em_andamento":
         return (
           <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-200">

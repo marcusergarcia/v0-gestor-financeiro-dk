@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -33,6 +34,7 @@ import {
   ClipboardList,
   AlertTriangle,
   MapPin,
+  Calendar,
 } from "lucide-react"
 
 interface Equipamento {
@@ -113,6 +115,7 @@ export default function EditarOrdemServicoPage() {
   const router = useRouter()
   const params = useParams()
   const ordemId = params.id as string
+  const { user } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -206,8 +209,33 @@ export default function EditarOrdemServicoPage() {
         }
 
         setContratoNumero(ordemServico.contrato_numero || "Cliente sem contrato")
-        setTecnicoName(ordemServico.tecnico_name || "")
-        setTecnicoEmail(ordemServico.tecnico_email || "")
+
+        console.log("[Frontend] Verificando técnico atual:", {
+          tecnico_name: ordemServico.tecnico_name,
+          tecnico_email: ordemServico.tecnico_email,
+        })
+
+        console.log("[Frontend] Dados do usuário logado:", user)
+
+        // Se os campos estiverem vazios ou com valores padrão, preencher automaticamente
+        if (
+          user &&
+          (!ordemServico.tecnico_name ||
+            ordemServico.tecnico_name === "A definir" ||
+            ordemServico.tecnico_name.trim() === "")
+        ) {
+          console.log("[Frontend] Preenchendo nome do técnico automaticamente:", user.nome)
+          setTecnicoName(user.nome || "")
+        } else {
+          setTecnicoName(ordemServico.tecnico_name || "")
+        }
+
+        if (user && (!ordemServico.tecnico_email || ordemServico.tecnico_email.trim() === "")) {
+          console.log("[Frontend] Preenchendo email do técnico automaticamente:", user.email)
+          setTecnicoEmail(user.email || "")
+        } else {
+          setTecnicoEmail(ordemServico.tecnico_email || "")
+        }
 
         if (ordemServico.data_execucao) {
           const dataFormatada = ordemServico.data_execucao.split("T")[0]
@@ -222,9 +250,9 @@ export default function EditarOrdemServicoPage() {
         setResponsavel(ordemServico.responsavel || "")
         setNomeResponsavel(ordemServico.nome_responsavel || "")
 
-        // Definir situação: se for "aberta", mudar para "em_andamento" por padrão na edição
+        // Definir situação: se for "aberta" ou "agendada", mudar para "em_andamento" por padrão na edição
         const situacaoAtual = ordemServico.situacao || "aberta"
-        if (situacaoAtual === "aberta") {
+        if (situacaoAtual === "aberta" || situacaoAtual === "agendada") {
           setSituacao("em_andamento")
         } else {
           setSituacao(situacaoAtual)
@@ -279,7 +307,7 @@ export default function EditarOrdemServicoPage() {
     if (ordemId) {
       carregarDados()
     }
-  }, [ordemId])
+  }, [ordemId, user]) // Adicionado 'user' à dependência do useEffect
 
   const handleSalvarOrdem = async (comoRascunho = false) => {
     if (!clienteSelecionado || !tecnicoName) {
@@ -442,6 +470,8 @@ export default function EditarOrdemServicoPage() {
     switch (situacao) {
       case "aberta":
         return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "agendada":
+        return "bg-cyan-100 text-cyan-800 border-cyan-200"
       case "em_andamento":
         return "bg-blue-100 text-blue-800 border-blue-200"
       case "concluida":
@@ -455,6 +485,8 @@ export default function EditarOrdemServicoPage() {
     switch (situacao) {
       case "aberta":
         return "ABERTA"
+      case "agendada":
+        return "AGENDADA"
       case "em_andamento":
         return "EM ANDAMENTO"
       case "concluida":
@@ -468,6 +500,8 @@ export default function EditarOrdemServicoPage() {
     switch (situacao) {
       case "aberta":
         return <Clock className="h-4 w-4" />
+      case "agendada":
+        return <Calendar className="h-4 w-4" />
       case "em_andamento":
         return <PlayCircle className="h-4 w-4" />
       case "concluida":
@@ -690,6 +724,12 @@ export default function EditarOrdemServicoPage() {
                             <span>Aberta</span>
                           </div>
                         </SelectItem>
+                        <SelectItem value="agendada">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-3 w-3 md:h-4 md:w-4 text-cyan-600" />
+                            <span>Agendada</span>
+                          </div>
+                        </SelectItem>
                         <SelectItem value="em_andamento">
                           <div className="flex items-center gap-2">
                             <PlayCircle className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
@@ -705,6 +745,7 @@ export default function EditarOrdemServicoPage() {
                       </SelectContent>
                     </Select>
                     <p className="text-[10px] md:text-xs text-gray-600 mt-2">
+                      {situacao === "agendada" && "Serviço agendado para data futura"}
                       {situacao === "em_andamento" && "Serviço está sendo executado"}
                       {situacao === "concluida" && "Serviço finalizado"}
                       {situacao === "aberta" && "Aguardando início da execução"}

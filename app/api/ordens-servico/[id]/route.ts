@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params
+    const { id } = await params
 
     console.log("Buscando ordem de serviço com ID:", id)
 
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     console.log("Itens encontrados:", itensResult)
 
-    // Montar objeto cliente
+    // Montar objeto cliente apenas com campos existentes
     const cliente = {
       id: ordemServico.cliente_id,
       nome: ordemServico.cliente_nome,
@@ -82,11 +82,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       estado: ordemServico.cliente_estado,
       cep: ordemServico.cliente_cep,
       bairro: ordemServico.cliente_bairro,
-      complemento: ordemServico.cliente_complemento,
-      inscricao_estadual: ordemServico.cliente_inscricao_estadual,
-      inscricao_municipal: ordemServico.cliente_inscricao_municipal,
-      nome_fantasia: ordemServico.cliente_nome_fantasia,
-      razao_social: ordemServico.cliente_razao_social,
       distancia_km: ordemServico.cliente_distancia_km,
     }
 
@@ -104,11 +99,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       cliente_estado,
       cliente_cep,
       cliente_bairro,
-      cliente_complemento,
-      cliente_inscricao_estadual,
-      cliente_inscricao_municipal,
-      cliente_nome_fantasia,
-      cliente_razao_social,
       cliente_distancia_km,
       ...ordemLimpa
     } = ordemServico
@@ -134,9 +124,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params
+    const { id } = await params
     const data = await request.json()
 
     console.log("Atualizando ordem de serviço ID:", id)
@@ -203,9 +193,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params
+    const { id } = await params
 
     console.log("Deletando ordem de serviço ID:", id)
 

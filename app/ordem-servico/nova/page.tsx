@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   ArrowLeft,
   Save,
@@ -81,6 +82,7 @@ export default function NovaOrdemServicoPage() {
   const [equipamentosSelecionados, setEquipamentosSelecionados] = useState<EquipamentoSelecionado[]>([])
   const [numeroOS, setNumeroOS] = useState("")
   const [showNovoClienteDialog, setShowNovoClienteDialog] = useState(false)
+  const [desejaAgendar, setDesejaAgendar] = useState(false)
 
   const [formData, setFormData] = useState({
     tipo_servico: "manutencao",
@@ -88,6 +90,7 @@ export default function NovaOrdemServicoPage() {
     solicitado_por: "",
     descricao_defeito: "",
     contrato_numero: "Cliente sem contrato",
+    data_agendamento: "",
   })
 
   // Gerar número da OS quando cliente for selecionado
@@ -294,6 +297,15 @@ export default function NovaOrdemServicoPage() {
       return
     }
 
+    if (desejaAgendar && !formData.data_agendamento) {
+      toast({
+        title: "Data de agendamento obrigatória",
+        description: "Informe a data de agendamento ou desmarque a opção 'Deseja agendar?'.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       setLoading(true)
 
@@ -307,7 +319,7 @@ export default function NovaOrdemServicoPage() {
         tecnico_email: null,
         solicitado_por: formData.solicitado_por,
         data_atual: formData.data_atual,
-        data_agendamento: null,
+        data_agendamento: desejaAgendar ? formData.data_agendamento : null,
         data_execucao: null,
         horario_entrada: null,
         horario_saida: null,
@@ -318,7 +330,7 @@ export default function NovaOrdemServicoPage() {
         observacoes: null,
         responsavel: null,
         nome_responsavel: null,
-        situacao: "aberta",
+        situacao: desejaAgendar ? "agendada" : "aberta",
         equipamentos: equipamentosSelecionados.map((eq) => ({
           equipamento_id: eq.id,
           equipamento_nome: eq.nome,
@@ -340,7 +352,7 @@ export default function NovaOrdemServicoPage() {
       if (result.success) {
         toast({
           title: "Ordem de serviço criada!",
-          description: `OS ${numeroOS} criada com sucesso e está ABERTA para execução.`,
+          description: `OS ${numeroOS} criada com sucesso e está ${desejaAgendar ? "AGENDADA" : "ABERTA"} para execução.`,
         })
         router.push("/ordem-servico")
       } else {
@@ -409,9 +421,15 @@ export default function NovaOrdemServicoPage() {
                   <Badge variant="outline" className="font-mono text-sm">
                     Número: {numeroOS}
                   </Badge>
-                  <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                  <Badge
+                    className={
+                      desejaAgendar
+                        ? "bg-cyan-100 text-cyan-800 border-cyan-200"
+                        : "bg-yellow-100 text-yellow-800 border-yellow-200"
+                    }
+                  >
                     <Clock className="h-3 w-3 mr-1" />
-                    Será criada como ABERTA
+                    Será criada como {desejaAgendar ? "AGENDADA" : "ABERTA"}
                   </Badge>
                 </div>
               )}
@@ -663,6 +681,46 @@ export default function NovaOrdemServicoPage() {
                       placeholder="Nome de quem solicitou o serviço"
                     />
                   </div>
+
+                  <Separator className="my-4" />
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="deseja_agendar"
+                        checked={desejaAgendar}
+                        onCheckedChange={(checked) => {
+                          setDesejaAgendar(checked as boolean)
+                          // Limpar data de agendamento se desmarcar
+                          if (!checked) {
+                            setFormData((prev) => ({ ...prev, data_agendamento: "" }))
+                          }
+                        }}
+                      />
+                      <Label
+                        htmlFor="deseja_agendar"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        Deseja agendar esta ordem de serviço?
+                      </Label>
+                    </div>
+
+                    {desejaAgendar && (
+                      <div className="pl-6 space-y-2">
+                        <Label htmlFor="data_agendamento">Data de Agendamento *</Label>
+                        <Input
+                          id="data_agendamento"
+                          type="date"
+                          value={formData.data_agendamento}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, data_agendamento: e.target.value }))}
+                          min={formData.data_atual}
+                        />
+                        <div className="text-xs text-gray-500">
+                          Data em que a visita está agendada para ser realizada
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -794,12 +852,20 @@ export default function NovaOrdemServicoPage() {
               </CardHeader>
               <CardContent className="p-6">
                 <div className="space-y-4">
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div className="flex items-center gap-2 text-yellow-800">
-                      <Clock className="h-4 w-4" />
-                      <span className="text-sm font-medium">A ordem será criada como ABERTA</span>
+                  <div
+                    className={`p-3 border rounded-lg ${desejaAgendar ? "bg-cyan-50 border-cyan-200" : "bg-yellow-50 border-yellow-200"}`}
+                  >
+                    <div className={`flex items-center gap-2 ${desejaAgendar ? "text-cyan-800" : "text-yellow-800"}`}>
+                      {desejaAgendar ? <Calendar className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
+                      <span className="text-sm font-medium">
+                        A ordem será criada como {desejaAgendar ? "AGENDADA" : "ABERTA"}
+                      </span>
                     </div>
-                    <p className="text-xs text-yellow-700 mt-1">O técnico poderá iniciar a execução depois</p>
+                    <p className={`text-xs mt-1 ${desejaAgendar ? "text-cyan-700" : "text-yellow-700"}`}>
+                      {desejaAgendar
+                        ? "A ordem ficará agendada para a data selecionada"
+                        : "O técnico poderá iniciar a execução depois"}
+                    </p>
                   </div>
 
                   <Separator />
@@ -839,6 +905,14 @@ export default function NovaOrdemServicoPage() {
                           : "Não definida"}
                       </span>
                     </div>
+                    {desejaAgendar && formData.data_agendamento && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Data Agendamento:</span>
+                        <span className="font-medium text-cyan-600">
+                          {new Date(formData.data_agendamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-gray-600">Solicitado por:</span>
                       <span className="font-medium">{formData.solicitado_por || "Não informado"}</span>
@@ -889,12 +963,13 @@ export default function NovaOrdemServicoPage() {
                         !clienteSelecionado ||
                         !formData.tipo_servico ||
                         !formData.data_atual ||
-                        !formData.solicitado_por
+                        !formData.solicitado_por ||
+                        (desejaAgendar && !formData.data_agendamento)
                       }
                       className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
                     >
                       <Save className="h-4 w-4 mr-2" />
-                      {loading ? "Criando..." : "Criar Ordem Aberta"}
+                      {loading ? "Criando..." : desejaAgendar ? "Criar Ordem Agendada" : "Criar Ordem Aberta"}
                     </Button>
                   </div>
                 </div>

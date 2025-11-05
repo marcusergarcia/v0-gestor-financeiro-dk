@@ -8,6 +8,8 @@ export interface OrdemServico {
   tecnico_email?: string
   solicitado_por?: string
   data_atual: string
+  data_agendamento?: string
+  data_execucao?: string
   horario_entrada?: string
   horario_saida?: string
   tipo_servico: "manutencao" | "orcamento" | "vistoria_contrato" | "preventiva"
@@ -17,7 +19,7 @@ export interface OrdemServico {
   responsavel: "zelador" | "porteiro" | "sindico" | "outros"
   nome_responsavel: string
   equipamentos?: string
-  situacao: "rascunho" | "aberta" | "em_andamento" | "concluida" | "cancelada"
+  situacao: "rascunho" | "aberta" | "agendada" | "em_andamento" | "concluida" | "cancelada"
   created_at: string
   updated_at: string
 
@@ -67,6 +69,8 @@ export interface CreateOrdemServicoData {
   tecnico_email?: string
   solicitado_por?: string
   data_atual: string
+  data_agendamento?: string
+  data_execucao?: string
   horario_entrada?: string
   horario_saida?: string
   tipo_servico: string
