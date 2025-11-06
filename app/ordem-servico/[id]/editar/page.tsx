@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -120,6 +120,8 @@ export default function EditarOrdemServicoPage() {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [autoSaving, setAutoSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [ordem, setOrdem] = useState<OrdemServico | null>(null)
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
   const [activeTab, setActiveTab] = useState("info")
@@ -321,6 +323,111 @@ export default function EditarOrdemServicoPage() {
     }
   }, [ordemId, user]) // Adicionado 'user' à dependência do useEffect
 
+  const validateExecucao = useCallback(() => {
+    return !!(tecnicoName && dataExecucao && horarioEntrada && horarioSaida)
+  }, [tecnicoName, dataExecucao, horarioEntrada, horarioSaida])
+
+  const validateEquipamentos = useCallback(() => {
+    return itensEquipamentos.length > 0
+  }, [itensEquipamentos])
+
+  const validateRelatorio = useCallback(() => {
+    return !!(servicoRealizado || relatorioVisita)
+  }, [servicoRealizado, relatorioVisita])
+
+  const canSign = useCallback(() => {
+    return validateExecucao() && validateEquipamentos() && validateRelatorio()
+  }, [validateExecucao, validateEquipamentos, validateRelatorio])
+
+  const autoSave = useCallback(async () => {
+    if (!clienteSelecionado || !ordem) return
+
+    try {
+      setAutoSaving(true)
+
+      const ordemData = {
+        cliente_id: clienteSelecionado.id,
+        contrato_id: ordem?.contrato_id || null,
+        contrato_numero: contratoNumero !== "Cliente sem contrato" ? contratoNumero : null,
+        tecnico_name: tecnicoName,
+        tecnico_email: tecnicoEmail,
+        data_agendamento: dataAgendamento || null,
+        periodo_agendamento: periodoAgendamento || null,
+        data_execucao: dataExecucao || null,
+        horario_entrada: horarioEntrada || null,
+        horario_saida: horarioSaida || null,
+        relatorio_visita: relatorioVisita,
+        servico_realizado: servicoRealizado,
+        observacoes: observacoes,
+        responsavel: responsavel,
+        nome_responsavel: nomeResponsavel,
+        situacao: situacao,
+      }
+
+      const response = await fetch(`/api/ordens-servico/${ordemId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(ordemData),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setLastSaved(new Date())
+      }
+    } catch (error) {
+      console.error("[v0] Erro no auto-save:", error)
+    } finally {
+      setAutoSaving(false)
+    }
+  }, [
+    clienteSelecionado,
+    ordem,
+    ordemId,
+    contratoNumero,
+    tecnicoName,
+    tecnicoEmail,
+    dataAgendamento,
+    periodoAgendamento,
+    dataExecucao,
+    horarioEntrada,
+    horarioSaida,
+    relatorioVisita,
+    servicoRealizado,
+    observacoes,
+    responsavel,
+    nomeResponsavel,
+    situacao,
+  ])
+
+  useEffect(() => {
+    if (!ordem) return // Não salvar antes de carregar a ordem
+
+    const timer = setTimeout(() => {
+      autoSave()
+    }, 2000) // Salva 2 segundos após parar de digitar
+
+    return () => clearTimeout(timer)
+  }, [
+    tecnicoName,
+    tecnicoEmail,
+    dataExecucao,
+    horarioEntrada,
+    horarioSaida,
+    relatorioVisita,
+    servicoRealizado,
+    observacoes,
+    responsavel,
+    nomeResponsavel,
+    situacao,
+    dataAgendamento,
+    periodoAgendamento,
+    autoSave,
+    ordem,
+  ])
+
   const handleSalvarOrdem = async (comoRascunho = false) => {
     if (!clienteSelecionado || !tecnicoName) {
       toast({
@@ -416,7 +523,7 @@ export default function EditarOrdemServicoPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(itemData),
+        body: JSON.JSON(itemData),
       })
 
       const data = await response.json()
@@ -553,6 +660,42 @@ export default function EditarOrdemServicoPage() {
     )
   }
 
+  const handleTabChange = (value: string) => {
+    // Se tentar abrir aba de assinaturas sem validação, mostrar toast
+    if (value === "assinaturas" && !canSign()) {
+      const mensagens = []
+      if (!validateExecucao()) {
+        mensagens.push("• Preencha os dados de execução (técnico, data, horários)")
+      }
+      if (!validateEquipamentos()) {
+        mensagens.push("• Selecione pelo menos um equipamento")
+      }
+      if (!validateRelatorio()) {
+        mensagens.push("• Preencha o serviço realizado ou relatório da visita")
+      }
+
+      toast({
+        title: "Não é possível assinar ainda",
+        description: (
+          <div className="mt-2 space-y-1">
+            <p className="font-semibold">Complete os seguintes itens:</p>
+            {mensagens.map((msg, i) => (
+              <p key={i} className="text-sm">
+                {msg}
+              </p>
+            ))}
+          </div>
+        ),
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Salvar antes de trocar de aba
+    autoSave()
+    setActiveTab(value)
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 pb-24 md:pb-6">
       <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
@@ -572,6 +715,18 @@ export default function EditarOrdemServicoPage() {
                 {getSituacaoIcon(situacao)}
                 <span className="ml-1">{getSituacaoLabel(situacao)}</span>
               </Badge>
+              {autoSaving && (
+                <Badge variant="outline" className="text-[10px] md:text-sm bg-blue-50 text-blue-600">
+                  <Save className="h-3 w-3 mr-1 animate-pulse" />
+                  Salvando...
+                </Badge>
+              )}
+              {lastSaved && !autoSaving && (
+                <Badge variant="outline" className="text-[10px] md:text-sm bg-green-50 text-green-600">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Salvo {lastSaved.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
@@ -587,12 +742,12 @@ export default function EditarOrdemServicoPage() {
           </div>
         </div>
 
-        {/* Tabs Navigation */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-5 gap-1 h-auto p-1">
             <TabsTrigger value="info" className="flex flex-col items-center gap-1 py-2 px-1 text-[10px] md:text-sm">
               <User className="h-3 w-3 md:h-4 md:w-4" />
               <span>Info</span>
+              {validateExecucao() && <CheckCircle className="h-3 w-3 text-green-600" />}
             </TabsTrigger>
             <TabsTrigger
               value="equipamentos"
@@ -600,6 +755,7 @@ export default function EditarOrdemServicoPage() {
             >
               <Package className="h-3 w-3 md:h-4 md:w-4" />
               <span>Equip.</span>
+              {validateEquipamentos() && <CheckCircle className="h-3 w-3 text-green-600" />}
             </TabsTrigger>
             <TabsTrigger
               value="relatorios"
@@ -607,6 +763,7 @@ export default function EditarOrdemServicoPage() {
             >
               <ClipboardList className="h-3 w-3 md:h-4 md:w-4" />
               <span>Relatório</span>
+              {validateRelatorio() && <CheckCircle className="h-3 w-3 text-green-600" />}
             </TabsTrigger>
             <TabsTrigger value="fotos" className="flex flex-col items-center gap-1 py-2 px-1 text-[10px] md:text-sm">
               <Camera className="h-3 w-3 md:h-4 md:w-4" />
@@ -614,10 +771,18 @@ export default function EditarOrdemServicoPage() {
             </TabsTrigger>
             <TabsTrigger
               value="assinaturas"
-              className="flex flex-col items-center gap-1 py-2 px-1 text-[10px] md:text-sm"
+              className={`flex flex-col items-center gap-1 py-2 px-1 text-[10px] md:text-sm ${
+                !canSign() ? "opacity-50" : ""
+              }`}
+              disabled={!canSign()}
             >
               <PenTool className="h-3 w-3 md:h-4 md:w-4" />
               <span>Assin.</span>
+              {canSign() ? (
+                <CheckCircle className="h-3 w-3 text-green-600" />
+              ) : (
+                <AlertTriangle className="h-3 w-3 text-orange-600" />
+              )}
             </TabsTrigger>
           </TabsList>
 
@@ -768,42 +933,44 @@ export default function EditarOrdemServicoPage() {
 
                   <Separator />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                    <div>
-                      <Label htmlFor="data_agendamento" className="text-xs md:text-sm">
-                        Data de Agendamento
-                      </Label>
-                      <Input
-                        id="data_agendamento"
-                        type="date"
-                        value={dataAgendamento}
-                        onChange={(e) => setDataAgendamento(e.target.value)}
-                        className="h-9 md:h-10"
-                      />
-                      <div className="text-[10px] md:text-xs text-gray-500 mt-1">Data agendada para a visita</div>
-                    </div>
+                  {ordem.situacao === "agendada" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                      <div>
+                        <Label htmlFor="data_agendamento" className="text-xs md:text-sm">
+                          Data de Agendamento
+                        </Label>
+                        <Input
+                          id="data_agendamento"
+                          type="date"
+                          value={dataAgendamento}
+                          onChange={(e) => setDataAgendamento(e.target.value)}
+                          className="h-9 md:h-10"
+                        />
+                        <div className="text-[10px] md:text-xs text-gray-500 mt-1">Data agendada para a visita</div>
+                      </div>
 
-                    <div>
-                      <Label htmlFor="periodo_agendamento" className="text-xs md:text-sm">
-                        Período do Agendamento
-                      </Label>
-                      <Select
-                        value={periodoAgendamento}
-                        onValueChange={(value: "" | "manha" | "tarde") => setPeriodoAgendamento(value)}
-                      >
-                        <SelectTrigger className="h-9 md:h-10 text-xs md:text-sm">
-                          <SelectValue placeholder="Selecione o período" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="manha">Manhã</SelectItem>
-                          <SelectItem value="tarde">Tarde</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <div className="text-[10px] md:text-xs text-gray-500 mt-1">Período da visita agendada</div>
+                      <div>
+                        <Label htmlFor="periodo_agendamento" className="text-xs md:text-sm">
+                          Período do Agendamento
+                        </Label>
+                        <Select
+                          value={periodoAgendamento}
+                          onValueChange={(value: "" | "manha" | "tarde") => setPeriodoAgendamento(value)}
+                        >
+                          <SelectTrigger className="h-9 md:h-10 text-xs md:text-sm">
+                            <SelectValue placeholder="Selecione o período" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="manha">Manhã</SelectItem>
+                            <SelectItem value="tarde">Tarde</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="text-[10px] md:text-xs text-gray-500 mt-1">Período da visita agendada</div>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  <Separator />
+                  {ordem.situacao === "agendada" && <Separator />}
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                     <div>
@@ -1204,10 +1371,9 @@ export default function EditarOrdemServicoPage() {
               </Button>
             </div>
 
-            {/* Resumo de Progresso - Agora Clicável no Mobile */}
             <div className="mt-2 md:mt-4 grid grid-cols-5 gap-1 md:gap-2 text-[10px] md:text-xs">
               <button
-                onClick={() => setActiveTab("info")}
+                onClick={() => handleTabChange("info")}
                 className={`flex flex-col md:flex-row items-center md:gap-1 p-2 rounded-lg transition-all ${
                   activeTab === "info"
                     ? "bg-blue-100 text-blue-700 md:bg-transparent md:text-gray-600"
@@ -1215,12 +1381,12 @@ export default function EditarOrdemServicoPage() {
                 } md:cursor-default cursor-pointer md:pointer-events-none`}
               >
                 <User className="h-4 w-4 md:h-3 md:w-3" />
-                <span className="hidden md:inline">{tecnicoName ? "✓" : "○"}</span>
-                <span className="md:hidden mt-1">{tecnicoName ? "✓" : "○"}</span>
+                <span className="hidden md:inline">{validateExecucao() ? "✓" : "○"}</span>
+                <span className="md:hidden mt-1">{validateExecucao() ? "✓" : "○"}</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("equipamentos")}
+                onClick={() => handleTabChange("equipamentos")}
                 className={`flex flex-col md:flex-row items-center md:gap-1 p-2 rounded-lg transition-all ${
                   activeTab === "equipamentos"
                     ? "bg-purple-100 text-purple-700 md:bg-transparent md:text-gray-600"
@@ -1229,13 +1395,13 @@ export default function EditarOrdemServicoPage() {
               >
                 <Package className="h-4 w-4 md:h-3 md:w-3" />
                 <span className="hidden md:inline">
-                  {itensEquipamentos.length > 0 ? "✓" : "○"} ({itensEquipamentos.length})
+                  {validateEquipamentos() ? "✓" : "○"} ({itensEquipamentos.length})
                 </span>
-                <span className="md:hidden mt-1">{itensEquipamentos.length > 0 ? "✓" : "○"}</span>
+                <span className="md:hidden mt-1">{validateEquipamentos() ? "✓" : "○"}</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("relatorios")}
+                onClick={() => handleTabChange("relatorios")}
                 className={`flex flex-col md:flex-row items-center md:gap-1 p-2 rounded-lg transition-all ${
                   activeTab === "relatorios"
                     ? "bg-cyan-100 text-cyan-700 md:bg-transparent md:text-gray-600"
@@ -1243,12 +1409,12 @@ export default function EditarOrdemServicoPage() {
                 } md:cursor-default cursor-pointer md:pointer-events-none`}
               >
                 <ClipboardList className="h-4 w-4 md:h-3 md:w-3" />
-                <span className="hidden md:inline">{relatorioVisita ? "✓" : "○"}</span>
-                <span className="md:hidden mt-1">{relatorioVisita ? "✓" : "○"}</span>
+                <span className="hidden md:inline">{validateRelatorio() ? "✓" : "○"}</span>
+                <span className="md:hidden mt-1">{validateRelatorio() ? "✓" : "○"}</span>
               </button>
 
               <button
-                onClick={() => setActiveTab("fotos")}
+                onClick={() => handleTabChange("fotos")}
                 className={`flex flex-col md:flex-row items-center md:gap-1 p-2 rounded-lg transition-all ${
                   activeTab === "fotos"
                     ? "bg-green-100 text-green-700 md:bg-transparent md:text-gray-600"
@@ -1263,18 +1429,20 @@ export default function EditarOrdemServicoPage() {
               </button>
 
               <button
-                onClick={() => setActiveTab("assinaturas")}
+                onClick={() => handleTabChange("assinaturas")}
                 className={`flex flex-col md:flex-row items-center md:gap-1 p-2 rounded-lg transition-all ${
                   activeTab === "assinaturas"
                     ? "bg-pink-100 text-pink-700 md:bg-transparent md:text-gray-600"
-                    : "text-gray-600 hover:bg-gray-100 md:hover:bg-transparent"
+                    : canSign()
+                      ? "text-gray-600 hover:bg-gray-100 md:hover:bg-transparent"
+                      : "text-gray-400 cursor-not-allowed"
                 } md:cursor-default cursor-pointer md:pointer-events-none`}
               >
                 <PenTool className="h-4 w-4 md:h-3 md:w-3" />
                 <span className="hidden md:inline">
-                  {assinaturas.length > 0 ? "✓" : "○"} ({assinaturas.length})
+                  {canSign() ? (assinaturas.length > 0 ? "✓" : "○") : "🔒"} ({assinaturas.length})
                 </span>
-                <span className="md:hidden mt-1">{assinaturas.length > 0 ? "✓" : "○"}</span>
+                <span className="md:hidden mt-1">{canSign() ? (assinaturas.length > 0 ? "✓" : "○") : "🔒"}</span>
               </button>
             </div>
           </div>
