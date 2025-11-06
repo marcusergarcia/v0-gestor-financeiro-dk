@@ -2,13 +2,13 @@ import { query } from "./db"
 
 export enum ConversationStage {
   TIPO_CLIENTE = "tipo_cliente",
-  CODIGO_CLIENTE = "codigo_cliente", // Novo stage para pedir código CNPJ
+  CODIGO_CLIENTE = "codigo_cliente",
   NOME_CLIENTE = "nome_cliente",
   SELECIONAR_CLIENTE = "selecionar_cliente",
   CLIENTE_NAO_ENCONTRADO = "cliente_nao_encontrado",
-  CADASTRO_CNPJ = "cadastro_cnpj", // Novo stage para pedir CNPJ completo
+  CADASTRO_CNPJ = "cadastro_cnpj",
   CADASTRO_CEP = "cadastro_cep",
-  CADASTRO_NUMERO = "cadastro_numero", // Adicionado stage para número do imóvel
+  CADASTRO_NUMERO = "cadastro_numero",
   CADASTRO_CONFIRMAR_ENDERECO = "cadastro_confirmar_endereco",
   CADASTRO_TELEFONE = "cadastro_telefone",
   CADASTRO_EMAIL = "cadastro_email",
@@ -18,10 +18,11 @@ export enum ConversationStage {
   CADASTRO_CIDADE = "cadastro_cidade",
   CADASTRO_CONFIRMAR = "cadastro_confirmar",
   MENU = "menu",
+  CRIAR_OS_TIPO_SERVICO = "criar_os_tipo_servico", // Adicionado stage para escolher tipo de serviço
   CRIAR_OS_TIPO_ATENDIMENTO = "criar_os_tipo_atendimento",
   CRIAR_OS_DATA_AGENDAMENTO = "criar_os_data_agendamento",
   CRIAR_OS_PERIODO_AGENDAMENTO = "criar_os_periodo_agendamento",
-  CRIAR_OS_SOLICITANTE = "criar_os_solicitante", // Adicionado stage para nome do solicitante da OS
+  CRIAR_OS_SOLICITANTE = "criar_os_solicitante",
   CREATE_ORDER_DESC = "create_order_desc",
   QUERY_ORDER = "query_order",
   WAIT_AGENT = "wait_agent",

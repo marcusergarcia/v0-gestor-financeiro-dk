@@ -335,6 +335,10 @@ export default function EditarOrdemServicoPage() {
     return !!(servicoRealizado || relatorioVisita)
   }, [servicoRealizado, relatorioVisita])
 
+  const validateFotos = useCallback(() => {
+    return fotos.length > 0
+  }, [fotos])
+
   const canSign = useCallback(() => {
     return validateExecucao() && validateEquipamentos() && validateRelatorio()
   }, [validateExecucao, validateEquipamentos, validateRelatorio])
@@ -768,6 +772,7 @@ export default function EditarOrdemServicoPage() {
             <TabsTrigger value="fotos" className="flex flex-col items-center gap-1 py-2 px-1 text-[10px] md:text-sm">
               <Camera className="h-3 w-3 md:h-4 md:w-4" />
               <span>Fotos</span>
+              {validateFotos() && <CheckCircle className="h-3 w-3 text-green-600" />}
             </TabsTrigger>
             <TabsTrigger
               value="assinaturas"
@@ -1423,9 +1428,9 @@ export default function EditarOrdemServicoPage() {
               >
                 <Camera className="h-4 w-4 md:h-3 md:w-3" />
                 <span className="hidden md:inline">
-                  {fotos.length > 0 ? "✓" : "○"} ({fotos.length})
+                  {validateFotos() ? "✓" : "○"} ({fotos.length})
                 </span>
-                <span className="md:hidden mt-1">{fotos.length > 0 ? "✓" : "○"}</span>
+                <span className="md:hidden mt-1">{validateFotos() ? "✓" : "○"}</span>
               </button>
 
               <button
