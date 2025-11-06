@@ -209,6 +209,34 @@ export async function findClientByCodigo(codigo: string): Promise<any | null> {
   }
 }
 
+export async function findClientByCNPJ(cnpj: string): Promise<any | null> {
+  try {
+    console.log("[v0] 🔍 Buscando cliente por CNPJ:", cnpj)
+
+    const cnpjLimpo = cnpj.replace(/\D/g, "")
+
+    const result = await query(
+      `SELECT id, codigo, nome, cnpj, telefone, email, endereco, cidade, estado 
+       FROM clientes 
+       WHERE REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '/', ''), '-', '') = ?
+       LIMIT 1`,
+      [cnpjLimpo],
+    )
+
+    if (!result || (result as any[]).length === 0) {
+      console.log("[v0] ⚠️ Cliente não encontrado por CNPJ")
+      return null
+    }
+
+    const cliente = (result as any[])[0]
+    console.log("[v0] ✅ Cliente encontrado por CNPJ:", cliente.nome)
+    return cliente
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao buscar cliente por CNPJ:", error)
+    return null
+  }
+}
+
 export async function generateOrderNumber(): Promise<string> {
   try {
     console.log("[v0] 🔢 Gerando número de ordem no formato AAAAMMDDXXX")
@@ -297,6 +325,9 @@ export async function createClient(data: {
   telefone: string
   email?: string
   sindico?: string
+  distanciaKm?: number
+  latitude?: number
+  longitude?: number
 }): Promise<number> {
   try {
     console.log("[v0] 📝 Cadastrando novo cliente:", data.nome)
@@ -310,8 +341,8 @@ export async function createClient(data: {
     const result = await query(
       `INSERT INTO clientes (
         codigo, nome, cnpj, cep, endereco, bairro, cidade, estado, 
-        telefone, email, sindico, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        telefone, email, sindico, distancia_km, latitude, longitude, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         codigo,
         data.nome,
@@ -324,6 +355,9 @@ export async function createClient(data: {
         data.telefone,
         data.email || null,
         data.sindico || null,
+        data.distanciaKm || null,
+        data.latitude || null,
+        data.longitude || null,
       ],
     )
 
@@ -466,5 +500,47 @@ export function validateDate(dateStr: string): {
     return { valid: true, date }
   } catch (error) {
     return { valid: false, error: "Erro ao validar data" }
+  }
+}
+
+export async function calcularDistanciaCliente(cep: string): Promise<{
+  success: boolean
+  distanciaKm?: number
+  latitude?: number
+  longitude?: number
+  error?: string
+}> {
+  try {
+    console.log("[v0] 📏 Calculando distância para CEP:", cep)
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/utils/calcular-distancia`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cepCliente: cep }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.log("[v0] ❌ Erro ao calcular distância:", errorData.message)
+      return { success: false, error: errorData.message || "Erro ao calcular distância" }
+    }
+
+    const result = await response.json()
+
+    if (!result.success) {
+      return { success: false, error: result.message || "Erro ao calcular distância" }
+    }
+
+    console.log("[v0] ✅ Distância calculada:", result.data.distanciaKm, "km")
+
+    return {
+      success: true,
+      distanciaKm: result.data.distanciaKm,
+      latitude: result.data.coordenadasCliente.latitude,
+      longitude: result.data.coordenadasCliente.longitude,
+    }
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao calcular distância:", error)
+    return { success: false, error: "Erro ao calcular distância" }
   }
 }

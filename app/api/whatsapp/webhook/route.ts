@@ -5,13 +5,14 @@ import {
   clearConversationState,
   restartConversation,
   findClientByCodigo,
+  findClientByCNPJ,
   createClient,
   generateOrderNumber,
   saveAtendimentoRequest,
   fetchCepData,
+  calcularDistanciaCliente,
   checkAgendamentoDisponivel,
   validateDate,
-  ConversationStage,
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
 
@@ -115,22 +116,22 @@ async function processUserMessage(from: string, messageBody: string) {
         normalizedMessage === "menu" ||
         normalizedMessage === "0" ||
         normalizedMessage === "voltar ao menu") &&
-      currentStage !== ConversationStage.TIPO_CLIENTE &&
-      currentStage !== ConversationStage.CODIGO_CLIENTE &&
-      currentStage !== ConversationStage.NOME_CLIENTE &&
-      currentStage !== ConversationStage.CADASTRO_CNPJ &&
-      currentStage !== ConversationStage.CADASTRO_CEP &&
-      currentStage !== ConversationStage.CADASTRO_NUMERO &&
-      currentStage !== ConversationStage.CADASTRO_CONFIRMAR_ENDERECO &&
-      currentStage !== ConversationStage.CADASTRO_TELEFONE &&
-      currentStage !== ConversationStage.CADASTRO_EMAIL &&
-      currentStage !== ConversationStage.CADASTRO_SINDICO &&
-      currentStage !== ConversationStage.CADASTRO_SOLICITANTE &&
-      currentStage !== ConversationStage.CADASTRO_CONFIRMAR &&
-      currentStage !== ConversationStage.CRIAR_OS_TIPO_ATENDIMENTO &&
-      currentStage !== ConversationStage.CRIAR_OS_DATA_AGENDAMENTO &&
-      currentStage !== ConversationStage.CRIAR_OS_PERIODO_AGENDAMENTO &&
-      currentStage !== ConversationStage.CRIAR_OS_SOLICITANTE
+      currentStage !== "tipo_cliente" &&
+      currentStage !== "codigo_cliente" &&
+      currentStage !== "nome_cliente" &&
+      currentStage !== "cadastro_cnpj" &&
+      currentStage !== "cadastro_cep" &&
+      currentStage !== "cadastro_numero" &&
+      currentStage !== "cadastro_confirmar_endereco" &&
+      currentStage !== "cadastro_telefone" &&
+      currentStage !== "cadastro_email" &&
+      currentStage !== "cadastro_sindico" &&
+      currentStage !== "cadastro_solicitante" &&
+      currentStage !== "cadastro_confirmar" &&
+      currentStage !== "criar_os_tipo_atendimento" &&
+      currentStage !== "criar_os_data_agendamento" &&
+      currentStage !== "criar_os_periodo_agendamento" &&
+      currentStage !== "criar_os_solicitante"
     ) {
       // User wants to return to menu - only if they have a client ID
       if (state.data?.clienteId) {
@@ -140,99 +141,99 @@ async function processUserMessage(from: string, messageBody: string) {
     }
 
     switch (currentStage) {
-      case ConversationStage.TIPO_CLIENTE:
+      case "tipo_cliente":
         await handleTipoCliente(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CODIGO_CLIENTE:
+      case "codigo_cliente":
         await handleCodigoCliente(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.NOME_CLIENTE:
+      case "nome_cliente":
         await handleNomeCliente(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CADASTRO_CNPJ:
+      case "cadastro_cnpj":
         await handleCadastroCNPJ(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CADASTRO_CEP:
+      case "cadastro_confirmar_cliente_existente":
+        await handleCadastroConfirmarClienteExistente(from, messageBody, state?.data || {})
+        break
+
+      case "cadastro_cep":
         await handleCadastroCEP(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CADASTRO_NUMERO:
+      case "cadastro_numero":
         await handleCadastroNumero(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CADASTRO_CONFIRMAR_ENDERECO:
+      case "cadastro_confirmar_endereco":
         await handleCadastroConfirmarEndereco(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CADASTRO_TELEFONE:
+      case "cadastro_telefone":
         await handleCadastroTelefone(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CADASTRO_EMAIL:
+      case "cadastro_email":
         await handleCadastroEmail(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CADASTRO_SINDICO:
+      case "cadastro_sindico":
         await handleCadastroSindico(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CADASTRO_SOLICITANTE:
-        await handleCadastroSolicitante(from, messageBody, state?.data || {})
-        break
-
-      case ConversationStage.CADASTRO_CONFIRMAR:
-        await handleCadastroConfirmar(from, messageBody, state?.data || {})
-        break
-
-      case ConversationStage.SELECIONAR_CLIENTE:
-        await handleSelecionarCliente(from, messageBody, state?.data || {})
-        break
-
-      case ConversationStage.CLIENTE_NAO_ENCONTRADO:
-        await handleClienteNaoEncontrado(from, messageBody, state?.data || {})
-        break
-
-      case ConversationStage.CADASTRO_ENDERECO:
+      case "cadastro_endereco":
         await handleCadastroEndereco(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CADASTRO_CIDADE:
+      case "cadastro_cidade":
         await handleCadastroCidade(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.MENU:
+      case "cadastro_confirmar":
+        await handleCadastroConfirmar(from, messageBody, state?.data || {})
+        break
+
+      case "selecionar_cliente":
+        await handleSelecionarCliente(from, messageBody, state?.data || {})
+        break
+
+      case "cliente_nao_encontrado":
+        await handleClienteNaoEncontrado(from, messageBody, state?.data || {})
+        break
+
+      case "menu":
         await handleMenuOption(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CRIAR_OS_TIPO_ATENDIMENTO:
+      case "criar_os_tipo_atendimento":
         await handleTipoAtendimento(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CRIAR_OS_DATA_AGENDAMENTO:
+      case "criar_os_data_agendamento":
         await handleDataAgendamento(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CRIAR_OS_PERIODO_AGENDAMENTO:
+      case "criar_os_periodo_agendamento":
         await handlePeriodoAgendamento(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CRIAR_OS_SOLICITANTE:
+      case "criar_os_solicitante":
         await handleCriarOSSolicitante(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CREATE_ORDER_DESC:
+      case "create_order_desc":
         await handleOrderDescription(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.QUERY_ORDER:
+      case "query_order":
         await handleQueryOrder(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.WAIT_AGENT:
+      case "wait_agent":
         await returnToMenu(from, state.data || {})
         break
 
@@ -251,7 +252,7 @@ async function handleTipoCliente(from: string, message: string, data: any) {
 
   if (opcao === "1") {
     // Cliente existente - pedir código CNPJ
-    await updateConversationState(from, ConversationStage.CODIGO_CLIENTE, { ...data, tipo: "existente" })
+    await updateConversationState(from, "codigo_cliente", { ...data, tipo: "existente" })
     await sendMessage(
       from,
       "✅ *Cliente Existente*\n\n" +
@@ -261,7 +262,7 @@ async function handleTipoCliente(from: string, message: string, data: any) {
     )
   } else if (opcao === "2") {
     // Primeiro contato - iniciar cadastro
-    await updateConversationState(from, ConversationStage.NOME_CLIENTE, { ...data, tipo: "novo" })
+    await updateConversationState(from, "nome_cliente", { ...data, tipo: "novo" })
     await sendMessage(
       from,
       "👋 *Bem-vindo!*\n\n" +
@@ -291,7 +292,7 @@ async function handleCodigoCliente(from: string, message: string, data: any) {
   const cliente = await findClientByCodigo(codigo)
 
   if (!cliente) {
-    await updateConversationState(from, ConversationStage.CLIENTE_NAO_ENCONTRADO, {
+    await updateConversationState(from, "cliente_nao_encontrado", {
       ...data,
       codigoBuscado: codigo,
     })
@@ -305,7 +306,7 @@ async function handleCodigoCliente(from: string, message: string, data: any) {
     )
   } else {
     // Cliente encontrado
-    await updateConversationState(from, ConversationStage.MENU, {
+    await updateConversationState(from, "menu", {
       ...data,
       clienteId: cliente.id,
       clienteNome: cliente.nome,
@@ -333,7 +334,7 @@ async function handleNomeCliente(from: string, message: string, data: any) {
   }
 
   // Novo cliente - pedir CNPJ
-  await updateConversationState(from, ConversationStage.CADASTRO_CNPJ, { ...data, nome })
+  await updateConversationState(from, "cadastro_cnpj", { ...data, nome })
   await sendMessage(
     from,
     `Perfeito, *${nome}*! 👍\n\n` +
@@ -358,17 +359,87 @@ async function handleCadastroCNPJ(from: string, message: string, data: any) {
   // Formatar CNPJ
   const cnpjFormatado = cnpjLimpo.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
 
-  await updateConversationState(from, ConversationStage.CADASTRO_CEP, {
-    ...data,
-    cnpj: cnpjFormatado,
-  })
-  await sendMessage(
-    from,
-    `✅ CNPJ registrado!\n\n` +
-      `Agora, qual é o *CEP* do condomínio?\n\n` +
-      `📮 Formato: XXXXX-XXX\n\n` +
-      `Exemplo: _03295-000_`,
-  )
+  console.log("[v0] 🔍 Verificando se CNPJ já existe:", cnpjFormatado)
+  const clienteExistente = await findClientByCNPJ(cnpjFormatado)
+
+  if (clienteExistente) {
+    // Cliente já existe - perguntar se confirma
+    await updateConversationState(from, "cadastro_confirmar_cliente_existente", {
+      ...data,
+      cnpj: cnpjFormatado,
+      clienteExistente,
+    })
+    await sendMessage(
+      from,
+      `✅ *CNPJ já cadastrado!*\n\n` +
+        `Encontrei o seguinte cliente:\n\n` +
+        `*${clienteExistente.nome}*\n` +
+        `CNPJ: ${clienteExistente.cnpj}\n` +
+        `Código: ${clienteExistente.codigo}\n` +
+        `Telefone: ${clienteExistente.telefone || "Não informado"}\n` +
+        `Endereço: ${clienteExistente.endereco || "Não informado"}\n` +
+        `Cidade: ${clienteExistente.cidade || "Não informado"} - ${clienteExistente.estado || ""}\n\n` +
+        `É este cliente?\n\n` +
+        `*1* - Sim, continuar\n` +
+        `*2* - Não, fazer novo cadastro`,
+    )
+  } else {
+    // CNPJ não existe - continuar cadastro
+    await updateConversationState(from, "cadastro_cep", {
+      ...data,
+      cnpj: cnpjFormatado,
+    })
+    await sendMessage(
+      from,
+      `✅ CNPJ registrado!\n\n` +
+        `Agora, qual é o *CEP* do condomínio?\n\n` +
+        `📮 Formato: XXXXX-XXX\n\n` +
+        `Exemplo: _03295-000_`,
+    )
+  }
+}
+
+async function handleCadastroConfirmarClienteExistente(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  if (opcao === "1") {
+    // Confirmar cliente existente - ir para menu principal
+    const cliente = data.clienteExistente
+    await updateConversationState(from, "menu", {
+      ...data,
+      clienteId: cliente.id,
+      clienteNome: cliente.nome,
+    })
+    await sendMessage(
+      from,
+      `✅ *Cliente identificado!*\n\n` +
+        `*${cliente.nome}*\n` +
+        `Código: ${cliente.codigo}\n` +
+        `CNPJ: ${cliente.cnpj}\n\n` +
+        `Agora escolha uma opção:\n\n` +
+        `*1* - Criar ordem de serviço\n` +
+        `*2* - Consultar ordem de serviço\n` +
+        `*3* - Falar com atendente`,
+    )
+  } else if (opcao === "2") {
+    // Não é este cliente - continuar cadastro
+    await updateConversationState(from, "cadastro_cep", {
+      ...data,
+      clienteExistente: undefined,
+    })
+    await sendMessage(
+      from,
+      `📝 Ok! Vamos continuar o cadastro.\n\n` +
+        `Qual é o *CEP* do condomínio?\n\n` +
+        `📮 Formato: XXXXX-XXX\n\n` +
+        `Exemplo: _03295-000_`,
+    )
+  } else {
+    await sendMessage(
+      from,
+      `❌ Opção inválida.\n\n` + `Digite:\n` + `*1* - Sim, continuar\n` + `*2* - Não, fazer novo cadastro`,
+    )
+  }
 }
 
 async function handleCadastroCEP(from: string, message: string, data: any) {
@@ -397,7 +468,7 @@ async function handleCadastroCEP(from: string, message: string, data: any) {
   // Formatar CEP
   const cepFormatado = cepLimpo.replace(/^(\d{5})(\d{3})$/, "$1-$2")
 
-  await updateConversationState(from, ConversationStage.CADASTRO_NUMERO, {
+  await updateConversationState(from, "cadastro_numero", {
     ...data,
     cep: cepFormatado,
     endereco: cepData.data.logradouro,
@@ -430,7 +501,7 @@ async function handleCadastroNumero(from: string, message: string, data: any) {
   // Adicionar número ao endereço
   const enderecoCompleto = `${data.endereco}, ${numero}`
 
-  await updateConversationState(from, ConversationStage.CADASTRO_CONFIRMAR_ENDERECO, {
+  await updateConversationState(from, "cadastro_confirmar_endereco", {
     ...data,
     endereco: enderecoCompleto,
     numero,
@@ -454,15 +525,36 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
   const opcao = message.trim()
 
   if (opcao === "1") {
-    // Endereço correto, pedir telefone
-    await updateConversationState(from, ConversationStage.CADASTRO_TELEFONE, data)
-    await sendMessage(
-      from,
-      `✅ Endereço confirmado!\n\n` + `Agora, qual é o *telefone* de contato?\n\n` + `Exemplo: _(11) 99999-9999_`,
-    )
+    console.log("[v0] 📏 Calculando distância do cliente...")
+    const distanciaResult = await calcularDistanciaCliente(data.cep)
+
+    if (distanciaResult.success) {
+      console.log("[v0] ✅ Distância calculada:", distanciaResult.distanciaKm, "km")
+      await updateConversationState(from, "cadastro_telefone", {
+        ...data,
+        distanciaKm: distanciaResult.distanciaKm,
+        latitude: distanciaResult.latitude,
+        longitude: distanciaResult.longitude,
+      })
+      await sendMessage(
+        from,
+        `✅ Endereço confirmado!\n` +
+          `📏 Distância: ${distanciaResult.distanciaKm} km\n\n` +
+          `Agora, qual é o *telefone* de contato?\n\n` +
+          `Exemplo: _(11) 99999-9999_`,
+      )
+    } else {
+      // Erro ao calcular distância - continuar sem distância
+      console.log("[v0] ⚠️ Não foi possível calcular distância:", distanciaResult.error)
+      await updateConversationState(from, "cadastro_telefone", data)
+      await sendMessage(
+        from,
+        `✅ Endereço confirmado!\n\n` + `Agora, qual é o *telefone* de contato?\n\n` + `Exemplo: _(11) 99999-9999_`,
+      )
+    }
   } else if (opcao === "2") {
     // Corrigir endereço manualmente
-    await updateConversationState(from, ConversationStage.CADASTRO_ENDERECO, data)
+    await updateConversationState(from, "cadastro_endereco", data)
     await sendMessage(
       from,
       `📝 Ok! Digite o *endereço completo* do condomínio:\n\n` + `Exemplo: _Rua Exemplo, 123 - Bairro_`,
@@ -477,7 +569,7 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
 
 async function handleCadastroTelefone(from: string, message: string, data: any) {
   const telefone = message.trim()
-  await updateConversationState(from, ConversationStage.CADASTRO_EMAIL, { ...data, telefone })
+  await updateConversationState(from, "cadastro_email", { ...data, telefone })
   await sendMessage(
     from,
     `✅ Telefone registrado!\n\n` +
@@ -499,7 +591,7 @@ async function handleCadastroEmail(from: string, message: string, data: any) {
     return
   }
 
-  await updateConversationState(from, ConversationStage.CADASTRO_SINDICO, { ...data, email })
+  await updateConversationState(from, "cadastro_sindico", { ...data, email })
   await sendMessage(
     from,
     `✅ Email registrado!\n\n` + `Agora, qual é o *nome do síndico* do condomínio?\n\n` + `Exemplo: _João Silva_`,
@@ -514,25 +606,7 @@ async function handleCadastroSindico(from: string, message: string, data: any) {
     return
   }
 
-  await updateConversationState(from, ConversationStage.CADASTRO_SOLICITANTE, { ...data, sindico })
-  await sendMessage(
-    from,
-    `✅ Nome do síndico registrado!\n\n` +
-      `Por último, *qual é o seu nome?*\n` +
-      `(Pessoa que está solicitando o serviço)\n\n` +
-      `Exemplo: _Maria Santos_`,
-  )
-}
-
-async function handleCadastroSolicitante(from: string, message: string, data: any) {
-  const solicitante = message.trim()
-
-  if (!solicitante || solicitante.length < 3) {
-    await sendMessage(from, "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.")
-    return
-  }
-
-  await updateConversationState(from, ConversationStage.CADASTRO_CONFIRMAR, { ...data, solicitante })
+  await updateConversationState(from, "cadastro_confirmar", { ...data, sindico })
   await sendMessage(
     from,
     `📋 *Confirme seus dados:*\n\n` +
@@ -544,8 +618,9 @@ async function handleCadastroSolicitante(from: string, message: string, data: an
       `*Cidade:* ${data.cidade} - ${data.estado}\n` +
       `*Telefone:* ${data.telefone}\n` +
       `*Email:* ${data.email}\n` +
-      `*Síndico:* ${data.sindico}\n` +
-      `*Solicitante:* ${solicitante}\n\n` +
+      `*Síndico:* ${sindico}\n` +
+      (data.distanciaKm ? `*Distância:* ${data.distanciaKm} km\n` : "") +
+      `\n` +
       `Está tudo correto?\n\n` +
       `*1* - Sim, cadastrar\n` +
       `*2* - Não, corrigir`,
@@ -570,22 +645,26 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
         telefone: data.telefone,
         email: data.email,
         sindico: data.sindico,
+        distanciaKm: data.distanciaKm,
+        latitude: data.latitude,
+        longitude: data.longitude,
       })
 
       const codigo = data.cnpj.replace(/\D/g, "").substring(0, 6)
 
-      await updateConversationState(from, ConversationStage.MENU, {
+      await updateConversationState(from, "menu", {
         ...data,
         clienteId,
         clienteNome: data.nome,
-        solicitadoPor: data.solicitante, // Salvar nome do solicitante para usar na criação da OS
       })
       await sendMessage(
         from,
         `✅ *Cadastro realizado com sucesso!*\n\n` +
           `*${data.nome}*\n` +
           `Código: ${codigo}\n` +
-          `CNPJ: ${data.cnpj}\n\n` +
+          `CNPJ: ${data.cnpj}\n` +
+          (data.distanciaKm ? `Distância: ${data.distanciaKm} km\n` : "") +
+          `\n` +
           `Agora escolha uma opção:\n\n` +
           `*1* - Criar ordem de serviço\n` +
           `*2* - Consultar ordem de serviço\n` +
@@ -598,7 +677,7 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
     }
   } else if (opcao === "2") {
     // Reiniciar cadastro
-    await updateConversationState(from, ConversationStage.NOME_CLIENTE, { tipo: "novo" })
+    await updateConversationState(from, "nome_cliente", { tipo: "novo" })
     await sendMessage(from, `🔄 Ok! Vamos recomeçar.\n\nQual é o *nome do condomínio*?`)
   } else {
     await sendMessage(from, `❌ Opção inválida.\n\n` + `Digite:\n` + `*1* - Sim, cadastrar\n` + `*2* - Não, corrigir`)
@@ -611,7 +690,7 @@ async function handleSelecionarCliente(from: string, message: string, data: any)
 
   if (opcao >= 1 && opcao <= clientes.length) {
     const cliente = clientes[opcao - 1]
-    await updateConversationState(from, ConversationStage.MENU, {
+    await updateConversationState(from, "menu", {
       ...data,
       clienteId: cliente.id,
       clienteNome: cliente.nome,
@@ -636,14 +715,14 @@ async function handleClienteNaoEncontrado(from: string, message: string, data: a
 
   if (opcao === "1") {
     // Iniciar cadastro
-    await updateConversationState(from, ConversationStage.NOME_CLIENTE, {
+    await updateConversationState(from, "nome_cliente", {
       ...data,
       tipo: "novo",
     })
     await sendMessage(from, `📝 *Novo Cadastro*\n\n` + `Vou fazer seu cadastro!\n\n` + `Qual é o *nome do condomínio*?`)
   } else if (opcao === "2") {
     // Tentar outro código
-    await updateConversationState(from, ConversationStage.CODIGO_CLIENTE, { ...data, tipo: "existente" })
+    await updateConversationState(from, "codigo_cliente", { ...data, tipo: "existente" })
     await sendMessage(from, `🔍 Ok! Digite os *6 primeiros dígitos do CNPJ* novamente:\n\n` + `Exemplo: _123456_`)
   } else {
     await sendMessage(
@@ -655,13 +734,13 @@ async function handleClienteNaoEncontrado(from: string, message: string, data: a
 
 async function handleCadastroEndereco(from: string, message: string, data: any) {
   const endereco = message.trim()
-  await updateConversationState(from, ConversationStage.CADASTRO_CIDADE, { ...data, endereco })
+  await updateConversationState(from, "cadastro_cidade", { ...data, endereco })
   await sendMessage(from, `✅ Endereço registrado!\n\n` + `Qual é a sua *cidade*?\n\n` + `Exemplo: _São Paulo_`)
 }
 
 async function handleCadastroCidade(from: string, message: string, data: any) {
   const cidade = message.trim()
-  await updateConversationState(from, ConversationStage.CADASTRO_CONFIRMAR, { ...data, cidade })
+  await updateConversationState(from, "cadastro_confirmar", { ...data, cidade })
   await sendMessage(
     from,
     `📋 *Confirme seus dados:*\n\n` +
@@ -686,7 +765,7 @@ async function handleMenuOption(from: string, option: string, data: any) {
   switch (option) {
     case "1":
       // Criar nova ordem de serviço
-      await updateConversationState(from, ConversationStage.CRIAR_OS_TIPO_ATENDIMENTO, data)
+      await updateConversationState(from, "criar_os_tipo_atendimento", data)
       await sendMessage(
         from,
         "📝 *Criar Nova Ordem de Serviço*\n\n" +
@@ -698,7 +777,7 @@ async function handleMenuOption(from: string, option: string, data: any) {
       break
 
     case "2":
-      await updateConversationState(from, ConversationStage.QUERY_ORDER, data)
+      await updateConversationState(from, "query_order", data)
       await sendMessage(
         from,
         "🔍 *Consultar Ordem de Serviço*\n\n" + "Digite o número da ordem de serviço que deseja consultar:",
@@ -708,7 +787,7 @@ async function handleMenuOption(from: string, option: string, data: any) {
     case "3":
       // Falar com atendente
       await saveAtendimentoRequest(from, data.clienteId)
-      await updateConversationState(from, ConversationStage.WAIT_AGENT, data)
+      await updateConversationState(from, "wait_agent", data)
       await sendMessage(
         from,
         "📞 *Solicitação de Atendimento*\n\n" +
@@ -735,7 +814,7 @@ async function handleTipoAtendimento(from: string, message: string, data: any) {
   const opcao = message.trim()
 
   if (opcao === "1") {
-    await updateConversationState(from, ConversationStage.CRIAR_OS_SOLICITANTE, {
+    await updateConversationState(from, "criar_os_solicitante", {
       ...data,
       tipoAtendimento: "hoje",
     })
@@ -748,7 +827,7 @@ async function handleTipoAtendimento(from: string, message: string, data: any) {
     )
   } else if (opcao === "2") {
     // Agendar - pedir data
-    await updateConversationState(from, ConversationStage.CRIAR_OS_DATA_AGENDAMENTO, {
+    await updateConversationState(from, "criar_os_data_agendamento", {
       ...data,
       tipoAtendimento: "agendado",
     })
@@ -789,7 +868,7 @@ async function handleDataAgendamento(from: string, message: string, data: any) {
   // Converter para formato YYYY-MM-DD para o banco
   const dataFormatada = validation.date!.toISOString().split("T")[0]
 
-  await updateConversationState(from, ConversationStage.CRIAR_OS_PERIODO_AGENDAMENTO, {
+  await updateConversationState(from, "criar_os_periodo_agendamento", {
     ...data,
     dataAgendamento: dataFormatada,
     dataAgendamentoFormatada: dataStr,
@@ -840,7 +919,7 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
     return
   }
 
-  await updateConversationState(from, ConversationStage.CRIAR_OS_SOLICITANTE, {
+  await updateConversationState(from, "criar_os_solicitante", {
     ...data,
     periodoAgendamento: periodo,
     periodoAgendamentoLabel: periodoLabel,
@@ -866,7 +945,7 @@ async function handleCriarOSSolicitante(from: string, message: string, data: any
     return
   }
 
-  await updateConversationState(from, ConversationStage.CREATE_ORDER_DESC, {
+  await updateConversationState(from, "create_order_desc", {
     ...data,
     solicitanteOS: solicitante,
   })
@@ -986,7 +1065,7 @@ async function handleOrderDescription(from: string, description: string, data: a
       "*3* - Falar com atendente"
 
     await sendMessage(from, mensagemConfirmacao)
-    await updateConversationState(from, ConversationStage.MENU, data)
+    await updateConversationState(from, "menu", data)
   } catch (error) {
     console.error("[v0] ❌ Erro ao criar ordem:", error)
     console.error("[v0] ❌ Stack trace:", error instanceof Error ? error.stack : "N/A")
@@ -1054,7 +1133,7 @@ async function handleQueryOrder(from: string, orderId: string, data: any) {
       "*3* - Falar com atendente"
 
     await sendMessage(from, message)
-    await updateConversationState(from, ConversationStage.MENU, data)
+    await updateConversationState(from, "menu", data)
   } catch (error) {
     console.error("[v0] ❌ Erro ao consultar ordem:", error)
     await sendMessage(from, "❌ Erro ao consultar ordem. Por favor, tente novamente.")
@@ -1069,7 +1148,7 @@ async function returnToMenu(from: string, data: any) {
     return
   }
 
-  await updateConversationState(from, ConversationStage.MENU, data)
+  await updateConversationState(from, "menu", data)
   await sendMessage(
     from,
     `🏠 *Menu Principal*\n\n` +
@@ -1083,7 +1162,7 @@ async function returnToMenu(from: string, data: any) {
 
 async function sendTipoClienteMenu(from: string) {
   await clearConversationState(from)
-  await updateConversationState(from, ConversationStage.TIPO_CLIENTE, {})
+  await updateConversationState(from, "tipo_cliente", {})
   await sendMessage(
     from,
     "👋 *Bem-vindo ao Gestor Financeiro!*\n\n" +
