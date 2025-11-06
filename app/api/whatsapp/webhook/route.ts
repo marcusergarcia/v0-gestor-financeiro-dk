@@ -9,6 +9,8 @@ import {
   generateOrderNumber,
   saveAtendimentoRequest,
   fetchCepData,
+  checkAgendamentoDisponivel,
+  validateDate,
   ConversationStage,
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
@@ -123,7 +125,10 @@ async function processUserMessage(from: string, messageBody: string) {
       currentStage !== ConversationStage.CADASTRO_SINDICO &&
       currentStage !== ConversationStage.CADASTRO_SOLICITANTE &&
       currentStage !== ConversationStage.CADASTRO_CONFIRMAR &&
-      currentStage !== ConversationStage.CADASTRO_CONFIRMAR_ENDERECO
+      currentStage !== ConversationStage.CADASTRO_CONFIRMAR_ENDERECO &&
+      currentStage !== ConversationStage.CRIAR_OS_TIPO_ATENDIMENTO &&
+      currentStage !== ConversationStage.CRIAR_OS_DATA_AGENDAMENTO &&
+      currentStage !== ConversationStage.CRIAR_OS_PERIODO_AGENDAMENTO
     ) {
       // User wants to return to menu - only if they have a client ID
       if (state.data?.clienteId) {
@@ -195,6 +200,18 @@ async function processUserMessage(from: string, messageBody: string) {
 
       case ConversationStage.MENU:
         await handleMenuOption(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CRIAR_OS_TIPO_ATENDIMENTO:
+        await handleTipoAtendimento(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CRIAR_OS_DATA_AGENDAMENTO:
+        await handleDataAgendamento(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CRIAR_OS_PERIODO_AGENDAMENTO:
+        await handlePeriodoAgendamento(from, messageBody, state?.data || {})
         break
 
       case ConversationStage.CREATE_ORDER_DESC:
@@ -630,12 +647,14 @@ async function handleMenuOption(from: string, option: string, data: any) {
   switch (option) {
     case "1":
       // Criar nova ordem de serviço
-      await updateConversationState(from, ConversationStage.CREATE_ORDER_DESC, data)
+      await updateConversationState(from, ConversationStage.CRIAR_OS_TIPO_ATENDIMENTO, data)
       await sendMessage(
         from,
         "📝 *Criar Nova Ordem de Serviço*\n\n" +
-          "Por favor, descreva o problema ou serviço necessário:\n\n" +
-          "Exemplo: _Verificar câmeras do hall do bloco A_",
+          "O atendimento é para hoje ou deseja agendar?\n\n" +
+          "*1* - Para hoje\n" +
+          "*2* - Agendar para data específica\n\n" +
+          "_Digite o número da opção desejada_",
       )
       break
 
@@ -662,7 +681,6 @@ async function handleMenuOption(from: string, option: string, data: any) {
       break
 
     default:
-      // Opção inválida - mostrar menu novamente
       await sendMessage(
         from,
         `❌ Opção inválida.\n\n` +
@@ -674,6 +692,133 @@ async function handleMenuOption(from: string, option: string, data: any) {
   }
 }
 
+async function handleTipoAtendimento(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  if (opcao === "1") {
+    // Para hoje - ir direto para descrição
+    await updateConversationState(from, ConversationStage.CREATE_ORDER_DESC, {
+      ...data,
+      tipoAtendimento: "hoje",
+    })
+    await sendMessage(
+      from,
+      "📝 *Atendimento para Hoje*\n\n" +
+        "Por favor, descreva o problema ou serviço necessário:\n\n" +
+        "Exemplo: _Verificar câmeras do hall do bloco A_",
+    )
+  } else if (opcao === "2") {
+    // Agendar - pedir data
+    await updateConversationState(from, ConversationStage.CRIAR_OS_DATA_AGENDAMENTO, {
+      ...data,
+      tipoAtendimento: "agendado",
+    })
+    await sendMessage(
+      from,
+      "📅 *Agendar Atendimento*\n\n" +
+        "Digite a data desejada para o atendimento:\n\n" +
+        "📋 Formato: DD/MM/AAAA\n" +
+        "Exemplo: _15/01/2025_\n\n" +
+        "⚠️ Apenas dias úteis (segunda a sexta)",
+    )
+  } else {
+    await sendMessage(
+      from,
+      "❌ Opção inválida.\n\n" + "Digite:\n" + "*1* - Para hoje\n" + "*2* - Agendar para data específica",
+    )
+  }
+}
+
+async function handleDataAgendamento(from: string, message: string, data: any) {
+  const dataStr = message.trim()
+
+  // Validar data
+  const validation = validateDate(dataStr)
+
+  if (!validation.valid) {
+    await sendMessage(
+      from,
+      `❌ ${validation.error}\n\n` +
+        "Por favor, digite uma data válida:\n\n" +
+        "📋 Formato: DD/MM/AAAA\n" +
+        "Exemplo: _15/01/2025_\n\n" +
+        "⚠️ Apenas dias úteis (segunda a sexta)",
+    )
+    return
+  }
+
+  // Converter para formato YYYY-MM-DD para o banco
+  const dataFormatada = validation.date!.toISOString().split("T")[0]
+
+  await updateConversationState(from, ConversationStage.CRIAR_OS_PERIODO_AGENDAMENTO, {
+    ...data,
+    dataAgendamento: dataFormatada,
+    dataAgendamentoFormatada: dataStr,
+  })
+
+  await sendMessage(
+    from,
+    `✅ Data selecionada: *${dataStr}*\n\n` +
+      "Agora escolha o período:\n\n" +
+      "*1* - Manhã (08:00 - 12:00)\n" +
+      "*2* - Tarde (13:00 - 18:00)\n\n" +
+      "_Digite o número da opção desejada_",
+  )
+}
+
+async function handlePeriodoAgendamento(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  let periodo: string
+  let periodoLabel: string
+
+  if (opcao === "1") {
+    periodo = "manha"
+    periodoLabel = "Manhã (08:00 - 12:00)"
+  } else if (opcao === "2") {
+    periodo = "tarde"
+    periodoLabel = "Tarde (13:00 - 18:00)"
+  } else {
+    await sendMessage(
+      from,
+      "❌ Opção inválida.\n\n" + "Digite:\n" + "*1* - Manhã (08:00 - 12:00)\n" + "*2* - Tarde (13:00 - 18:00)",
+    )
+    return
+  }
+
+  // Verificar disponibilidade
+  const { disponivel, count } = await checkAgendamentoDisponivel(data.dataAgendamento, periodo)
+
+  if (!disponivel) {
+    await sendMessage(
+      from,
+      `⚠️ *Período já escolhido*\n\n` +
+        `Já existe ${count} agendamento(s) para ${data.dataAgendamentoFormatada} no período da ${periodoLabel.split(" ")[0]}.\n\n` +
+        `Por favor, escolha outro período:\n\n` +
+        `*1* - Manhã (08:00 - 12:00)\n` +
+        `*2* - Tarde (13:00 - 18:00)`,
+    )
+    return
+  }
+
+  // Período disponível - pedir descrição
+  await updateConversationState(from, ConversationStage.CREATE_ORDER_DESC, {
+    ...data,
+    periodoAgendamento: periodo,
+    periodoAgendamentoLabel: periodoLabel,
+  })
+
+  await sendMessage(
+    from,
+    `✅ *Agendamento Confirmado*\n\n` +
+      `📅 Data: ${data.dataAgendamentoFormatada}\n` +
+      `🕐 Período: ${periodoLabel}\n\n` +
+      `⚠️ *Agendamento sujeito a confirmação*\n\n` +
+      `Agora, descreva o problema ou serviço necessário:\n\n` +
+      `Exemplo: _Verificar câmeras do hall do bloco A_`,
+  )
+}
+
 async function handleOrderDescription(from: string, description: string, data: any) {
   try {
     if (!data.clienteId) {
@@ -682,7 +827,6 @@ async function handleOrderDescription(from: string, description: string, data: a
       return
     }
 
-    // Buscar dados do cliente
     const clienteResult = await query("SELECT id, nome, endereco FROM clientes WHERE id = ?", [data.clienteId])
 
     if (!clienteResult || (clienteResult as any[]).length === 0) {
@@ -692,21 +836,21 @@ async function handleOrderDescription(from: string, description: string, data: a
     }
 
     const cliente = (clienteResult as any[])[0]
-
-    // Gerar número da ordem
     const numeroOrdem = await generateOrderNumber()
-
-    // Criar ordem de serviço
     const dataAtual = new Date().toISOString().split("T")[0]
-
-    // Usar nome do solicitante se disponível, senão usar nome do cliente
     const solicitadoPor = data.solicitante || data.solicitadoPor || cliente.nome
+
+    const tipoAtendimento = data.tipoAtendimento || "hoje"
+    const situacao = tipoAtendimento === "agendado" ? "agendada" : "aberta"
+    const dataAgendamento = data.dataAgendamento || null
+    const periodoAgendamento = data.periodoAgendamento || null
 
     await query(
       `INSERT INTO ordens_servico 
        (numero, cliente_id, tecnico_name, tecnico_email, data_atual, tipo_servico, 
-        descricao_defeito, responsavel, nome_responsavel, solicitado_por, situacao, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        descricao_defeito, responsavel, nome_responsavel, solicitado_por, situacao, 
+        data_agendamento, periodo_agendamento, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         numeroOrdem,
         cliente.id,
@@ -717,30 +861,38 @@ async function handleOrderDescription(from: string, description: string, data: a
         description,
         "sindico",
         cliente.nome,
-        solicitadoPor, // Nome de quem está solicitando
-        "aberta",
+        solicitadoPor,
+        situacao,
+        dataAgendamento,
+        periodoAgendamento,
       ],
     )
 
     console.log("[v0] ✅ Ordem criada:", numeroOrdem, "para cliente:", cliente.nome)
 
-    // Enviar confirmação
-    await sendMessage(
-      from,
+    let mensagemConfirmacao =
       "✅ *Ordem de Serviço Criada!*\n\n" +
-        `📋 Número: *${numeroOrdem}*\n` +
-        `👤 Cliente: ${cliente.nome}\n` +
-        `📍 Endereço: ${cliente.endereco || "Não informado"}\n` +
-        `📝 Descrição: ${description}\n` +
-        `✍️ Solicitado por: ${solicitadoPor}\n\n` +
-        "🔔 Você receberá atualizações sobre o andamento do serviço.\n\n" +
-        "Deseja fazer mais alguma coisa?\n\n" +
-        "*1* - Criar outra OS\n" +
-        "*2* - Consultar OS\n" +
-        "*3* - Falar com atendente",
-    )
+      `📋 Número: *${numeroOrdem}*\n` +
+      `👤 Cliente: ${cliente.nome}\n` +
+      `📍 Endereço: ${cliente.endereco || "Não informado"}\n`
 
-    // Manter estado no menu
+    if (tipoAtendimento === "agendado") {
+      mensagemConfirmacao +=
+        `📅 Data: ${data.dataAgendamentoFormatada}\n` +
+        `🕐 Período: ${data.periodoAgendamentoLabel}\n` +
+        `⚠️ *Agendamento sujeito a confirmação*\n`
+    }
+
+    mensagemConfirmacao +=
+      `📝 Descrição: ${description}\n` +
+      `✍️ Solicitado por: ${solicitadoPor}\n\n` +
+      "🔔 Você receberá atualizações sobre o andamento do serviço.\n\n" +
+      "Deseja fazer mais alguma coisa?\n\n" +
+      "*1* - Criar outra OS\n" +
+      "*2* - Consultar OS\n" +
+      "*3* - Falar com atendente"
+
+    await sendMessage(from, mensagemConfirmacao)
     await updateConversationState(from, ConversationStage.MENU, data)
   } catch (error) {
     console.error("[v0] ❌ Erro ao criar ordem:", error)

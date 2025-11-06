@@ -17,6 +17,9 @@ export enum ConversationStage {
   CADASTRO_CIDADE = "cadastro_cidade",
   CADASTRO_CONFIRMAR = "cadastro_confirmar",
   MENU = "menu",
+  CRIAR_OS_TIPO_ATENDIMENTO = "criar_os_tipo_atendimento",
+  CRIAR_OS_DATA_AGENDAMENTO = "criar_os_data_agendamento",
+  CRIAR_OS_PERIODO_AGENDAMENTO = "criar_os_periodo_agendamento",
   CREATE_ORDER_DESC = "create_order_desc",
   QUERY_ORDER = "query_order",
   WAIT_AGENT = "wait_agent",
@@ -359,5 +362,76 @@ export async function fetchCepData(cep: string): Promise<{
   } catch (error) {
     console.error("[v0] ❌ Erro ao buscar CEP:", error)
     return { success: false, error: "Erro ao consultar CEP" }
+  }
+}
+
+export async function checkAgendamentoDisponivel(
+  data: string,
+  periodo: string,
+): Promise<{ disponivel: boolean; count: number }> {
+  try {
+    console.log("[v0] 🔍 Verificando disponibilidade de agendamento para:", data, periodo)
+
+    const result = await query(
+      `SELECT COUNT(*) as count 
+       FROM ordens_servico 
+       WHERE data_agendamento = ? 
+       AND periodo_agendamento = ? 
+       AND situacao = 'agendada'`,
+      [data, periodo],
+    )
+
+    const count = (result as any[])[0]?.count || 0
+    const disponivel = count === 0
+
+    console.log("[v0] ✅ Agendamentos encontrados:", count)
+    console.log("[v0] ✅ Disponível:", disponivel)
+
+    return { disponivel, count }
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao verificar disponibilidade:", error)
+    return { disponivel: true, count: 0 }
+  }
+}
+
+export function validateDate(dateStr: string): {
+  valid: boolean
+  date?: Date
+  error?: string
+} {
+  try {
+    // Aceitar formato DD/MM/AAAA
+    const parts = dateStr.split("/")
+    if (parts.length !== 3) {
+      return { valid: false, error: "Formato inválido. Use DD/MM/AAAA" }
+    }
+
+    const day = Number.parseInt(parts[0])
+    const month = Number.parseInt(parts[1]) - 1 // Mês começa em 0
+    const year = Number.parseInt(parts[2])
+
+    const date = new Date(year, month, day)
+
+    // Verificar se a data é válida
+    if (date.getDate() !== day || date.getMonth() !== month || date.getFullYear() !== year) {
+      return { valid: false, error: "Data inválida" }
+    }
+
+    // Verificar se não é no passado
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    if (date < hoje) {
+      return { valid: false, error: "Data não pode ser no passado" }
+    }
+
+    // Verificar se é dia útil (seg-sex)
+    const diaSemana = date.getDay()
+    if (diaSemana === 0 || diaSemana === 6) {
+      return { valid: false, error: "Data deve ser dia útil (segunda a sexta)" }
+    }
+
+    return { valid: true, date }
+  } catch (error) {
+    return { valid: false, error: "Erro ao validar data" }
   }
 }
