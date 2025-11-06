@@ -175,16 +175,19 @@ export async function findClientByCodigo(codigo: string): Promise<any | null> {
   try {
     console.log("[v0] 🔍 Buscando cliente por código:", codigo)
 
-    // Limpar código (remover pontos e traços)
     const cleanCodigo = codigo.replace(/\D/g, "").substring(0, 6)
+    // Remover zeros à esquerda, mas manter pelo menos um dígito
+    const normalizedCodigo = cleanCodigo.replace(/^0+/, "") || "0"
     console.log("[v0] 🔢 Código limpo:", cleanCodigo)
+    console.log("[v0] 🔢 Código normalizado (sem zeros à esquerda):", normalizedCodigo)
 
+    // Buscar tanto pelo código com zeros quanto sem zeros
     const result = await query(
       `SELECT id, codigo, nome, cnpj, telefone, email, cidade, estado 
        FROM clientes 
-       WHERE codigo = ?
+       WHERE codigo = ? OR codigo = ?
        LIMIT 1`,
-      [cleanCodigo],
+      [cleanCodigo, normalizedCodigo],
     )
 
     if (!result || (result as any[]).length === 0) {
