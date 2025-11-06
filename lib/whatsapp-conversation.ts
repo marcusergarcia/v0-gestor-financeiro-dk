@@ -2,9 +2,11 @@ import { query } from "./db"
 
 export enum ConversationStage {
   TIPO_CLIENTE = "tipo_cliente",
+  CODIGO_CLIENTE = "codigo_cliente", // Novo stage para pedir código CNPJ
   NOME_CLIENTE = "nome_cliente",
   SELECIONAR_CLIENTE = "selecionar_cliente",
   CLIENTE_NAO_ENCONTRADO = "cliente_nao_encontrado",
+  CADASTRO_CNPJ = "cadastro_cnpj", // Novo stage para pedir CNPJ completo
   CADASTRO_TELEFONE = "cadastro_telefone",
   CADASTRO_ENDERECO = "cadastro_endereco",
   CADASTRO_CIDADE = "cadastro_cidade",
@@ -25,6 +27,8 @@ export interface ConversationState {
     clienteNome?: string
     tipo?: "existente" | "novo"
     nome?: string
+    cnpj?: string // Adicionado campo CNPJ
+    codigo?: string // Adicionado campo código
     telefone?: string
     endereco?: string
     cidade?: string
@@ -139,6 +143,36 @@ export async function findClientByPhone(phoneNumber: string): Promise<any | null
   }
 }
 
+export async function findClientByCodigo(codigo: string): Promise<any | null> {
+  try {
+    console.log("[v0] 🔍 Buscando cliente por código:", codigo)
+
+    // Limpar código (remover pontos e traços)
+    const cleanCodigo = codigo.replace(/\D/g, "").substring(0, 6)
+    console.log("[v0] 🔢 Código limpo:", cleanCodigo)
+
+    const result = await query(
+      `SELECT id, codigo, nome, cnpj, telefone, email, endereco, cidade, estado 
+       FROM clientes 
+       WHERE codigo = ?
+       LIMIT 1`,
+      [cleanCodigo],
+    )
+
+    if (!result || (result as any[]).length === 0) {
+      console.log("[v0] ⚠️ Cliente não encontrado")
+      return null
+    }
+
+    const cliente = (result as any[])[0]
+    console.log("[v0] ✅ Cliente encontrado:", cliente.nome)
+    return cliente
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao buscar cliente por código:", error)
+    return null
+  }
+}
+
 export async function generateOrderNumber(): Promise<string> {
   try {
     console.log("[v0] 🔢 Gerando número de ordem")
@@ -187,6 +221,7 @@ export async function findClientsByName(nome: string): Promise<any[]> {
 
 export async function createClient(data: {
   nome: string
+  cnpj: string
   telefone: string
   endereco?: string
   cidade?: string
@@ -194,14 +229,16 @@ export async function createClient(data: {
   try {
     console.log("[v0] 📝 Cadastrando novo cliente:", data.nome)
 
-    // Gerar código a partir do telefone (primeiros 6 dígitos)
-    const telefoneLimpo = data.telefone.replace(/\D/g, "")
-    const codigo = telefoneLimpo.substring(0, 6)
+    // Extrair código (6 primeiros dígitos do CNPJ)
+    const cnpjLimpo = data.cnpj.replace(/\D/g, "")
+    const codigo = cnpjLimpo.substring(0, 6)
+
+    console.log("[v0] 🔢 Código gerado:", codigo)
 
     const result = await query(
-      `INSERT INTO clientes (codigo, nome, telefone, endereco, cidade, created_at) 
-       VALUES (?, ?, ?, ?, ?, NOW())`,
-      [codigo, data.nome, data.telefone, data.endereco || null, data.cidade || null],
+      `INSERT INTO clientes (codigo, nome, cnpj, telefone, endereco, cidade, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+      [codigo, data.nome, data.cnpj, data.telefone, data.endereco || null, data.cidade || null],
     )
 
     const clienteId = (result as any).insertId

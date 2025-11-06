@@ -3,7 +3,7 @@ import {
   getConversationState,
   updateConversationState,
   clearConversationState,
-  findClientsByName,
+  findClientByCodigo,
   createClient,
   generateOrderNumber,
   saveAtendimentoRequest,
@@ -62,7 +62,14 @@ async function processUserMessage(from: string, messageBody: string) {
   try {
     // Buscar estado atual da conversa
     const state = await getConversationState(from)
-    const currentStage = state?.stage || ConversationStage.TIPO_CLIENTE
+
+    if (!state) {
+      console.log("[v0] 👋 Primeira interação detectada")
+      await sendTipoClienteMenu(from)
+      return
+    }
+
+    const currentStage = state.stage
 
     console.log("[v0] 📊 Estado atual:", currentStage)
     console.log("[v0] 📦 Dados salvos:", state?.data)
@@ -72,8 +79,16 @@ async function processUserMessage(from: string, messageBody: string) {
         await handleTipoCliente(from, messageBody, state?.data || {})
         break
 
+      case ConversationStage.CODIGO_CLIENTE:
+        await handleCodigoCliente(from, messageBody, state?.data || {})
+        break
+
       case ConversationStage.NOME_CLIENTE:
         await handleNomeCliente(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_CNPJ:
+        await handleCadastroCNPJ(from, messageBody, state?.data || {})
         break
 
       case ConversationStage.SELECIONAR_CLIENTE:
@@ -130,27 +145,76 @@ async function handleTipoCliente(from: string, message: string, data: any) {
   const opcao = message.trim()
 
   if (opcao === "1") {
-    // Cliente existente
-    await updateConversationState(from, ConversationStage.NOME_CLIENTE, { ...data, tipo: "existente" })
+    // Cliente existente - pedir código CNPJ
+    await updateConversationState(from, ConversationStage.CODIGO_CLIENTE, { ...data, tipo: "existente" })
     await sendMessage(
       from,
       "✅ *Cliente Existente*\n\n" +
-        "Para te identificar, digite o *nome* cadastrado no sistema.\n\n" +
-        "Exemplo: _COND. VILLAGGIO DI RAVENNA_",
+        "Para te identificar, digite os *6 primeiros dígitos do CNPJ* do seu condomínio.\n\n" +
+        "📋 Formato: *12.345.6*XX/XXXX-XX\n\n" +
+        "Exemplo: _123456_",
     )
   } else if (opcao === "2") {
-    // Primeiro contato
+    // Primeiro contato - iniciar cadastro
     await updateConversationState(from, ConversationStage.NOME_CLIENTE, { ...data, tipo: "novo" })
     await sendMessage(
       from,
       "👋 *Bem-vindo!*\n\n" +
         "Vou fazer seu cadastro rapidamente. 📝\n\n" +
-        "Para começar, qual é o *nome* ou *razão social*?",
+        "Para começar, qual é o *nome do condomínio*?",
     )
   } else {
     await sendMessage(
       from,
       "❌ Opção inválida.\n\n" + "Digite:\n" + "*1* - Já sou cliente\n" + "*2* - Primeiro contato",
+    )
+  }
+}
+
+async function handleCodigoCliente(from: string, message: string, data: any) {
+  const codigo = message.trim().replace(/\D/g, "").substring(0, 6)
+
+  if (!codigo || codigo.length < 6) {
+    await sendMessage(
+      from,
+      "❌ Código inválido.\n\n" + "Por favor, digite os *6 primeiros dígitos* do CNPJ.\n\n" + "Exemplo: _123456_",
+    )
+    return
+  }
+
+  console.log("[v0] 🔍 Buscando cliente por código:", codigo)
+  const cliente = await findClientByCodigo(codigo)
+
+  if (!cliente) {
+    await updateConversationState(from, ConversationStage.CLIENTE_NAO_ENCONTRADO, {
+      ...data,
+      codigoBuscado: codigo,
+    })
+    await sendMessage(
+      from,
+      `❌ *CNPJ não encontrado*\n\n` +
+        `Não encontrei nenhum cliente com o código *${codigo}*.\n\n` +
+        `Deseja fazer um novo cadastro?\n\n` +
+        `*1* - Sim, cadastrar\n` +
+        `*2* - Não, tentar outro código`,
+    )
+  } else {
+    // Cliente encontrado
+    await updateConversationState(from, ConversationStage.MENU, {
+      ...data,
+      clienteId: cliente.id,
+      clienteNome: cliente.nome,
+    })
+    await sendMessage(
+      from,
+      `✅ *Cliente identificado!*\n\n` +
+        `*${cliente.nome}*\n` +
+        `Código: ${cliente.codigo}\n` +
+        `CNPJ: ${cliente.cnpj || "Não informado"}\n\n` +
+        `Agora escolha uma opção:\n\n` +
+        `*1* - Criar ordem de serviço\n` +
+        `*2* - Consultar ordem de serviço\n` +
+        `*3* - Falar com atendente`,
     )
   }
 }
@@ -163,61 +227,40 @@ async function handleNomeCliente(from: string, message: string, data: any) {
     return
   }
 
-  if (data.tipo === "existente") {
-    // Buscar cliente existente
-    console.log("[v0] 🔍 Buscando cliente:", nome)
-    const clientes = await findClientsByName(nome)
+  // Novo cliente - pedir CNPJ
+  await updateConversationState(from, ConversationStage.CADASTRO_CNPJ, { ...data, nome })
+  await sendMessage(
+    from,
+    `Perfeito, *${nome}*! 👍\n\n` +
+      `Agora, qual é o *CNPJ* do condomínio?\n\n` +
+      `📋 Formato: XX.XXX.XXX/XXXX-XX\n\n` +
+      `Exemplo: _12.345.678/0001-90_`,
+  )
+}
 
-    if (clientes.length === 0) {
-      await updateConversationState(from, ConversationStage.CLIENTE_NAO_ENCONTRADO, { ...data, nomeBuscado: nome })
-      await sendMessage(
-        from,
-        `❌ *Cliente não encontrado*\n\n` +
-          `Não encontrei nenhum cliente com o nome "${nome}".\n\n` +
-          `Deseja fazer um novo cadastro?\n\n` +
-          `*1* - Sim, cadastrar\n` +
-          `*2* - Não, tentar outro nome`,
-      )
-    } else if (clientes.length === 1) {
-      // Cliente encontrado
-      const cliente = clientes[0]
-      await updateConversationState(from, ConversationStage.MENU, {
-        ...data,
-        clienteId: cliente.id,
-        clienteNome: cliente.nome,
-      })
-      await sendMessage(
-        from,
-        `✅ *Cliente identificado!*\n\n` +
-          `*${cliente.nome}*\n` +
-          `Código: ${cliente.codigo}\n\n` +
-          `Agora escolha uma opção:\n\n` +
-          `*1* - Criar ordem de serviço\n` +
-          `*2* - Consultar ordem de serviço\n` +
-          `*3* - Falar com atendente`,
-      )
-    } else {
-      // Múltiplos clientes encontrados
-      let mensagem = `🔍 Encontrei *${clientes.length}* clientes:\n\n`
-      clientes.forEach((c: any, index: number) => {
-        mensagem += `*${index + 1}* - ${c.nome} (${c.codigo})\n`
-      })
-      mensagem += `\nDigite o número do cliente correto:`
+async function handleCadastroCNPJ(from: string, message: string, data: any) {
+  const cnpj = message.trim()
+  const cnpjLimpo = cnpj.replace(/\D/g, "")
 
-      await updateConversationState(from, ConversationStage.SELECIONAR_CLIENTE, {
-        ...data,
-        clientesEncontrados: clientes,
-      })
-      await sendMessage(from, mensagem)
-    }
-  } else {
-    // Novo cliente - continuar cadastro
-    await updateConversationState(from, ConversationStage.CADASTRO_TELEFONE, { ...data, nome })
+  if (!cnpjLimpo || cnpjLimpo.length < 14) {
     await sendMessage(
       from,
-      `Perfeito, *${nome}*! 👍\n\n` + `Agora, qual é o seu *telefone*?\n\n` + `Exemplo: _(11) 99999-9999_`,
+      "❌ CNPJ inválido.\n\n" + "Por favor, digite o CNPJ completo (14 dígitos).\n\n" + "Exemplo: _12.345.678/0001-90_",
     )
+    return
   }
+
+  // Formatar CNPJ
+  const cnpjFormatado = cnpjLimpo.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
+
+  await updateConversationState(from, ConversationStage.CADASTRO_TELEFONE, {
+    ...data,
+    cnpj: cnpjFormatado,
+  })
+  await sendMessage(
+    from,
+    `✅ CNPJ registrado!\n\n` + `Agora, qual é o *telefone* de contato?\n\n` + `Exemplo: _(11) 99999-9999_`,
+  )
 }
 
 async function handleSelecionarCliente(from: string, message: string, data: any) {
@@ -251,26 +294,19 @@ async function handleClienteNaoEncontrado(from: string, message: string, data: a
 
   if (opcao === "1") {
     // Iniciar cadastro
-    await updateConversationState(from, ConversationStage.CADASTRO_TELEFONE, {
+    await updateConversationState(from, ConversationStage.NOME_CLIENTE, {
       ...data,
-      nome: data.nomeBuscado,
       tipo: "novo",
     })
-    await sendMessage(
-      from,
-      `📝 *Novo Cadastro*\n\n` +
-        `Vou fazer seu cadastro!\n\n` +
-        `Qual é o seu *telefone*?\n\n` +
-        `Exemplo: _(11) 99999-9999_`,
-    )
+    await sendMessage(from, `📝 *Novo Cadastro*\n\n` + `Vou fazer seu cadastro!\n\n` + `Qual é o *nome do condomínio*?`)
   } else if (opcao === "2") {
-    // Tentar outro nome
-    await updateConversationState(from, ConversationStage.NOME_CLIENTE, { ...data, tipo: "existente" })
-    await sendMessage(from, `🔍 Ok! Digite o *nome* do cliente novamente:`)
+    // Tentar outro código
+    await updateConversationState(from, ConversationStage.CODIGO_CLIENTE, { ...data, tipo: "existente" })
+    await sendMessage(from, `🔍 Ok! Digite os *6 primeiros dígitos do CNPJ* novamente:\n\n` + `Exemplo: _123456_`)
   } else {
     await sendMessage(
       from,
-      `❌ Opção inválida.\n\n` + `Digite:\n` + `*1* - Sim, cadastrar\n` + `*2* - Não, tentar outro nome`,
+      `❌ Opção inválida.\n\n` + `Digite:\n` + `*1* - Sim, cadastrar\n` + `*2* - Não, tentar outro código`,
     )
   }
 }
@@ -297,6 +333,7 @@ async function handleCadastroCidade(from: string, message: string, data: any) {
     from,
     `📋 *Confirme seus dados:*\n\n` +
       `*Nome:* ${data.nome}\n` +
+      `*CNPJ:* ${data.cnpj}\n` +
       `*Telefone:* ${data.telefone}\n` +
       `*Endereço:* ${data.endereco}\n` +
       `*Cidade:* ${cidade}\n\n` +
@@ -315,20 +352,25 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
 
       const clienteId = await createClient({
         nome: data.nome,
+        cnpj: data.cnpj,
         telefone: data.telefone,
         endereco: data.endereco,
         cidade: data.cidade,
       })
 
-      const telefoneLimpo = data.telefone.replace(/\D/g, "")
-      const codigo = telefoneLimpo.substring(0, 6)
+      const codigo = data.cnpj.replace(/\D/g, "").substring(0, 6)
 
-      await updateConversationState(from, ConversationStage.MENU, { ...data, clienteId, clienteNome: data.nome })
+      await updateConversationState(from, ConversationStage.MENU, {
+        ...data,
+        clienteId,
+        clienteNome: data.nome,
+      })
       await sendMessage(
         from,
         `✅ *Cadastro realizado com sucesso!*\n\n` +
           `*${data.nome}*\n` +
-          `Código: ${codigo}\n\n` +
+          `Código: ${codigo}\n` +
+          `CNPJ: ${data.cnpj}\n\n` +
           `Agora escolha uma opção:\n\n` +
           `*1* - Criar ordem de serviço\n` +
           `*2* - Consultar ordem de serviço\n` +
@@ -342,7 +384,7 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
   } else if (opcao === "2") {
     // Reiniciar cadastro
     await updateConversationState(from, ConversationStage.NOME_CLIENTE, { tipo: "novo" })
-    await sendMessage(from, `🔄 Ok! Vamos recomeçar.\n\nQual é o *nome* ou *razão social*?`)
+    await sendMessage(from, `🔄 Ok! Vamos recomeçar.\n\nQual é o *nome do condomínio*?`)
   } else {
     await sendMessage(from, `❌ Opção inválida.\n\n` + `Digite:\n` + `*1* - Sim, cadastrar\n` + `*2* - Não, corrigir`)
   }
