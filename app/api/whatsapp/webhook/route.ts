@@ -3,7 +3,8 @@ import {
   getConversationState,
   updateConversationState,
   clearConversationState,
-  findClientByPhone,
+  findClientsByName,
+  createClient,
   generateOrderNumber,
   saveAtendimentoRequest,
   ConversationStage,
@@ -61,23 +62,54 @@ async function processUserMessage(from: string, messageBody: string) {
   try {
     // Buscar estado atual da conversa
     const state = await getConversationState(from)
-    const currentStage = state?.stage || ConversationStage.MENU
+    const currentStage = state?.stage || ConversationStage.TIPO_CLIENTE
 
     console.log("[v0] 📊 Estado atual:", currentStage)
     console.log("[v0] 📦 Dados salvos:", state?.data)
 
-    // Processar baseado no estágio
     switch (currentStage) {
+      case ConversationStage.TIPO_CLIENTE:
+        await handleTipoCliente(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.NOME_CLIENTE:
+        await handleNomeCliente(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.SELECIONAR_CLIENTE:
+        await handleSelecionarCliente(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CLIENTE_NAO_ENCONTRADO:
+        await handleClienteNaoEncontrado(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_TELEFONE:
+        await handleCadastroTelefone(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_ENDERECO:
+        await handleCadastroEndereco(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_CIDADE:
+        await handleCadastroCidade(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_CONFIRMAR:
+        await handleCadastroConfirmar(from, messageBody, state?.data || {})
+        break
+
       case ConversationStage.MENU:
-        await handleMenuOption(from, messageBody)
+        await handleMenuOption(from, messageBody, state?.data || {})
         break
 
       case ConversationStage.CREATE_ORDER_DESC:
-        await handleOrderDescription(from, messageBody)
+        await handleOrderDescription(from, messageBody, state?.data || {})
         break
 
       case ConversationStage.QUERY_ORDER:
-        await handleQueryOrder(from, messageBody)
+        await handleQueryOrder(from, messageBody, state?.data || {})
         break
 
       case ConversationStage.WAIT_AGENT:
@@ -85,7 +117,7 @@ async function processUserMessage(from: string, messageBody: string) {
         break
 
       default:
-        await sendMainMenu(from)
+        await sendTipoClienteMenu(from)
     }
   } catch (error) {
     console.error("[v0] ❌ Erro ao processar mensagem:", error)
@@ -94,11 +126,239 @@ async function processUserMessage(from: string, messageBody: string) {
   }
 }
 
-async function handleMenuOption(from: string, option: string) {
+async function handleTipoCliente(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  if (opcao === "1") {
+    // Cliente existente
+    await updateConversationState(from, ConversationStage.NOME_CLIENTE, { ...data, tipo: "existente" })
+    await sendMessage(
+      from,
+      "✅ *Cliente Existente*\n\n" +
+        "Para te identificar, digite o *nome* cadastrado no sistema.\n\n" +
+        "Exemplo: _COND. VILLAGGIO DI RAVENNA_",
+    )
+  } else if (opcao === "2") {
+    // Primeiro contato
+    await updateConversationState(from, ConversationStage.NOME_CLIENTE, { ...data, tipo: "novo" })
+    await sendMessage(
+      from,
+      "👋 *Bem-vindo!*\n\n" +
+        "Vou fazer seu cadastro rapidamente. 📝\n\n" +
+        "Para começar, qual é o *nome* ou *razão social*?",
+    )
+  } else {
+    await sendMessage(
+      from,
+      "❌ Opção inválida.\n\n" + "Digite:\n" + "*1* - Já sou cliente\n" + "*2* - Primeiro contato",
+    )
+  }
+}
+
+async function handleNomeCliente(from: string, message: string, data: any) {
+  const nome = message.trim()
+
+  if (!nome || nome.length < 3) {
+    await sendMessage(from, "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.")
+    return
+  }
+
+  if (data.tipo === "existente") {
+    // Buscar cliente existente
+    console.log("[v0] 🔍 Buscando cliente:", nome)
+    const clientes = await findClientsByName(nome)
+
+    if (clientes.length === 0) {
+      await updateConversationState(from, ConversationStage.CLIENTE_NAO_ENCONTRADO, { ...data, nomeBuscado: nome })
+      await sendMessage(
+        from,
+        `❌ *Cliente não encontrado*\n\n` +
+          `Não encontrei nenhum cliente com o nome "${nome}".\n\n` +
+          `Deseja fazer um novo cadastro?\n\n` +
+          `*1* - Sim, cadastrar\n` +
+          `*2* - Não, tentar outro nome`,
+      )
+    } else if (clientes.length === 1) {
+      // Cliente encontrado
+      const cliente = clientes[0]
+      await updateConversationState(from, ConversationStage.MENU, {
+        ...data,
+        clienteId: cliente.id,
+        clienteNome: cliente.nome,
+      })
+      await sendMessage(
+        from,
+        `✅ *Cliente identificado!*\n\n` +
+          `*${cliente.nome}*\n` +
+          `Código: ${cliente.codigo}\n\n` +
+          `Agora escolha uma opção:\n\n` +
+          `*1* - Criar ordem de serviço\n` +
+          `*2* - Consultar ordem de serviço\n` +
+          `*3* - Falar com atendente`,
+      )
+    } else {
+      // Múltiplos clientes encontrados
+      let mensagem = `🔍 Encontrei *${clientes.length}* clientes:\n\n`
+      clientes.forEach((c: any, index: number) => {
+        mensagem += `*${index + 1}* - ${c.nome} (${c.codigo})\n`
+      })
+      mensagem += `\nDigite o número do cliente correto:`
+
+      await updateConversationState(from, ConversationStage.SELECIONAR_CLIENTE, {
+        ...data,
+        clientesEncontrados: clientes,
+      })
+      await sendMessage(from, mensagem)
+    }
+  } else {
+    // Novo cliente - continuar cadastro
+    await updateConversationState(from, ConversationStage.CADASTRO_TELEFONE, { ...data, nome })
+    await sendMessage(
+      from,
+      `Perfeito, *${nome}*! 👍\n\n` + `Agora, qual é o seu *telefone*?\n\n` + `Exemplo: _(11) 99999-9999_`,
+    )
+  }
+}
+
+async function handleSelecionarCliente(from: string, message: string, data: any) {
+  const opcao = Number.parseInt(message.trim())
+  const clientes = data.clientesEncontrados || []
+
+  if (opcao >= 1 && opcao <= clientes.length) {
+    const cliente = clientes[opcao - 1]
+    await updateConversationState(from, ConversationStage.MENU, {
+      ...data,
+      clienteId: cliente.id,
+      clienteNome: cliente.nome,
+    })
+    await sendMessage(
+      from,
+      `✅ *Cliente identificado!*\n\n` +
+        `*${cliente.nome}*\n` +
+        `Código: ${cliente.codigo}\n\n` +
+        `Agora escolha uma opção:\n\n` +
+        `*1* - Criar ordem de serviço\n` +
+        `*2* - Consultar ordem de serviço\n` +
+        `*3* - Falar com atendente`,
+    )
+  } else {
+    await sendMessage(from, `❌ Opção inválida. Digite um número entre 1 e ${clientes.length}.`)
+  }
+}
+
+async function handleClienteNaoEncontrado(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  if (opcao === "1") {
+    // Iniciar cadastro
+    await updateConversationState(from, ConversationStage.CADASTRO_TELEFONE, {
+      ...data,
+      nome: data.nomeBuscado,
+      tipo: "novo",
+    })
+    await sendMessage(
+      from,
+      `📝 *Novo Cadastro*\n\n` +
+        `Vou fazer seu cadastro!\n\n` +
+        `Qual é o seu *telefone*?\n\n` +
+        `Exemplo: _(11) 99999-9999_`,
+    )
+  } else if (opcao === "2") {
+    // Tentar outro nome
+    await updateConversationState(from, ConversationStage.NOME_CLIENTE, { ...data, tipo: "existente" })
+    await sendMessage(from, `🔍 Ok! Digite o *nome* do cliente novamente:`)
+  } else {
+    await sendMessage(
+      from,
+      `❌ Opção inválida.\n\n` + `Digite:\n` + `*1* - Sim, cadastrar\n` + `*2* - Não, tentar outro nome`,
+    )
+  }
+}
+
+async function handleCadastroTelefone(from: string, message: string, data: any) {
+  const telefone = message.trim()
+  await updateConversationState(from, ConversationStage.CADASTRO_ENDERECO, { ...data, telefone })
+  await sendMessage(
+    from,
+    `✅ Telefone registrado!\n\n` + `Agora, qual é o seu *endereço*?\n\n` + `Exemplo: _Rua Exemplo, 123_`,
+  )
+}
+
+async function handleCadastroEndereco(from: string, message: string, data: any) {
+  const endereco = message.trim()
+  await updateConversationState(from, ConversationStage.CADASTRO_CIDADE, { ...data, endereco })
+  await sendMessage(from, `✅ Endereço registrado!\n\n` + `Qual é a sua *cidade*?\n\n` + `Exemplo: _São Paulo_`)
+}
+
+async function handleCadastroCidade(from: string, message: string, data: any) {
+  const cidade = message.trim()
+  await updateConversationState(from, ConversationStage.CADASTRO_CONFIRMAR, { ...data, cidade })
+  await sendMessage(
+    from,
+    `📋 *Confirme seus dados:*\n\n` +
+      `*Nome:* ${data.nome}\n` +
+      `*Telefone:* ${data.telefone}\n` +
+      `*Endereço:* ${data.endereco}\n` +
+      `*Cidade:* ${cidade}\n\n` +
+      `Está tudo correto?\n\n` +
+      `*1* - Sim, cadastrar\n` +
+      `*2* - Não, corrigir`,
+  )
+}
+
+async function handleCadastroConfirmar(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  if (opcao === "1") {
+    try {
+      console.log("[v0] 📝 Cadastrando novo cliente:", data.nome)
+
+      const clienteId = await createClient({
+        nome: data.nome,
+        telefone: data.telefone,
+        endereco: data.endereco,
+        cidade: data.cidade,
+      })
+
+      const telefoneLimpo = data.telefone.replace(/\D/g, "")
+      const codigo = telefoneLimpo.substring(0, 6)
+
+      await updateConversationState(from, ConversationStage.MENU, { ...data, clienteId, clienteNome: data.nome })
+      await sendMessage(
+        from,
+        `✅ *Cadastro realizado com sucesso!*\n\n` +
+          `*${data.nome}*\n` +
+          `Código: ${codigo}\n\n` +
+          `Agora escolha uma opção:\n\n` +
+          `*1* - Criar ordem de serviço\n` +
+          `*2* - Consultar ordem de serviço\n` +
+          `*3* - Falar com atendente`,
+      )
+    } catch (error) {
+      console.error("[v0] ❌ Erro ao cadastrar cliente:", error)
+      await sendMessage(from, "❌ Desculpe, ocorreu um erro ao cadastrar. Por favor, tente novamente mais tarde.")
+      await clearConversationState(from)
+    }
+  } else if (opcao === "2") {
+    // Reiniciar cadastro
+    await updateConversationState(from, ConversationStage.NOME_CLIENTE, { tipo: "novo" })
+    await sendMessage(from, `🔄 Ok! Vamos recomeçar.\n\nQual é o *nome* ou *razão social*?`)
+  } else {
+    await sendMessage(from, `❌ Opção inválida.\n\n` + `Digite:\n` + `*1* - Sim, cadastrar\n` + `*2* - Não, corrigir`)
+  }
+}
+
+async function handleMenuOption(from: string, option: string, data: any) {
+  if (!data.clienteId) {
+    await sendMessage(from, "❌ Erro: Cliente não identificado. Vou reiniciar a conversa.")
+    await sendTipoClienteMenu(from)
+    return
+  }
+
   switch (option) {
     case "1":
       // Criar nova ordem de serviço
-      await updateConversationState(from, ConversationStage.CREATE_ORDER_DESC)
+      await updateConversationState(from, ConversationStage.CREATE_ORDER_DESC, data)
       await sendMessage(
         from,
         "📝 *Criar Nova Ordem de Serviço*\n\n" +
@@ -108,7 +368,7 @@ async function handleMenuOption(from: string, option: string) {
       break
 
     case "2":
-      await updateConversationState(from, ConversationStage.QUERY_ORDER)
+      await updateConversationState(from, ConversationStage.QUERY_ORDER, data)
       await sendMessage(
         from,
         "🔍 *Consultar Ordem de Serviço*\n\n" + "Digite o número da ordem de serviço que deseja consultar:",
@@ -117,9 +377,8 @@ async function handleMenuOption(from: string, option: string) {
 
     case "3":
       // Falar com atendente
-      const cliente = await findClientByPhone(from)
-      await saveAtendimentoRequest(from, cliente?.id)
-      await updateConversationState(from, ConversationStage.WAIT_AGENT)
+      await saveAtendimentoRequest(from, data.clienteId)
+      await updateConversationState(from, ConversationStage.WAIT_AGENT, data)
       await sendMessage(
         from,
         "📞 *Solicitação de Atendimento*\n\n" +
@@ -132,26 +391,35 @@ async function handleMenuOption(from: string, option: string) {
 
     default:
       // Opção inválida - mostrar menu novamente
-      await sendMainMenu(from)
+      await sendMessage(
+        from,
+        `❌ Opção inválida.\n\n` +
+          `Digite:\n` +
+          `*1* - Criar ordem de serviço\n` +
+          `*2* - Consultar ordem de serviço\n` +
+          `*3* - Falar com atendente`,
+      )
   }
 }
 
-async function handleOrderDescription(from: string, description: string) {
+async function handleOrderDescription(from: string, description: string, data: any) {
   try {
-    // Buscar cliente pelo telefone
-    const cliente = await findClientByPhone(from)
+    if (!data.clienteId) {
+      await sendMessage(from, "❌ Erro: Cliente não identificado. Vou reiniciar a conversa.")
+      await sendTipoClienteMenu(from)
+      return
+    }
 
-    if (!cliente) {
-      await sendMessage(
-        from,
-        "❌ *Cliente não encontrado*\n\n" +
-          "Seu número de telefone não está cadastrado no nosso sistema.\n\n" +
-          "Por favor, entre em contato conosco para cadastro:\n" +
-          "📞 (11) 1234-5678",
-      )
+    // Buscar dados do cliente
+    const clienteResult = await query("SELECT id, nome, endereco FROM clientes WHERE id = ?", [data.clienteId])
+
+    if (!clienteResult || (clienteResult as any[]).length === 0) {
+      await sendMessage(from, "❌ Erro: Cliente não encontrado.")
       await clearConversationState(from)
       return
     }
+
+    const cliente = (clienteResult as any[])[0]
 
     // Gerar número da ordem
     const numeroOrdem = await generateOrderNumber()
@@ -189,11 +457,14 @@ async function handleOrderDescription(from: string, description: string) {
         `📍 Endereço: ${cliente.endereco || "Não informado"}\n` +
         `📝 Descrição: ${description}\n\n` +
         "🔔 Você receberá atualizações sobre o andamento do serviço.\n\n" +
-        "_Digite qualquer mensagem para voltar ao menu principal_",
+        "Deseja fazer mais alguma coisa?\n\n" +
+        "*1* - Criar outra OS\n" +
+        "*2* - Consultar OS\n" +
+        "*3* - Falar com atendente",
     )
 
-    // Limpar estado da conversa
-    await clearConversationState(from)
+    // Manter estado no menu
+    await updateConversationState(from, ConversationStage.MENU, data)
   } catch (error) {
     console.error("[v0] ❌ Erro ao criar ordem:", error)
     await sendMessage(from, "❌ Erro ao criar ordem de serviço. Por favor, tente novamente mais tarde.")
@@ -201,7 +472,7 @@ async function handleOrderDescription(from: string, description: string) {
   }
 }
 
-async function handleQueryOrder(from: string, orderId: string) {
+async function handleQueryOrder(from: string, orderId: string, data: any) {
   try {
     // Buscar ordem pelo número
     const result = await query(
@@ -254,10 +525,13 @@ async function handleQueryOrder(from: string, orderId: string) {
       `Tipo: ${tipoMap[ordem.tipo_servico] || ordem.tipo_servico}\n\n` +
       `📝 Descrição:\n${ordem.descricao_defeito || "Não informada"}\n\n` +
       (ordem.servico_realizado ? `✨ Serviço Realizado:\n${ordem.servico_realizado}\n\n` : "") +
-      "_Digite qualquer mensagem para voltar ao menu principal_"
+      "Deseja fazer mais alguma coisa?\n\n" +
+      "*1* - Criar OS\n" +
+      "*2* - Consultar outra OS\n" +
+      "*3* - Falar com atendente"
 
     await sendMessage(from, message)
-    await clearConversationState(from)
+    await updateConversationState(from, ConversationStage.MENU, data)
   } catch (error) {
     console.error("[v0] ❌ Erro ao consultar ordem:", error)
     await sendMessage(from, "❌ Erro ao consultar ordem. Por favor, tente novamente.")
@@ -265,15 +539,15 @@ async function handleQueryOrder(from: string, orderId: string) {
   }
 }
 
-async function sendMainMenu(from: string) {
+async function sendTipoClienteMenu(from: string) {
   await clearConversationState(from)
+  await updateConversationState(from, ConversationStage.TIPO_CLIENTE, {})
   await sendMessage(
     from,
     "👋 *Bem-vindo ao Gestor Financeiro!*\n\n" +
-      "Como posso ajudar?\n\n" +
-      "1️⃣ Criar nova ordem de serviço\n" +
-      "2️⃣ Consultar ordem de serviço\n" +
-      "3️⃣ Falar com atendente\n\n" +
+      "Para começarmos, preciso saber:\n\n" +
+      "*1* - Já sou cliente\n" +
+      "*2* - Primeiro contato\n\n" +
       "_Digite o número da opção desejada_",
   )
 }

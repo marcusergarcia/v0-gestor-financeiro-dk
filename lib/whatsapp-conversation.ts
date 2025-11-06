@@ -1,6 +1,14 @@
 import { query } from "./db"
 
 export enum ConversationStage {
+  TIPO_CLIENTE = "tipo_cliente",
+  NOME_CLIENTE = "nome_cliente",
+  SELECIONAR_CLIENTE = "selecionar_cliente",
+  CLIENTE_NAO_ENCONTRADO = "cliente_nao_encontrado",
+  CADASTRO_TELEFONE = "cadastro_telefone",
+  CADASTRO_ENDERECO = "cadastro_endereco",
+  CADASTRO_CIDADE = "cadastro_cidade",
+  CADASTRO_CONFIRMAR = "cadastro_confirmar",
   MENU = "menu",
   CREATE_ORDER_DESC = "create_order_desc",
   QUERY_ORDER = "query_order",
@@ -14,6 +22,14 @@ export interface ConversationState {
     description?: string
     orderId?: string
     clienteId?: number
+    clienteNome?: string
+    tipo?: "existente" | "novo"
+    nome?: string
+    telefone?: string
+    endereco?: string
+    cidade?: string
+    nomeBuscado?: string
+    clientesEncontrados?: any[]
   }
 }
 
@@ -144,6 +160,56 @@ export async function generateOrderNumber(): Promise<string> {
     const fallback = Date.now().toString().slice(-6)
     console.log("[v0] ⚠️ Usando fallback:", fallback)
     return fallback
+  }
+}
+
+export async function findClientsByName(nome: string): Promise<any[]> {
+  try {
+    console.log("[v0] 🔍 Buscando clientes por nome:", nome)
+
+    const result = await query(
+      `SELECT id, codigo, nome, telefone, email, cidade, tem_contrato 
+       FROM clientes 
+       WHERE nome LIKE ? 
+       AND (status IS NULL OR status != 'inativo')
+       LIMIT 5`,
+      [`%${nome}%`],
+    )
+
+    const clientes = (result as any[]) || []
+    console.log("[v0] ✅ Clientes encontrados:", clientes.length)
+    return clientes
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao buscar clientes por nome:", error)
+    return []
+  }
+}
+
+export async function createClient(data: {
+  nome: string
+  telefone: string
+  endereco?: string
+  cidade?: string
+}): Promise<number> {
+  try {
+    console.log("[v0] 📝 Cadastrando novo cliente:", data.nome)
+
+    // Gerar código a partir do telefone (primeiros 6 dígitos)
+    const telefoneLimpo = data.telefone.replace(/\D/g, "")
+    const codigo = telefoneLimpo.substring(0, 6)
+
+    const result = await query(
+      `INSERT INTO clientes (codigo, nome, telefone, endereco, cidade, created_at) 
+       VALUES (?, ?, ?, ?, ?, NOW())`,
+      [codigo, data.nome, data.telefone, data.endereco || null, data.cidade || null],
+    )
+
+    const clienteId = (result as any).insertId
+    console.log("[v0] ✅ Cliente cadastrado com ID:", clienteId)
+    return clienteId
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao cadastrar cliente:", error)
+    throw error
   }
 }
 
