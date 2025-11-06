@@ -7,7 +7,12 @@ export enum ConversationStage {
   SELECIONAR_CLIENTE = "selecionar_cliente",
   CLIENTE_NAO_ENCONTRADO = "cliente_nao_encontrado",
   CADASTRO_CNPJ = "cadastro_cnpj", // Novo stage para pedir CNPJ completo
+  CADASTRO_CEP = "cadastro_cep",
+  CADASTRO_CONFIRMAR_ENDERECO = "cadastro_confirmar_endereco",
   CADASTRO_TELEFONE = "cadastro_telefone",
+  CADASTRO_EMAIL = "cadastro_email",
+  CADASTRO_SINDICO = "cadastro_sindico",
+  CADASTRO_SOLICITANTE = "cadastro_solicitante",
   CADASTRO_ENDERECO = "cadastro_endereco",
   CADASTRO_CIDADE = "cadastro_cidade",
   CADASTRO_CONFIRMAR = "cadastro_confirmar",
@@ -27,11 +32,17 @@ export interface ConversationState {
     clienteNome?: string
     tipo?: "existente" | "novo"
     nome?: string
-    cnpj?: string // Adicionado campo CNPJ
-    codigo?: string // Adicionado campo código
-    telefone?: string
+    cnpj?: string
+    codigo?: string
+    cep?: string
     endereco?: string
+    bairro?: string
     cidade?: string
+    estado?: string
+    telefone?: string
+    email?: string
+    sindico?: string
+    solicitante?: string
     nomeBuscado?: string
     clientesEncontrados?: any[]
   }
@@ -222,9 +233,14 @@ export async function findClientsByName(nome: string): Promise<any[]> {
 export async function createClient(data: {
   nome: string
   cnpj: string
-  telefone: string
+  cep?: string
   endereco?: string
+  bairro?: string
   cidade?: string
+  estado?: string
+  telefone: string
+  email?: string
+  sindico?: string
 }): Promise<number> {
   try {
     console.log("[v0] 📝 Cadastrando novo cliente:", data.nome)
@@ -236,9 +252,23 @@ export async function createClient(data: {
     console.log("[v0] 🔢 Código gerado:", codigo)
 
     const result = await query(
-      `INSERT INTO clientes (codigo, nome, cnpj, telefone, endereco, cidade, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-      [codigo, data.nome, data.cnpj, data.telefone, data.endereco || null, data.cidade || null],
+      `INSERT INTO clientes (
+        codigo, nome, cnpj, cep, endereco, bairro, cidade, estado, 
+        telefone, email, sindico, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        codigo,
+        data.nome,
+        data.cnpj,
+        data.cep || null,
+        data.endereco || null,
+        data.bairro || null,
+        data.cidade || null,
+        data.estado || null,
+        data.telefone,
+        data.email || null,
+        data.sindico || null,
+      ],
     )
 
     const clienteId = (result as any).insertId
@@ -261,5 +291,53 @@ export async function saveAtendimentoRequest(phoneNumber: string, clienteId?: nu
     // Por enquanto, apenas logamos a solicitação
   } catch (error) {
     console.error("[v0] ❌ Erro ao salvar solicitação de atendimento:", error)
+  }
+}
+
+export async function fetchCepData(cep: string): Promise<{
+  success: boolean
+  data?: {
+    logradouro: string
+    bairro: string
+    localidade: string
+    uf: string
+  }
+  error?: string
+}> {
+  try {
+    const cepLimpo = cep.replace(/\D/g, "")
+
+    if (cepLimpo.length !== 8) {
+      return { success: false, error: "CEP deve ter 8 dígitos" }
+    }
+
+    console.log("[v0] 🔍 Buscando dados do CEP:", cepLimpo)
+
+    const response = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
+
+    if (!response.ok) {
+      return { success: false, error: "Erro ao consultar CEP" }
+    }
+
+    const data = await response.json()
+
+    if (data.erro) {
+      return { success: false, error: "CEP não encontrado" }
+    }
+
+    console.log("[v0] ✅ Dados do CEP encontrados:", data.localidade)
+
+    return {
+      success: true,
+      data: {
+        logradouro: data.logradouro || "",
+        bairro: data.bairro || "",
+        localidade: data.localidade || "",
+        uf: data.uf || "",
+      },
+    }
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao buscar CEP:", error)
+    return { success: false, error: "Erro ao consultar CEP" }
   }
 }

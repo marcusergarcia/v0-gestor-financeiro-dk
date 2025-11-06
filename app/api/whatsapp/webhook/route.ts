@@ -7,6 +7,7 @@ import {
   createClient,
   generateOrderNumber,
   saveAtendimentoRequest,
+  fetchCepData,
   ConversationStage,
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
@@ -84,10 +85,13 @@ async function processUserMessage(from: string, messageBody: string) {
       currentStage !== ConversationStage.CODIGO_CLIENTE &&
       currentStage !== ConversationStage.NOME_CLIENTE &&
       currentStage !== ConversationStage.CADASTRO_CNPJ &&
+      currentStage !== ConversationStage.CADASTRO_CEP &&
       currentStage !== ConversationStage.CADASTRO_TELEFONE &&
-      currentStage !== ConversationStage.CADASTRO_ENDERECO &&
-      currentStage !== ConversationStage.CADASTRO_CIDADE &&
-      currentStage !== ConversationStage.CADASTRO_CONFIRMAR
+      currentStage !== ConversationStage.CADASTRO_EMAIL &&
+      currentStage !== ConversationStage.CADASTRO_SINDICO &&
+      currentStage !== ConversationStage.CADASTRO_SOLICITANTE &&
+      currentStage !== ConversationStage.CADASTRO_CONFIRMAR &&
+      currentStage !== ConversationStage.CADASTRO_CONFIRMAR_ENDERECO
     ) {
       // User wants to return to menu - only if they have a client ID
       if (state.data?.clienteId) {
@@ -113,6 +117,34 @@ async function processUserMessage(from: string, messageBody: string) {
         await handleCadastroCNPJ(from, messageBody, state?.data || {})
         break
 
+      case ConversationStage.CADASTRO_CEP:
+        await handleCadastroCEP(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_CONFIRMAR_ENDERECO:
+        await handleCadastroConfirmarEndereco(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_TELEFONE:
+        await handleCadastroTelefone(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_EMAIL:
+        await handleCadastroEmail(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_SINDICO:
+        await handleCadastroSindico(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_SOLICITANTE:
+        await handleCadastroSolicitante(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_CONFIRMAR:
+        await handleCadastroConfirmar(from, messageBody, state?.data || {})
+        break
+
       case ConversationStage.SELECIONAR_CLIENTE:
         await handleSelecionarCliente(from, messageBody, state?.data || {})
         break
@@ -121,20 +153,12 @@ async function processUserMessage(from: string, messageBody: string) {
         await handleClienteNaoEncontrado(from, messageBody, state?.data || {})
         break
 
-      case ConversationStage.CADASTRO_TELEFONE:
-        await handleCadastroTelefone(from, messageBody, state?.data || {})
-        break
-
       case ConversationStage.CADASTRO_ENDERECO:
         await handleCadastroEndereco(from, messageBody, state?.data || {})
         break
 
       case ConversationStage.CADASTRO_CIDADE:
         await handleCadastroCidade(from, messageBody, state?.data || {})
-        break
-
-      case ConversationStage.CADASTRO_CONFIRMAR:
-        await handleCadastroConfirmar(from, messageBody, state?.data || {})
         break
 
       case ConversationStage.MENU:
@@ -275,14 +299,222 @@ async function handleCadastroCNPJ(from: string, message: string, data: any) {
   // Formatar CNPJ
   const cnpjFormatado = cnpjLimpo.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
 
-  await updateConversationState(from, ConversationStage.CADASTRO_TELEFONE, {
+  await updateConversationState(from, ConversationStage.CADASTRO_CEP, {
     ...data,
     cnpj: cnpjFormatado,
   })
   await sendMessage(
     from,
-    `✅ CNPJ registrado!\n\n` + `Agora, qual é o *telefone* de contato?\n\n` + `Exemplo: _(11) 99999-9999_`,
+    `✅ CNPJ registrado!\n\n` +
+      `Agora, qual é o *CEP* do condomínio?\n\n` +
+      `📮 Formato: XXXXX-XXX\n\n` +
+      `Exemplo: _03295-000_`,
   )
+}
+
+async function handleCadastroCEP(from: string, message: string, data: any) {
+  const cep = message.trim()
+  const cepLimpo = cep.replace(/\D/g, "")
+
+  if (!cepLimpo || cepLimpo.length !== 8) {
+    await sendMessage(
+      from,
+      "❌ CEP inválido.\n\n" + "Por favor, digite o CEP completo (8 dígitos).\n\n" + "Exemplo: _03295-000_",
+    )
+    return
+  }
+
+  // Buscar dados do CEP
+  const cepData = await fetchCepData(cepLimpo)
+
+  if (!cepData.success || !cepData.data) {
+    await sendMessage(
+      from,
+      "❌ CEP não encontrado.\n\n" + "Por favor, verifique o CEP e tente novamente.\n\n" + "Exemplo: _03295-000_",
+    )
+    return
+  }
+
+  // Formatar CEP
+  const cepFormatado = cepLimpo.replace(/^(\d{5})(\d{3})$/, "$1-$2")
+
+  // Salvar dados do CEP
+  await updateConversationState(from, ConversationStage.CADASTRO_CONFIRMAR_ENDERECO, {
+    ...data,
+    cep: cepFormatado,
+    endereco: cepData.data.logradouro,
+    bairro: cepData.data.bairro,
+    cidade: cepData.data.localidade,
+    estado: cepData.data.uf,
+  })
+
+  await sendMessage(
+    from,
+    `✅ CEP encontrado!\n\n` +
+      `📍 *Endereço:*\n` +
+      `${cepData.data.logradouro || "Não informado"}\n` +
+      `Bairro: ${cepData.data.bairro || "Não informado"}\n` +
+      `Cidade: ${cepData.data.localidade} - ${cepData.data.uf}\n` +
+      `CEP: ${cepFormatado}\n\n` +
+      `Os dados estão corretos?\n\n` +
+      `*1* - Sim, continuar\n` +
+      `*2* - Não, corrigir endereço`,
+  )
+}
+
+async function handleCadastroConfirmarEndereco(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  if (opcao === "1") {
+    // Endereço correto, pedir telefone
+    await updateConversationState(from, ConversationStage.CADASTRO_TELEFONE, data)
+    await sendMessage(
+      from,
+      `✅ Endereço confirmado!\n\n` + `Agora, qual é o *telefone* de contato?\n\n` + `Exemplo: _(11) 99999-9999_`,
+    )
+  } else if (opcao === "2") {
+    // Corrigir endereço manualmente
+    await updateConversationState(from, ConversationStage.CADASTRO_ENDERECO, data)
+    await sendMessage(
+      from,
+      `📝 Ok! Digite o *endereço completo* do condomínio:\n\n` + `Exemplo: _Rua Exemplo, 123 - Bairro_`,
+    )
+  } else {
+    await sendMessage(
+      from,
+      `❌ Opção inválida.\n\n` + `Digite:\n` + `*1* - Sim, continuar\n` + `*2* - Não, corrigir endereço`,
+    )
+  }
+}
+
+async function handleCadastroTelefone(from: string, message: string, data: any) {
+  const telefone = message.trim()
+  await updateConversationState(from, ConversationStage.CADASTRO_EMAIL, { ...data, telefone })
+  await sendMessage(
+    from,
+    `✅ Telefone registrado!\n\n` +
+      `Agora, qual é o *email* para contato?\n\n` +
+      `Exemplo: _contato@condominio.com.br_`,
+  )
+}
+
+async function handleCadastroEmail(from: string, message: string, data: any) {
+  const email = message.trim()
+
+  // Validação básica de email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    await sendMessage(
+      from,
+      "❌ Email inválido.\n\n" + "Por favor, digite um email válido.\n\n" + "Exemplo: _contato@condominio.com.br_",
+    )
+    return
+  }
+
+  await updateConversationState(from, ConversationStage.CADASTRO_SINDICO, { ...data, email })
+  await sendMessage(
+    from,
+    `✅ Email registrado!\n\n` + `Agora, qual é o *nome do síndico* do condomínio?\n\n` + `Exemplo: _João Silva_`,
+  )
+}
+
+async function handleCadastroSindico(from: string, message: string, data: any) {
+  const sindico = message.trim()
+
+  if (!sindico || sindico.length < 3) {
+    await sendMessage(from, "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.")
+    return
+  }
+
+  await updateConversationState(from, ConversationStage.CADASTRO_SOLICITANTE, { ...data, sindico })
+  await sendMessage(
+    from,
+    `✅ Nome do síndico registrado!\n\n` +
+      `Por último, *qual é o seu nome?*\n` +
+      `(Pessoa que está solicitando o serviço)\n\n` +
+      `Exemplo: _Maria Santos_`,
+  )
+}
+
+async function handleCadastroSolicitante(from: string, message: string, data: any) {
+  const solicitante = message.trim()
+
+  if (!solicitante || solicitante.length < 3) {
+    await sendMessage(from, "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.")
+    return
+  }
+
+  await updateConversationState(from, ConversationStage.CADASTRO_CONFIRMAR, { ...data, solicitante })
+  await sendMessage(
+    from,
+    `📋 *Confirme seus dados:*\n\n` +
+      `*Condomínio:* ${data.nome}\n` +
+      `*CNPJ:* ${data.cnpj}\n` +
+      `*CEP:* ${data.cep}\n` +
+      `*Endereço:* ${data.endereco}\n` +
+      `*Bairro:* ${data.bairro}\n` +
+      `*Cidade:* ${data.cidade} - ${data.estado}\n` +
+      `*Telefone:* ${data.telefone}\n` +
+      `*Email:* ${data.email}\n` +
+      `*Síndico:* ${data.sindico}\n` +
+      `*Solicitante:* ${solicitante}\n\n` +
+      `Está tudo correto?\n\n` +
+      `*1* - Sim, cadastrar\n` +
+      `*2* - Não, corrigir`,
+  )
+}
+
+async function handleCadastroConfirmar(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  if (opcao === "1") {
+    try {
+      console.log("[v0] 📝 Cadastrando novo cliente:", data.nome)
+
+      const clienteId = await createClient({
+        nome: data.nome,
+        cnpj: data.cnpj,
+        cep: data.cep,
+        endereco: data.endereco,
+        bairro: data.bairro,
+        cidade: data.cidade,
+        estado: data.estado,
+        telefone: data.telefone,
+        email: data.email,
+        sindico: data.sindico,
+      })
+
+      const codigo = data.cnpj.replace(/\D/g, "").substring(0, 6)
+
+      await updateConversationState(from, ConversationStage.MENU, {
+        ...data,
+        clienteId,
+        clienteNome: data.nome,
+        solicitadoPor: data.solicitante, // Salvar nome do solicitante para usar na criação da OS
+      })
+      await sendMessage(
+        from,
+        `✅ *Cadastro realizado com sucesso!*\n\n` +
+          `*${data.nome}*\n` +
+          `Código: ${codigo}\n` +
+          `CNPJ: ${data.cnpj}\n\n` +
+          `Agora escolha uma opção:\n\n` +
+          `*1* - Criar ordem de serviço\n` +
+          `*2* - Consultar ordem de serviço\n` +
+          `*3* - Falar com atendente`,
+      )
+    } catch (error) {
+      console.error("[v0] ❌ Erro ao cadastrar cliente:", error)
+      await sendMessage(from, "❌ Desculpe, ocorreu um erro ao cadastrar. Por favor, tente novamente mais tarde.")
+      await clearConversationState(from)
+    }
+  } else if (opcao === "2") {
+    // Reiniciar cadastro
+    await updateConversationState(from, ConversationStage.NOME_CLIENTE, { tipo: "novo" })
+    await sendMessage(from, `🔄 Ok! Vamos recomeçar.\n\nQual é o *nome do condomínio*?`)
+  } else {
+    await sendMessage(from, `❌ Opção inválida.\n\n` + `Digite:\n` + `*1* - Sim, cadastrar\n` + `*2* - Não, corrigir`)
+  }
 }
 
 async function handleSelecionarCliente(from: string, message: string, data: any) {
@@ -333,15 +565,6 @@ async function handleClienteNaoEncontrado(from: string, message: string, data: a
   }
 }
 
-async function handleCadastroTelefone(from: string, message: string, data: any) {
-  const telefone = message.trim()
-  await updateConversationState(from, ConversationStage.CADASTRO_ENDERECO, { ...data, telefone })
-  await sendMessage(
-    from,
-    `✅ Telefone registrado!\n\n` + `Agora, qual é o seu *endereço*?\n\n` + `Exemplo: _Rua Exemplo, 123_`,
-  )
-}
-
 async function handleCadastroEndereco(from: string, message: string, data: any) {
   const endereco = message.trim()
   await updateConversationState(from, ConversationStage.CADASTRO_CIDADE, { ...data, endereco })
@@ -363,53 +586,6 @@ async function handleCadastroCidade(from: string, message: string, data: any) {
       `*1* - Sim, cadastrar\n` +
       `*2* - Não, corrigir`,
   )
-}
-
-async function handleCadastroConfirmar(from: string, message: string, data: any) {
-  const opcao = message.trim()
-
-  if (opcao === "1") {
-    try {
-      console.log("[v0] 📝 Cadastrando novo cliente:", data.nome)
-
-      const clienteId = await createClient({
-        nome: data.nome,
-        cnpj: data.cnpj,
-        telefone: data.telefone,
-        endereco: data.endereco,
-        cidade: data.cidade,
-      })
-
-      const codigo = data.cnpj.replace(/\D/g, "").substring(0, 6)
-
-      await updateConversationState(from, ConversationStage.MENU, {
-        ...data,
-        clienteId,
-        clienteNome: data.nome,
-      })
-      await sendMessage(
-        from,
-        `✅ *Cadastro realizado com sucesso!*\n\n` +
-          `*${data.nome}*\n` +
-          `Código: ${codigo}\n` +
-          `CNPJ: ${data.cnpj}\n\n` +
-          `Agora escolha uma opção:\n\n` +
-          `*1* - Criar ordem de serviço\n` +
-          `*2* - Consultar ordem de serviço\n` +
-          `*3* - Falar com atendente`,
-      )
-    } catch (error) {
-      console.error("[v0] ❌ Erro ao cadastrar cliente:", error)
-      await sendMessage(from, "❌ Desculpe, ocorreu um erro ao cadastrar. Por favor, tente novamente mais tarde.")
-      await clearConversationState(from)
-    }
-  } else if (opcao === "2") {
-    // Reiniciar cadastro
-    await updateConversationState(from, ConversationStage.NOME_CLIENTE, { tipo: "novo" })
-    await sendMessage(from, `🔄 Ok! Vamos recomeçar.\n\nQual é o *nome do condomínio*?`)
-  } else {
-    await sendMessage(from, `❌ Opção inválida.\n\n` + `Digite:\n` + `*1* - Sim, cadastrar\n` + `*2* - Não, corrigir`)
-  }
 }
 
 async function handleMenuOption(from: string, option: string, data: any) {
@@ -491,11 +667,14 @@ async function handleOrderDescription(from: string, description: string, data: a
     // Criar ordem de serviço
     const dataAtual = new Date().toISOString().split("T")[0]
 
+    // Usar nome do solicitante se disponível, senão usar nome do cliente
+    const solicitadoPor = data.solicitante || data.solicitadoPor || cliente.nome
+
     await query(
       `INSERT INTO ordens_servico 
        (numero, cliente_id, tecnico_name, tecnico_email, data_atual, tipo_servico, 
-        descricao_defeito, responsavel, nome_responsavel, situacao, created_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        descricao_defeito, responsavel, nome_responsavel, solicitado_por, situacao, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         numeroOrdem,
         cliente.id,
@@ -506,6 +685,7 @@ async function handleOrderDescription(from: string, description: string, data: a
         description,
         "sindico",
         cliente.nome,
+        solicitadoPor, // Nome de quem está solicitando
         "aberta",
       ],
     )
@@ -519,7 +699,8 @@ async function handleOrderDescription(from: string, description: string, data: a
         `📋 Número: *${numeroOrdem}*\n` +
         `👤 Cliente: ${cliente.nome}\n` +
         `📍 Endereço: ${cliente.endereco || "Não informado"}\n` +
-        `📝 Descrição: ${description}\n\n` +
+        `📝 Descrição: ${description}\n` +
+        `✍️ Solicitado por: ${solicitadoPor}\n\n` +
         "🔔 Você receberá atualizações sobre o andamento do serviço.\n\n" +
         "Deseja fazer mais alguma coisa?\n\n" +
         "*1* - Criar outra OS\n" +
