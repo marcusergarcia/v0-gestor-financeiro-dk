@@ -605,21 +605,20 @@ export async function findOrdemById(ordemId: number): Promise<any | null> {
   }
 }
 
-export async function findOrdensBySituacao(clienteId: number, situacao: string[]): Promise<any[]> {
+export async function findOrdensBySituacao(clienteId: number, situacao: string): Promise<any[]> {
   try {
-    console.log("[v0] 🔍 Buscando ordens para cliente ID:", clienteId, "com situação:", situacao)
+    console.log("[v0] 🔍 Buscando ordens com situação:", situacao, "para cliente ID:", clienteId)
 
-    const placeholders = situacao.map(() => "?").join(", ")
     const result = await query(
       `SELECT 
         id, numero, data_atual, tipo_servico, descricao_defeito, 
         situacao, data_agendamento, periodo_agendamento, created_at
        FROM ordens_servico 
        WHERE cliente_id = ? 
-       AND situacao IN (${placeholders})
+       AND situacao = ?
        ORDER BY created_at DESC
        LIMIT 10`,
-      [clienteId, ...situacao],
+      [clienteId, situacao],
     )
 
     const ordens = (result as any[]) || []
