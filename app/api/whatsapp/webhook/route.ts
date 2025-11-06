@@ -3,6 +3,7 @@ import {
   getConversationState,
   updateConversationState,
   clearConversationState,
+  restartConversation,
   findClientByCodigo,
   createClient,
   generateOrderNumber,
@@ -76,6 +77,37 @@ async function processUserMessage(from: string, messageBody: string) {
     console.log("[v0] 📦 Dados salvos:", state?.data)
 
     const normalizedMessage = messageBody.toLowerCase().trim()
+
+    const restartKeywords = [
+      "voltar ao início",
+      "voltar ao inicio",
+      "voltar inicio",
+      "recomeçar",
+      "recomecar",
+      "começar de novo",
+      "comecar de novo",
+      "reiniciar",
+      "cancelar",
+      "sair",
+    ]
+
+    const shouldRestart = restartKeywords.some((keyword) => normalizedMessage.includes(keyword))
+
+    if (shouldRestart) {
+      console.log("[v0] 🔄 Solicitação de reiniciar conversa detectada")
+      await restartConversation(from)
+      await sendMessage(
+        from,
+        "🔄 *Conversa reiniciada!*\n\n" +
+          "Vamos começar do início. 👋\n\n" +
+          "Você é nosso cliente ou é o primeiro contato?\n\n" +
+          "*1* - Já sou cliente\n" +
+          "*2* - Primeiro contato\n\n" +
+          "_Digite o número da opção desejada_",
+      )
+      return
+    }
+
     if (
       (normalizedMessage === "voltar" ||
         normalizedMessage === "menu" ||

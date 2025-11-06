@@ -123,6 +123,23 @@ export async function clearConversationState(phoneNumber: string): Promise<void>
   }
 }
 
+export async function restartConversation(phoneNumber: string): Promise<void> {
+  try {
+    console.log("[v0] 🔄 Reiniciando conversa para:", phoneNumber)
+
+    // Limpar estado atual
+    await clearConversationState(phoneNumber)
+
+    // Criar novo estado inicial
+    await updateConversationState(phoneNumber, ConversationStage.TIPO_CLIENTE, {})
+
+    console.log("[v0] ✅ Conversa reiniciada com sucesso")
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao reiniciar conversa:", error)
+    throw error
+  }
+}
+
 export async function findClientByPhone(phoneNumber: string): Promise<any | null> {
   try {
     console.log("[v0] 🔍 Buscando cliente por telefone:", phoneNumber)
@@ -163,7 +180,7 @@ export async function findClientByCodigo(codigo: string): Promise<any | null> {
     console.log("[v0] 🔢 Código limpo:", cleanCodigo)
 
     const result = await query(
-      `SELECT id, codigo, nome, cnpj, telefone, email, endereco, cidade, estado 
+      `SELECT id, codigo, nome, cnpj, telefone, email, cidade, estado 
        FROM clientes 
        WHERE codigo = ?
        LIMIT 1`,
