@@ -17,13 +17,16 @@ export enum ConversationStage {
   CADASTRO_ENDERECO = "cadastro_endereco",
   CADASTRO_CIDADE = "cadastro_cidade",
   CADASTRO_CONFIRMAR = "cadastro_confirmar",
+  CADASTRO_CONFIRMAR_CLIENTE_EXISTENTE = "cadastro_confirmar_cliente_existente",
   MENU = "menu",
-  CRIAR_OS_TIPO_SERVICO = "criar_os_tipo_servico", // Adicionado stage para escolher tipo de serviço
+  CRIAR_OS_TIPO_SERVICO = "criar_os_tipo_servico",
   CRIAR_OS_TIPO_ATENDIMENTO = "criar_os_tipo_atendimento",
   CRIAR_OS_DATA_AGENDAMENTO = "criar_os_data_agendamento",
   CRIAR_OS_PERIODO_AGENDAMENTO = "criar_os_periodo_agendamento",
   CRIAR_OS_SOLICITANTE = "criar_os_solicitante",
   CREATE_ORDER_DESC = "create_order_desc",
+  CONSULTAR_OS_CODIGO = "consultar_os_codigo",
+  CONSULTAR_OS_SELECIONAR = "consultar_os_selecionar",
   QUERY_ORDER = "query_order",
   WAIT_AGENT = "wait_agent",
 }
@@ -51,6 +54,7 @@ export interface ConversationState {
     solicitante?: string
     nomeBuscado?: string
     clientesEncontrados?: any[]
+    ordemId?: number
   }
 }
 
@@ -543,5 +547,60 @@ export async function calcularDistanciaCliente(cep: string): Promise<{
   } catch (error) {
     console.error("[v0] ❌ Erro ao calcular distância:", error)
     return { success: false, error: "Erro ao calcular distância" }
+  }
+}
+
+export async function findOrdensAbertas(clienteId: number): Promise<any[]> {
+  try {
+    console.log("[v0] 🔍 Buscando ordens abertas para cliente ID:", clienteId)
+
+    const result = await query(
+      `SELECT 
+        id, numero, data_atual, tipo_servico, descricao_defeito, 
+        situacao, data_agendamento, periodo_agendamento, created_at
+       FROM ordens_servico 
+       WHERE cliente_id = ? 
+       AND situacao IN ('aberta', 'agendada', 'em_andamento')
+       ORDER BY created_at DESC
+       LIMIT 10`,
+      [clienteId],
+    )
+
+    const ordens = (result as any[]) || []
+    console.log("[v0] ✅ Ordens encontradas:", ordens.length)
+    return ordens
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao buscar ordens abertas:", error)
+    return []
+  }
+}
+
+export async function findOrdemById(ordemId: number): Promise<any | null> {
+  try {
+    console.log("[v0] 🔍 Buscando ordem por ID:", ordemId)
+
+    const result = await query(
+      `SELECT 
+        os.id, os.numero, os.situacao, os.data_atual, os.tipo_servico, 
+        os.descricao_defeito, os.servico_realizado, os.tecnico_name,
+        os.data_agendamento, os.periodo_agendamento, os.solicitado_por,
+        c.nome as cliente_nome, c.endereco as cliente_endereco
+       FROM ordens_servico os
+       LEFT JOIN clientes c ON os.cliente_id = c.id
+       WHERE os.id = ?`,
+      [ordemId],
+    )
+
+    if (!result || (result as any[]).length === 0) {
+      console.log("[v0] ⚠️ Ordem não encontrada")
+      return null
+    }
+
+    const ordem = (result as any[])[0]
+    console.log("[v0] ✅ Ordem encontrada:", ordem.numero)
+    return ordem
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao buscar ordem por ID:", error)
+    return null
   }
 }

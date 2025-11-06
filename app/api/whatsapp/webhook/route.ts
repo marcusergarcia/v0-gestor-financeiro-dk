@@ -12,6 +12,8 @@ import {
   calcularDistanciaCliente,
   checkAgendamentoDisponivel,
   validateDate,
+  findOrdensAbertas,
+  findOrdemById,
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
 
@@ -235,6 +237,14 @@ async function processUserMessage(from: string, messageBody: string) {
 
       case "query_order":
         await handleQueryOrder(from, messageBody, state?.data || {})
+        break
+
+      case "consultar_os_codigo":
+        await handleConsultarOSCodigo(from, messageBody, state?.data || {})
+        break
+
+      case "consultar_os_selecionar":
+        await handleConsultarOSSelecionar(from, messageBody, state?.data || {})
         break
 
       case "wait_agent":
@@ -875,11 +885,13 @@ async function handleMenuOption(from: string, option: string, data: any) {
       break
 
     case "2":
-      await updateConversationState(from, "query_order", data)
+      await updateConversationState(from, "consultar_os_codigo", data)
       await sendMessage(
         from,
-        "🔍 *Consultar Ordem de Serviço*\n\n" +
-          "Digite o número da ordem de serviço que deseja consultar:\n\n" +
+        "🔍 *Consultar Ordens de Serviço*\n\n" +
+          "Digite os *6 primeiros dígitos do CNPJ* para consultar suas ordens:\n\n" +
+          "📋 Formato: *12.345.6*XX/XXXX-XX\n\n" +
+          "Exemplo: _123456_\n\n" +
           "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
       )
       break
@@ -1294,6 +1306,199 @@ async function handleQueryOrder(from: string, orderId: string, data: any) {
     await sendMessage(from, "❌ Erro ao consultar ordem. Por favor, tente novamente.")
     await clearConversationState(from)
   }
+}
+
+async function handleConsultarOSCodigo(from: string, message: string, data: any) {
+  const codigo = message.trim().replace(/\D/g, "").substring(0, 6)
+
+  if (!codigo || codigo.length < 6) {
+    await sendMessage(
+      from,
+      "❌ Código inválido.\n\n" +
+        "Por favor, digite os *6 primeiros dígitos* do CNPJ.\n\n" +
+        "Exemplo: _123456_\n\n" +
+        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+    )
+    return
+  }
+
+  console.log("[v0] 🔍 Buscando cliente por código para consulta:", codigo)
+  const cliente = await findClientByCodigo(codigo)
+
+  if (!cliente) {
+    await sendMessage(
+      from,
+      `❌ *CNPJ não encontrado*\n\n` +
+        `Não encontrei nenhum cliente com o código *${codigo}*.\n\n` +
+        `Digite outro código ou 'voltar' para retornar ao menu.\n\n` +
+        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+    )
+    return
+  }
+
+  console.log("[v0] 🔍 Buscando ordens abertas do cliente:", cliente.id)
+  const ordens = await findOrdensAbertas(cliente.id)
+
+  if (ordens.length === 0) {
+    await updateConversationState(from, "menu", data)
+    await sendMessage(
+      from,
+      `ℹ️ *Nenhuma ordem encontrada*\n\n` +
+        `Não há ordens de serviço abertas para *${cliente.nome}*.\n\n` +
+        `Deseja criar uma nova ordem?\n\n` +
+        `*1* - Criar ordem de serviço\n` +
+        `*2* - Voltar ao menu\n\n` +
+        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+    )
+    return
+  }
+
+  // Mapear tipo de serviço
+  const tipoMap: Record<string, string> = {
+    manutencao: "Manutenção",
+    orcamento: "Orçamento",
+    vistoria_contrato: "Vistoria",
+    preventiva: "Preventiva",
+  }
+
+  // Mapear situação
+  const statusMap: Record<string, string> = {
+    aberta: "🔴 Aberta",
+    agendada: "📅 Agendada",
+    em_andamento: "🟡 Em Andamento",
+  }
+
+  // Mapear período
+  const periodoMap: Record<string, string> = {
+    manha: "Manhã",
+    tarde: "Tarde",
+  }
+
+  // Montar lista de ordens
+  let mensagem = `📋 *Ordens de Serviço - ${cliente.nome}*\n\n`
+
+  ordens.forEach((ordem, index) => {
+    const numero = index + 1
+    const dataFormatada = new Date(ordem.data_atual).toLocaleDateString("pt-BR")
+    const descricaoResumida =
+      ordem.descricao_defeito && ordem.descricao_defeito.length > 50
+        ? ordem.descricao_defeito.substring(0, 50) + "..."
+        : ordem.descricao_defeito || "Sem descrição"
+
+    mensagem += `*${numero}* - OS #${ordem.numero}\n`
+    mensagem += `${statusMap[ordem.situacao] || ordem.situacao}\n`
+    mensagem += `📅 ${dataFormatada}\n`
+    mensagem += `🔧 ${tipoMap[ordem.tipo_servico] || ordem.tipo_servico}\n`
+
+    if (ordem.data_agendamento) {
+      const dataAgendamento = new Date(ordem.data_agendamento).toLocaleDateString("pt-BR")
+      const periodo = periodoMap[ordem.periodo_agendamento] || ordem.periodo_agendamento
+      mensagem += `📆 Agendado: ${dataAgendamento} - ${periodo}\n`
+    }
+
+    mensagem += `📝 ${descricaoResumida}\n\n`
+  })
+
+  mensagem += `Digite o *número* da ordem para ver detalhes completos.\n\n`
+  mensagem += `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`
+
+  await updateConversationState(from, "consultar_os_selecionar", {
+    ...data,
+    ordensEncontradas: ordens,
+    clienteConsulta: cliente,
+  })
+
+  await sendMessage(from, mensagem)
+}
+
+async function handleConsultarOSSelecionar(from: string, message: string, data: any) {
+  const opcao = Number.parseInt(message.trim())
+  const ordens = data.ordensEncontradas || []
+
+  if (isNaN(opcao) || opcao < 1 || opcao > ordens.length) {
+    await sendMessage(
+      from,
+      `❌ Opção inválida.\n\n` +
+        `Digite um número entre 1 e ${ordens.length} para ver os detalhes da ordem.\n\n` +
+        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+    )
+    return
+  }
+
+  const ordemSelecionada = ordens[opcao - 1]
+
+  console.log("[v0] 🔍 Buscando detalhes da ordem ID:", ordemSelecionada.id)
+  const ordem = await findOrdemById(ordemSelecionada.id)
+
+  if (!ordem) {
+    await sendMessage(
+      from,
+      "❌ Erro ao buscar detalhes da ordem.\n\n" + "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+    )
+    return
+  }
+
+  // Mapear tipo de serviço
+  const tipoMap: Record<string, string> = {
+    manutencao: "Manutenção",
+    orcamento: "Orçamento",
+    vistoria_contrato: "Vistoria",
+    preventiva: "Preventiva",
+  }
+
+  // Mapear situação
+  const statusMap: Record<string, string> = {
+    aberta: "🔴 Aberta",
+    agendada: "📅 Agendada",
+    em_andamento: "🟡 Em Andamento",
+    concluida: "✅ Concluída",
+    cancelada: "❌ Cancelada",
+  }
+
+  // Mapear período
+  const periodoMap: Record<string, string> = {
+    manha: "Manhã (08:00 - 12:00)",
+    tarde: "Tarde (13:00 - 18:00)",
+  }
+
+  const dataFormatada = new Date(ordem.data_atual).toLocaleDateString("pt-BR")
+
+  let mensagem =
+    `📋 *Ordem de Serviço #${ordem.numero}*\n\n` +
+    `${statusMap[ordem.situacao] || ordem.situacao}\n\n` +
+    `👤 *Cliente:* ${ordem.cliente_nome}\n` +
+    `📍 *Endereço:* ${ordem.cliente_endereco || "Não informado"}\n` +
+    `📅 *Data:* ${dataFormatada}\n` +
+    `🔧 *Tipo:* ${tipoMap[ordem.tipo_servico] || ordem.tipo_servico}\n`
+
+  if (ordem.data_agendamento) {
+    const dataAgendamento = new Date(ordem.data_agendamento).toLocaleDateString("pt-BR")
+    const periodo = periodoMap[ordem.periodo_agendamento] || ordem.periodo_agendamento
+    mensagem += `📆 *Agendamento:* ${dataAgendamento} - ${periodo}\n`
+  }
+
+  if (ordem.tecnico_name && ordem.tecnico_name !== "A definir") {
+    mensagem += `👨‍🔧 *Técnico:* ${ordem.tecnico_name}\n`
+  }
+
+  if (ordem.solicitado_por) {
+    mensagem += `✍️ *Solicitado por:* ${ordem.solicitado_por}\n`
+  }
+
+  mensagem += `\n📝 *Descrição:*\n${ordem.descricao_defeito || "Não informada"}\n`
+
+  if (ordem.servico_realizado) {
+    mensagem += `\n✨ *Serviço Realizado:*\n${ordem.servico_realizado}\n`
+  }
+
+  mensagem +=
+    `\n\nDeseja fazer mais alguma coisa?\n\n` +
+    `*1* - Criar nova OS\n` +
+    `*2* - Consultar outra OS\n\n` +
+    `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`
+
+  await updateConversationState(from, "menu", data)
+  await sendMessage(from, mensagem)
 }
 
 async function returnToMenu(from: string, data: any) {
