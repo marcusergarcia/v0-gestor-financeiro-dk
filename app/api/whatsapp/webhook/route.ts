@@ -821,22 +821,33 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
 
 async function handleOrderDescription(from: string, description: string, data: any) {
   try {
+    console.log("[v0] 📝 Iniciando criação de ordem de serviço")
+    console.log("[v0] 📦 Dados recebidos:", JSON.stringify(data, null, 2))
+
     if (!data.clienteId) {
+      console.log("[v0] ❌ Cliente ID não encontrado")
       await sendMessage(from, "❌ Erro: Cliente não identificado. Vou reiniciar a conversa.")
       await sendTipoClienteMenu(from)
       return
     }
 
+    console.log("[v0] 🔍 Buscando dados do cliente ID:", data.clienteId)
     const clienteResult = await query("SELECT id, nome, endereco FROM clientes WHERE id = ?", [data.clienteId])
 
     if (!clienteResult || (clienteResult as any[]).length === 0) {
+      console.log("[v0] ❌ Cliente não encontrado no banco")
       await sendMessage(from, "❌ Erro: Cliente não encontrado.")
       await clearConversationState(from)
       return
     }
 
     const cliente = (clienteResult as any[])[0]
+    console.log("[v0] ✅ Cliente encontrado:", cliente.nome)
+
+    console.log("[v0] 🔢 Gerando número da ordem...")
     const numeroOrdem = await generateOrderNumber()
+    console.log("[v0] ✅ Número gerado:", numeroOrdem)
+
     const dataAtual = new Date().toISOString().split("T")[0]
     const solicitadoPor = data.solicitante || data.solicitadoPor || cliente.nome
 
@@ -845,7 +856,16 @@ async function handleOrderDescription(from: string, description: string, data: a
     const dataAgendamento = data.dataAgendamento || null
     const periodoAgendamento = data.periodoAgendamento || null
 
-    await query(
+    console.log("[v0] 📋 Dados da ordem:")
+    console.log("[v0]   - Número:", numeroOrdem)
+    console.log("[v0]   - Cliente ID:", cliente.id)
+    console.log("[v0]   - Situação:", situacao)
+    console.log("[v0]   - Data agendamento:", dataAgendamento)
+    console.log("[v0]   - Período agendamento:", periodoAgendamento)
+    console.log("[v0]   - Solicitado por:", solicitadoPor)
+
+    console.log("[v0] 💾 Inserindo ordem no banco...")
+    const insertResult = await query(
       `INSERT INTO ordens_servico 
        (numero, cliente_id, tecnico_name, tecnico_email, data_atual, tipo_servico, 
         descricao_defeito, responsavel, nome_responsavel, solicitado_por, situacao, 
@@ -868,7 +888,9 @@ async function handleOrderDescription(from: string, description: string, data: a
       ],
     )
 
-    console.log("[v0] ✅ Ordem criada:", numeroOrdem, "para cliente:", cliente.nome)
+    const ordemId = (insertResult as any).insertId
+    console.log("[v0] ✅ Ordem criada com ID:", ordemId)
+    console.log("[v0] ✅ Ordem criada com número:", numeroOrdem, "para cliente:", cliente.nome)
 
     let mensagemConfirmacao =
       "✅ *Ordem de Serviço Criada!*\n\n" +
@@ -896,6 +918,7 @@ async function handleOrderDescription(from: string, description: string, data: a
     await updateConversationState(from, ConversationStage.MENU, data)
   } catch (error) {
     console.error("[v0] ❌ Erro ao criar ordem:", error)
+    console.error("[v0] ❌ Stack trace:", error instanceof Error ? error.stack : "N/A")
     await sendMessage(from, "❌ Erro ao criar ordem de serviço. Por favor, tente novamente mais tarde.")
     await clearConversationState(from)
   }

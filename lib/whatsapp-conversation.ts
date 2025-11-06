@@ -209,23 +209,54 @@ export async function findClientByCodigo(codigo: string): Promise<any | null> {
 
 export async function generateOrderNumber(): Promise<string> {
   try {
-    console.log("[v0] 🔢 Gerando número de ordem")
+    console.log("[v0] 🔢 Gerando número de ordem no formato AAAAMMDDXXX")
 
-    const result = await query("SELECT numero FROM ordens_servico ORDER BY id DESC LIMIT 1")
+    const hoje = new Date()
+    const ano = hoje.getFullYear()
+    const mes = String(hoje.getMonth() + 1).padStart(2, "0")
+    const dia = String(hoje.getDate()).padStart(2, "0")
 
-    if (!result || (result as any[]).length === 0) {
-      console.log("[v0] ℹ️ Primeira ordem, retornando 1")
-      return "1"
+    const prefixoMes = `${ano}${mes}`
+    const prefixoDia = `${ano}${mes}${dia}`
+
+    console.log("[v0] 📅 Prefixo do dia:", prefixoDia)
+
+    // Buscar última ordem do mês atual
+    const result = await query(
+      `SELECT numero 
+       FROM ordens_servico 
+       WHERE numero LIKE ? 
+       ORDER BY numero DESC 
+       LIMIT 1`,
+      [`${prefixoMes}%`],
+    )
+
+    let sequencial = 1
+
+    if (result && (result as any[]).length > 0) {
+      const ultimoNumero = (result as any[])[0].numero
+      console.log("[v0] 📋 Último número do mês:", ultimoNumero)
+
+      // Extrair os últimos 3 dígitos (sequencial)
+      const ultimoSequencial = Number.parseInt(ultimoNumero.slice(-3))
+      sequencial = ultimoSequencial + 1
+
+      console.log("[v0] 🔢 Último sequencial:", ultimoSequencial)
+      console.log("[v0] 🔢 Novo sequencial:", sequencial)
+    } else {
+      console.log("[v0] ℹ️ Primeira ordem do mês")
     }
 
-    const lastNumber = (result as any[])[0].numero
-    const nextNumber = Number.parseInt(lastNumber) + 1
-    console.log("[v0] ✅ Próximo número:", nextNumber)
-    return nextNumber.toString()
+    // Formatar sequencial com 3 dígitos (001, 002, etc.)
+    const sequencialFormatado = String(sequencial).padStart(3, "0")
+    const numeroOrdem = `${prefixoDia}${sequencialFormatado}`
+
+    console.log("[v0] ✅ Número gerado:", numeroOrdem)
+    return numeroOrdem
   } catch (error) {
     console.error("[v0] ❌ Erro ao gerar número de ordem:", error)
     // Fallback: usar timestamp
-    const fallback = Date.now().toString().slice(-6)
+    const fallback = Date.now().toString()
     console.log("[v0] ⚠️ Usando fallback:", fallback)
     return fallback
   }
