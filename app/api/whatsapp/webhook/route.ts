@@ -120,15 +120,17 @@ async function processUserMessage(from: string, messageBody: string) {
       currentStage !== ConversationStage.NOME_CLIENTE &&
       currentStage !== ConversationStage.CADASTRO_CNPJ &&
       currentStage !== ConversationStage.CADASTRO_CEP &&
+      currentStage !== ConversationStage.CADASTRO_NUMERO &&
+      currentStage !== ConversationStage.CADASTRO_CONFIRMAR_ENDERECO &&
       currentStage !== ConversationStage.CADASTRO_TELEFONE &&
       currentStage !== ConversationStage.CADASTRO_EMAIL &&
       currentStage !== ConversationStage.CADASTRO_SINDICO &&
       currentStage !== ConversationStage.CADASTRO_SOLICITANTE &&
       currentStage !== ConversationStage.CADASTRO_CONFIRMAR &&
-      currentStage !== ConversationStage.CADASTRO_CONFIRMAR_ENDERECO &&
       currentStage !== ConversationStage.CRIAR_OS_TIPO_ATENDIMENTO &&
       currentStage !== ConversationStage.CRIAR_OS_DATA_AGENDAMENTO &&
-      currentStage !== ConversationStage.CRIAR_OS_PERIODO_AGENDAMENTO
+      currentStage !== ConversationStage.CRIAR_OS_PERIODO_AGENDAMENTO &&
+      currentStage !== ConversationStage.CRIAR_OS_SOLICITANTE
     ) {
       // User wants to return to menu - only if they have a client ID
       if (state.data?.clienteId) {
@@ -156,6 +158,10 @@ async function processUserMessage(from: string, messageBody: string) {
 
       case ConversationStage.CADASTRO_CEP:
         await handleCadastroCEP(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CADASTRO_NUMERO:
+        await handleCadastroNumero(from, messageBody, state?.data || {})
         break
 
       case ConversationStage.CADASTRO_CONFIRMAR_ENDERECO:
@@ -212,6 +218,10 @@ async function processUserMessage(from: string, messageBody: string) {
 
       case ConversationStage.CRIAR_OS_PERIODO_AGENDAMENTO:
         await handlePeriodoAgendamento(from, messageBody, state?.data || {})
+        break
+
+      case ConversationStage.CRIAR_OS_SOLICITANTE:
+        await handleCriarOSSolicitante(from, messageBody, state?.data || {})
         break
 
       case ConversationStage.CREATE_ORDER_DESC:
@@ -387,8 +397,7 @@ async function handleCadastroCEP(from: string, message: string, data: any) {
   // Formatar CEP
   const cepFormatado = cepLimpo.replace(/^(\d{5})(\d{3})$/, "$1-$2")
 
-  // Salvar dados do CEP
-  await updateConversationState(from, ConversationStage.CADASTRO_CONFIRMAR_ENDERECO, {
+  await updateConversationState(from, ConversationStage.CADASTRO_NUMERO, {
     ...data,
     cep: cepFormatado,
     endereco: cepData.data.logradouro,
@@ -405,6 +414,36 @@ async function handleCadastroCEP(from: string, message: string, data: any) {
       `Bairro: ${cepData.data.bairro || "Não informado"}\n` +
       `Cidade: ${cepData.data.localidade} - ${cepData.data.uf}\n` +
       `CEP: ${cepFormatado}\n\n` +
+      `Agora, qual é o *número do imóvel*?\n\n` +
+      `Exemplo: _123_`,
+  )
+}
+
+async function handleCadastroNumero(from: string, message: string, data: any) {
+  const numero = message.trim()
+
+  if (!numero) {
+    await sendMessage(from, "❌ Por favor, digite o número do imóvel.")
+    return
+  }
+
+  // Adicionar número ao endereço
+  const enderecoCompleto = `${data.endereco}, ${numero}`
+
+  await updateConversationState(from, ConversationStage.CADASTRO_CONFIRMAR_ENDERECO, {
+    ...data,
+    endereco: enderecoCompleto,
+    numero,
+  })
+
+  await sendMessage(
+    from,
+    `✅ Número registrado!\n\n` +
+      `📍 *Endereço completo:*\n` +
+      `${enderecoCompleto}\n` +
+      `Bairro: ${data.bairro || "Não informado"}\n` +
+      `Cidade: ${data.cidade} - ${data.estado}\n` +
+      `CEP: ${data.cep}\n\n` +
       `Os dados estão corretos?\n\n` +
       `*1* - Sim, continuar\n` +
       `*2* - Não, corrigir endereço`,
@@ -696,16 +735,16 @@ async function handleTipoAtendimento(from: string, message: string, data: any) {
   const opcao = message.trim()
 
   if (opcao === "1") {
-    // Para hoje - ir direto para descrição
-    await updateConversationState(from, ConversationStage.CREATE_ORDER_DESC, {
+    await updateConversationState(from, ConversationStage.CRIAR_OS_SOLICITANTE, {
       ...data,
       tipoAtendimento: "hoje",
     })
     await sendMessage(
       from,
       "📝 *Atendimento para Hoje*\n\n" +
-        "Por favor, descreva o problema ou serviço necessário:\n\n" +
-        "Exemplo: _Verificar câmeras do hall do bloco A_",
+        "Antes de continuar, qual é o *seu nome*?\n" +
+        "(Pessoa que está solicitando o serviço)\n\n" +
+        "Exemplo: _Maria Santos_",
     )
   } else if (opcao === "2") {
     // Agendar - pedir data
@@ -801,8 +840,7 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
     return
   }
 
-  // Período disponível - pedir descrição
-  await updateConversationState(from, ConversationStage.CREATE_ORDER_DESC, {
+  await updateConversationState(from, ConversationStage.CRIAR_OS_SOLICITANTE, {
     ...data,
     periodoAgendamento: periodo,
     periodoAgendamentoLabel: periodoLabel,
@@ -814,9 +852,42 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
       `📅 Data: ${data.dataAgendamentoFormatada}\n` +
       `🕐 Período: ${periodoLabel}\n\n` +
       `⚠️ *Agendamento sujeito a confirmação*\n\n` +
-      `Agora, descreva o problema ou serviço necessário:\n\n` +
-      `Exemplo: _Verificar câmeras do hall do bloco A_`,
+      `Agora, qual é o *seu nome*?\n` +
+      `(Pessoa que está solicitando o serviço)\n\n` +
+      `Exemplo: _Maria Santos_`,
   )
+}
+
+async function handleCriarOSSolicitante(from: string, message: string, data: any) {
+  const solicitante = message.trim()
+
+  if (!solicitante || solicitante.length < 3) {
+    await sendMessage(from, "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.")
+    return
+  }
+
+  await updateConversationState(from, ConversationStage.CREATE_ORDER_DESC, {
+    ...data,
+    solicitanteOS: solicitante,
+  })
+
+  const tipoAtendimento = data.tipoAtendimento || "hoje"
+
+  if (tipoAtendimento === "agendado") {
+    await sendMessage(
+      from,
+      `✅ Nome registrado: *${solicitante}*\n\n` +
+        `Agora, descreva o problema ou serviço necessário:\n\n` +
+        `Exemplo: _Verificar câmeras do hall do bloco A_`,
+    )
+  } else {
+    await sendMessage(
+      from,
+      `✅ Nome registrado: *${solicitante}*\n\n` +
+        `Agora, descreva o problema ou serviço necessário:\n\n` +
+        `Exemplo: _Verificar câmeras do hall do bloco A_`,
+    )
+  }
 }
 
 async function handleOrderDescription(from: string, description: string, data: any) {
@@ -849,7 +920,7 @@ async function handleOrderDescription(from: string, description: string, data: a
     console.log("[v0] ✅ Número gerado:", numeroOrdem)
 
     const dataAtual = new Date().toISOString().split("T")[0]
-    const solicitadoPor = data.solicitante || data.solicitadoPor || cliente.nome
+    const solicitadoPor = data.solicitanteOS || data.solicitante || data.solicitadoPor || cliente.nome
 
     const tipoAtendimento = data.tipoAtendimento || "hoje"
     const situacao = tipoAtendimento === "agendado" ? "agendada" : "aberta"

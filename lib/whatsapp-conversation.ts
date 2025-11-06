@@ -8,6 +8,7 @@ export enum ConversationStage {
   CLIENTE_NAO_ENCONTRADO = "cliente_nao_encontrado",
   CADASTRO_CNPJ = "cadastro_cnpj", // Novo stage para pedir CNPJ completo
   CADASTRO_CEP = "cadastro_cep",
+  CADASTRO_NUMERO = "cadastro_numero", // Adicionado stage para número do imóvel
   CADASTRO_CONFIRMAR_ENDERECO = "cadastro_confirmar_endereco",
   CADASTRO_TELEFONE = "cadastro_telefone",
   CADASTRO_EMAIL = "cadastro_email",
@@ -20,6 +21,7 @@ export enum ConversationStage {
   CRIAR_OS_TIPO_ATENDIMENTO = "criar_os_tipo_atendimento",
   CRIAR_OS_DATA_AGENDAMENTO = "criar_os_data_agendamento",
   CRIAR_OS_PERIODO_AGENDAMENTO = "criar_os_periodo_agendamento",
+  CRIAR_OS_SOLICITANTE = "criar_os_solicitante", // Adicionado stage para nome do solicitante da OS
   CREATE_ORDER_DESC = "create_order_desc",
   QUERY_ORDER = "query_order",
   WAIT_AGENT = "wait_agent",
