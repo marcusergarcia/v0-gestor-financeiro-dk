@@ -91,6 +91,7 @@ export default function NovaOrdemServicoPage() {
     descricao_defeito: "",
     contrato_numero: "Cliente sem contrato",
     data_agendamento: "",
+    periodo_agendamento: "" as "" | "manha" | "tarde",
   })
 
   // Gerar número da OS quando cliente for selecionado
@@ -306,6 +307,15 @@ export default function NovaOrdemServicoPage() {
       return
     }
 
+    if (desejaAgendar && !formData.periodo_agendamento) {
+      toast({
+        title: "Período obrigatório",
+        description: "Selecione o período (Manhã ou Tarde) para o agendamento.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       setLoading(true)
 
@@ -320,6 +330,7 @@ export default function NovaOrdemServicoPage() {
         solicitado_por: formData.solicitado_por,
         data_atual: formData.data_atual,
         data_agendamento: desejaAgendar ? formData.data_agendamento : null,
+        periodo_agendamento: desejaAgendar ? formData.periodo_agendamento : null,
         data_execucao: null,
         horario_entrada: null,
         horario_saida: null,
@@ -693,7 +704,7 @@ export default function NovaOrdemServicoPage() {
                           setDesejaAgendar(checked as boolean)
                           // Limpar data de agendamento se desmarcar
                           if (!checked) {
-                            setFormData((prev) => ({ ...prev, data_agendamento: "" }))
+                            setFormData((prev) => ({ ...prev, data_agendamento: "", periodo_agendamento: "" }))
                           }
                         }}
                       />
@@ -706,17 +717,38 @@ export default function NovaOrdemServicoPage() {
                     </div>
 
                     {desejaAgendar && (
-                      <div className="pl-6 space-y-2">
-                        <Label htmlFor="data_agendamento">Data de Agendamento *</Label>
-                        <Input
-                          id="data_agendamento"
-                          type="date"
-                          value={formData.data_agendamento}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, data_agendamento: e.target.value }))}
-                          min={formData.data_atual}
-                        />
-                        <div className="text-xs text-gray-500">
-                          Data em que a visita está agendada para ser realizada
+                      <div className="pl-6 space-y-4">
+                        <div>
+                          <Label htmlFor="data_agendamento">Data de Agendamento *</Label>
+                          <Input
+                            id="data_agendamento"
+                            type="date"
+                            value={formData.data_agendamento}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, data_agendamento: e.target.value }))}
+                            min={formData.data_atual}
+                          />
+                          <div className="text-xs text-gray-500 mt-1">
+                            Data em que a visita está agendada para ser realizada
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="periodo_agendamento">Período *</Label>
+                          <Select
+                            value={formData.periodo_agendamento}
+                            onValueChange={(value: "manha" | "tarde") =>
+                              setFormData((prev) => ({ ...prev, periodo_agendamento: value }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione o período" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="manha">Manhã</SelectItem>
+                              <SelectItem value="tarde">Tarde</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="text-xs text-gray-500 mt-1">Horário de funcionamento: Segunda a Sexta</div>
                         </div>
                       </div>
                     )}
@@ -906,12 +938,22 @@ export default function NovaOrdemServicoPage() {
                       </span>
                     </div>
                     {desejaAgendar && formData.data_agendamento && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Data Agendamento:</span>
-                        <span className="font-medium text-cyan-600">
-                          {new Date(formData.data_agendamento + "T00:00:00").toLocaleDateString("pt-BR")}
-                        </span>
-                      </div>
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Data Agendamento:</span>
+                          <span className="font-medium text-cyan-600">
+                            {new Date(formData.data_agendamento + "T00:00:00").toLocaleDateString("pt-BR")}
+                          </span>
+                        </div>
+                        {formData.periodo_agendamento && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Período:</span>
+                            <span className="font-medium text-cyan-600">
+                              {formData.periodo_agendamento === "manha" ? "Manhã" : "Tarde"}
+                            </span>
+                          </div>
+                        )}
+                      </>
                     )}
                     <div className="flex justify-between">
                       <span className="text-gray-600">Solicitado por:</span>
@@ -964,7 +1006,8 @@ export default function NovaOrdemServicoPage() {
                         !formData.tipo_servico ||
                         !formData.data_atual ||
                         !formData.solicitado_por ||
-                        (desejaAgendar && !formData.data_agendamento)
+                        (desejaAgendar && !formData.data_agendamento) ||
+                        (desejaAgendar && !formData.periodo_agendamento) // Adicionada verificação do período
                       }
                       className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
                     >

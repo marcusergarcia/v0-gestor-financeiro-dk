@@ -537,7 +537,7 @@ export function OrdemServicoPrint({ ordemServico, itens, fotos, assinaturas, onC
                 <div class="info-line"><strong>Data:</strong> ${formatDate(ordemServico.data_atual)}</div>
                 <div class="info-line"><strong>Tipo de Serviço:</strong> ${getTipoServicoLabel(ordemServico.tipo_servico)}</div>
                 <div class="info-line"><strong>Técnico:</strong> ${ordemServico.tecnico_name || "Não informado"}</div>
-                ${ordemServico.data_agendamento ? `<div class="info-line"><strong>Data Agendamento:</strong> ${formatDate(ordemServico.data_agendamento)}</div>` : ""}
+                ${ordemServico.data_agendamento ? `<div class="info-line"><strong>Data Agendamento:</strong> ${formatDate(ordemServico.data_agendamento)}${ordemServico.periodo_agendamento ? ` - ${ordemServico.periodo_agendamento === "manha" ? "Manhã" : "Tarde"}` : ""}</div>` : ""}
                 ${ordemServico.horario_entrada ? `<div class="info-line"><strong>Horário Entrada:</strong> ${formatTime(ordemServico.horario_entrada)}</div>` : ""}
                 ${ordemServico.horario_saida ? `<div class="info-line"><strong>Horário Saída:</strong> ${formatTime(ordemServico.horario_saida)}</div>` : ""}
                 ${ordemServico.solicitado_por ? `<div class="info-line"><strong>Solicitado por:</strong> ${ordemServico.solicitado_por}</div>` : ""}
@@ -853,6 +853,11 @@ export function OrdemServicoPrint({ ordemServico, itens, fotos, assinaturas, onC
                     {ordemServico.data_agendamento && (
                       <p>
                         <strong>Data Agendamento:</strong> {formatDate(ordemServico.data_agendamento)}
+                        {ordemServico.periodo_agendamento && (
+                          <span className="ml-2 text-cyan-600 font-semibold">
+                            ({ordemServico.periodo_agendamento === "manha" ? "Manhã" : "Tarde"})
+                          </span>
+                        )}
                       </p>
                     )}
                     {ordemServico.horario_entrada && (

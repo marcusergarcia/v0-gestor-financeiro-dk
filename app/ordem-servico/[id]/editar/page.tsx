@@ -104,6 +104,7 @@ interface OrdemServico {
   situacao: string
   cliente: Cliente
   itens: OrdemServicoItem[]
+  periodo_agendamento?: "" | "manha" | "tarde"
 }
 
 const TEXTO_SERVICO_PREVENTIVA = `1. Limpeza e Lubrificação dos portões de pedestre com verificação das fechaduras e/ou Eletroímãs.
@@ -129,6 +130,8 @@ export default function EditarOrdemServicoPage() {
   const [tecnicoName, setTecnicoName] = useState("")
   const [tecnicoEmail, setTecnicoEmail] = useState("")
   const [dataExecucao, setDataExecucao] = useState("")
+  const [dataAgendamento, setDataAgendamento] = useState("")
+  const [periodoAgendamento, setPeriodoAgendamento] = useState<"" | "manha" | "tarde">("")
   const [horarioEntrada, setHorarioEntrada] = useState("")
   const [horarioSaida, setHorarioSaida] = useState("")
   const [relatorioVisita, setRelatorioVisita] = useState("")
@@ -242,6 +245,15 @@ export default function EditarOrdemServicoPage() {
           setDataExecucao(dataFormatada)
         }
 
+        if (ordemServico.data_agendamento) {
+          const dataFormatada = ordemServico.data_agendamento.split("T")[0]
+          setDataAgendamento(dataFormatada)
+        }
+
+        if (ordemServico.periodo_agendamento) {
+          setPeriodoAgendamento(ordemServico.periodo_agendamento)
+        }
+
         setHorarioEntrada(ordemServico.horario_entrada || "")
         setHorarioSaida(ordemServico.horario_saida || "")
         setRelatorioVisita(ordemServico.relatorio_visita || "")
@@ -328,6 +340,8 @@ export default function EditarOrdemServicoPage() {
         contrato_numero: contratoNumero !== "Cliente sem contrato" ? contratoNumero : null,
         tecnico_name: tecnicoName,
         tecnico_email: tecnicoEmail,
+        data_agendamento: dataAgendamento || null,
+        periodo_agendamento: periodoAgendamento || null,
         data_execucao: dataExecucao || null,
         horario_entrada: horarioEntrada || null,
         horario_saida: horarioSaida || null,
@@ -750,6 +764,43 @@ export default function EditarOrdemServicoPage() {
                       {situacao === "concluida" && "Serviço finalizado"}
                       {situacao === "aberta" && "Aguardando início da execução"}
                     </p>
+                  </div>
+
+                  <Separator />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                    <div>
+                      <Label htmlFor="data_agendamento" className="text-xs md:text-sm">
+                        Data de Agendamento
+                      </Label>
+                      <Input
+                        id="data_agendamento"
+                        type="date"
+                        value={dataAgendamento}
+                        onChange={(e) => setDataAgendamento(e.target.value)}
+                        className="h-9 md:h-10"
+                      />
+                      <div className="text-[10px] md:text-xs text-gray-500 mt-1">Data agendada para a visita</div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="periodo_agendamento" className="text-xs md:text-sm">
+                        Período do Agendamento
+                      </Label>
+                      <Select
+                        value={periodoAgendamento}
+                        onValueChange={(value: "" | "manha" | "tarde") => setPeriodoAgendamento(value)}
+                      >
+                        <SelectTrigger className="h-9 md:h-10 text-xs md:text-sm">
+                          <SelectValue placeholder="Selecione o período" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manha">Manhã</SelectItem>
+                          <SelectItem value="tarde">Tarde</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="text-[10px] md:text-xs text-gray-500 mt-1">Período da visita agendada</div>
+                    </div>
                   </div>
 
                   <Separator />

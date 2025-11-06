@@ -74,6 +74,28 @@ async function processUserMessage(from: string, messageBody: string) {
     console.log("[v0] 📊 Estado atual:", currentStage)
     console.log("[v0] 📦 Dados salvos:", state?.data)
 
+    const normalizedMessage = messageBody.toLowerCase().trim()
+    if (
+      (normalizedMessage === "voltar" ||
+        normalizedMessage === "menu" ||
+        normalizedMessage === "0" ||
+        normalizedMessage === "voltar ao menu") &&
+      currentStage !== ConversationStage.TIPO_CLIENTE &&
+      currentStage !== ConversationStage.CODIGO_CLIENTE &&
+      currentStage !== ConversationStage.NOME_CLIENTE &&
+      currentStage !== ConversationStage.CADASTRO_CNPJ &&
+      currentStage !== ConversationStage.CADASTRO_TELEFONE &&
+      currentStage !== ConversationStage.CADASTRO_ENDERECO &&
+      currentStage !== ConversationStage.CADASTRO_CIDADE &&
+      currentStage !== ConversationStage.CADASTRO_CONFIRMAR
+    ) {
+      // User wants to return to menu - only if they have a client ID
+      if (state.data?.clienteId) {
+        await returnToMenu(from, state.data)
+        return
+      }
+    }
+
     switch (currentStage) {
       case ConversationStage.TIPO_CLIENTE:
         await handleTipoCliente(from, messageBody, state?.data || {})
@@ -128,7 +150,7 @@ async function processUserMessage(from: string, messageBody: string) {
         break
 
       case ConversationStage.WAIT_AGENT:
-        await sendMessage(from, "⏳ Você já está na fila de atendimento. Um agente responderá em breve!")
+        await returnToMenu(from, state.data || {})
         break
 
       default:
@@ -533,7 +555,7 @@ async function handleQueryOrder(from: string, orderId: string, data: any) {
         from,
         "❌ *Ordem não encontrada*\n\n" +
           `Não encontramos a ordem de serviço número *${orderId}*.\n\n` +
-          "Verifique o número e tente novamente ou digite *0* para voltar ao menu.",
+          "Verifique o número e tente novamente ou digite *voltar* para retornar ao menu.",
       )
       return
     }
@@ -579,6 +601,25 @@ async function handleQueryOrder(from: string, orderId: string, data: any) {
     await sendMessage(from, "❌ Erro ao consultar ordem. Por favor, tente novamente.")
     await clearConversationState(from)
   }
+}
+
+async function returnToMenu(from: string, data: any) {
+  if (!data.clienteId) {
+    await sendMessage(from, "❌ Erro: Cliente não identificado. Vou reiniciar a conversa.")
+    await sendTipoClienteMenu(from)
+    return
+  }
+
+  await updateConversationState(from, ConversationStage.MENU, data)
+  await sendMessage(
+    from,
+    `🏠 *Menu Principal*\n\n` +
+      `Olá, ${data.clienteNome || ""}! 👋\n\n` +
+      `Escolha uma opção:\n\n` +
+      `*1* - Criar ordem de serviço\n` +
+      `*2* - Consultar ordem de serviço\n` +
+      `*3* - Falar com atendente`,
+  )
 }
 
 async function sendTipoClienteMenu(from: string) {

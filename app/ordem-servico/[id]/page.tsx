@@ -471,6 +471,11 @@ export default function VisualizarOrdemServicoPage() {
                     <Calendar className="h-4 w-4 text-orange-600" />
                     <span className="font-medium">Data Agendamento:</span>
                     <span>{formatDate(ordemServico.data_agendamento)}</span>
+                    {ordemServico.periodo_agendamento && (
+                      <Badge variant="outline" className="ml-2">
+                        {ordemServico.periodo_agendamento === "manha" ? "Manhã" : "Tarde"}
+                      </Badge>
+                    )}
                   </div>
                 )}
                 {ordemServico.horario_entrada && (
