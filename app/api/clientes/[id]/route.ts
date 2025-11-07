@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import { pool } from "@/lib/database"
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
+    const { id } = params
 
     const [rows] = await pool.execute(`SELECT * FROM clientes WHERE id = ?`, [id])
 
@@ -21,14 +21,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
+    const { id } = params
     const data = await request.json()
 
     console.log("Dados recebidos para atualização do cliente:", data)
 
-    // Buscar dados atuais do cliente
     const [currentRows] = await pool.execute(`SELECT * FROM clientes WHERE id = ?`, [id])
 
     if (!Array.isArray(currentRows) || currentRows.length === 0) {
@@ -37,34 +36,33 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     const currentClient = currentRows[0] as any
 
-    // Mesclar dados atuais com os novos dados (preservando dados existentes)
     const updatedData = {
-      nome: data.nome !== undefined ? data.nome : currentClient.nome,
-      codigo: data.codigo !== undefined ? data.codigo : currentClient.codigo,
-      cnpj: data.cnpj !== undefined ? data.cnpj : currentClient.cnpj,
-      cpf: data.cpf !== undefined ? data.cpf : currentClient.cpf,
-      email: data.email !== undefined ? data.email : currentClient.email,
+      nome: data.nome !== undefined ? data.nome.toUpperCase() : currentClient.nome,
+      codigo: data.codigo !== undefined ? data.codigo.toUpperCase() : currentClient.codigo,
+      cnpj: data.cnpj !== undefined ? data.cnpj.toUpperCase() : currentClient.cnpj,
+      cpf: data.cpf !== undefined ? data.cpf.toUpperCase() : currentClient.cpf,
+      email: data.email !== undefined ? data.email.toLowerCase() : currentClient.email,
       telefone: data.telefone !== undefined ? data.telefone : currentClient.telefone,
-      endereco: data.endereco !== undefined ? data.endereco : currentClient.endereco,
-      bairro: data.bairro !== undefined ? data.bairro : currentClient.bairro,
-      cidade: data.cidade !== undefined ? data.cidade : currentClient.cidade,
-      estado: data.estado !== undefined ? data.estado : currentClient.estado,
+      endereco: data.endereco !== undefined ? data.endereco.toUpperCase() : currentClient.endereco,
+      bairro: data.bairro !== undefined ? data.bairro.toUpperCase() : currentClient.bairro,
+      cidade: data.cidade !== undefined ? data.cidade.toUpperCase() : currentClient.cidade,
+      estado: data.estado !== undefined ? data.estado.toUpperCase() : currentClient.estado,
       cep: data.cep !== undefined ? data.cep : currentClient.cep,
-      contato: data.contato !== undefined ? data.contato : currentClient.contato,
+      contato: data.contato !== undefined ? data.contato.toUpperCase() : currentClient.contato,
       distancia_km: data.distancia_km !== undefined ? data.distancia_km : currentClient.distancia_km,
       latitude: data.latitude !== undefined ? data.latitude : currentClient.latitude,
       longitude: data.longitude !== undefined ? data.longitude : currentClient.longitude,
-      sindico: data.sindico !== undefined ? data.sindico : currentClient.sindico,
-      rg_sindico: data.rg_sindico !== undefined ? data.rg_sindico : currentClient.rg_sindico,
-      cpf_sindico: data.cpf_sindico !== undefined ? data.cpf_sindico : currentClient.cpf_sindico,
-      zelador: data.zelador !== undefined ? data.zelador : currentClient.zelador,
+      sindico: data.sindico !== undefined ? data.sindico.toUpperCase() : currentClient.sindico,
+      rg_sindico: data.rg_sindico !== undefined ? data.rg_sindico.toUpperCase() : currentClient.rg_sindico,
+      cpf_sindico: data.cpf_sindico !== undefined ? data.cpf_sindico.toUpperCase() : currentClient.cpf_sindico,
+      zelador: data.zelador !== undefined ? data.zelador.toUpperCase() : currentClient.zelador,
       tem_contrato: data.tem_contrato !== undefined ? data.tem_contrato : currentClient.tem_contrato,
       dia_contrato: data.dia_contrato !== undefined ? data.dia_contrato : currentClient.dia_contrato,
-      observacoes: data.observacoes !== undefined ? data.observacoes : currentClient.observacoes,
-      nome_adm: data.nome_adm !== undefined ? data.nome_adm : currentClient.nome_adm,
-      contato_adm: data.contato_adm !== undefined ? data.contato_adm : currentClient.contato_adm,
+      observacoes: data.observacoes !== undefined ? data.observacoes.toUpperCase() : currentClient.observacoes,
+      nome_adm: data.nome_adm !== undefined ? data.nome_adm.toUpperCase() : currentClient.nome_adm,
+      contato_adm: data.contato_adm !== undefined ? data.contato_adm.toUpperCase() : currentClient.contato_adm,
       telefone_adm: data.telefone_adm !== undefined ? data.telefone_adm : currentClient.telefone_adm,
-      email_adm: data.email_adm !== undefined ? data.email_adm : currentClient.email_adm,
+      email_adm: data.email_adm !== undefined ? data.email_adm.toLowerCase() : currentClient.email_adm,
     }
 
     console.log("Dados mesclados para atualização:", updatedData)
@@ -142,9 +140,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
+    const { id } = params
 
     // Verificar se o cliente existe
     const [rows] = await pool.execute(`SELECT * FROM clientes WHERE id = ?`, [id])

@@ -35,7 +35,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const formData = await request.formData()
 
-    // Obter os dados do FormData - CORRIGIDO: usar tipo_foto em vez de tipo
     const file = formData.get("foto") as File
     const tipo_foto = formData.get("tipo_foto") as string
     const descricao = (formData.get("descricao") as string) || ""
@@ -79,12 +78,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     console.log("Salvando foto no banco de dados...")
 
-    // Salvar no banco de dados
     const result = await query(
       `INSERT INTO ordens_servico_fotos 
        (ordem_servico_id, nome_arquivo, caminho_arquivo, tipo_foto, descricao, created_at) 
        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-      [id, file.name, dataUri, tipo_foto, descricao],
+      [id, file.name?.toUpperCase(), dataUri, tipo_foto, descricao?.toUpperCase()],
     )
 
     console.log("Foto salva com sucesso:", result.insertId)

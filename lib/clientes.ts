@@ -197,31 +197,31 @@ export async function createCliente(clienteData: Omit<Cliente, "id" | "created_a
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
-        clienteData.codigo,
-        clienteData.nome,
-        clienteData.cnpj,
-        clienteData.cpf,
-        clienteData.email,
+        clienteData.codigo?.toUpperCase(),
+        clienteData.nome.toUpperCase(),
+        clienteData.cnpj?.toUpperCase(),
+        clienteData.cpf?.toUpperCase(),
+        clienteData.email?.toLowerCase(),
         clienteData.telefone,
-        clienteData.endereco,
-        clienteData.bairro,
-        clienteData.cidade,
-        clienteData.estado,
+        clienteData.endereco?.toUpperCase(),
+        clienteData.bairro?.toUpperCase(),
+        clienteData.cidade?.toUpperCase(),
+        clienteData.estado?.toUpperCase(),
         clienteData.cep,
-        clienteData.contato,
+        clienteData.contato?.toUpperCase(),
         clienteData.distancia_km,
-        clienteData.sindico,
-        clienteData.rg_sindico,
-        clienteData.cpf_sindico,
-        clienteData.zelador,
+        clienteData.sindico?.toUpperCase(),
+        clienteData.rg_sindico?.toUpperCase(),
+        clienteData.cpf_sindico?.toUpperCase(),
+        clienteData.zelador?.toUpperCase(),
         clienteData.tem_contrato,
         clienteData.dia_contrato,
-        clienteData.observacoes,
+        clienteData.observacoes?.toUpperCase(),
         clienteData.status || "ativo",
-        clienteData.nome_adm,
-        clienteData.contato_adm,
+        clienteData.nome_adm?.toUpperCase(),
+        clienteData.contato_adm?.toUpperCase(),
         clienteData.telefone_adm,
-        clienteData.email_adm,
+        clienteData.email_adm?.toLowerCase(),
       ],
     )
 
@@ -247,23 +247,23 @@ export async function updateCliente(id: number, clienteData: Partial<Cliente>): 
 
     if (clienteData.codigo !== undefined) {
       updateFields.push("codigo = ?")
-      updateValues.push(clienteData.codigo)
+      updateValues.push(clienteData.codigo.toUpperCase())
     }
     if (clienteData.nome !== undefined) {
       updateFields.push("nome = ?")
-      updateValues.push(clienteData.nome)
+      updateValues.push(clienteData.nome.toUpperCase())
     }
     if (clienteData.cnpj !== undefined) {
       updateFields.push("cnpj = ?")
-      updateValues.push(clienteData.cnpj)
+      updateValues.push(clienteData.cnpj.toUpperCase())
     }
     if (clienteData.cpf !== undefined) {
       updateFields.push("cpf = ?")
-      updateValues.push(clienteData.cpf)
+      updateValues.push(clienteData.cpf.toUpperCase())
     }
     if (clienteData.email !== undefined) {
       updateFields.push("email = ?")
-      updateValues.push(clienteData.email)
+      updateValues.push(clienteData.email.toLowerCase())
     }
     if (clienteData.telefone !== undefined) {
       updateFields.push("telefone = ?")
@@ -271,19 +271,19 @@ export async function updateCliente(id: number, clienteData: Partial<Cliente>): 
     }
     if (clienteData.endereco !== undefined) {
       updateFields.push("endereco = ?")
-      updateValues.push(clienteData.endereco)
+      updateValues.push(clienteData.endereco.toUpperCase())
     }
     if (clienteData.bairro !== undefined) {
       updateFields.push("bairro = ?")
-      updateValues.push(clienteData.bairro)
+      updateValues.push(clienteData.bairro.toUpperCase())
     }
     if (clienteData.cidade !== undefined) {
       updateFields.push("cidade = ?")
-      updateValues.push(clienteData.cidade)
+      updateValues.push(clienteData.cidade.toUpperCase())
     }
     if (clienteData.estado !== undefined) {
       updateFields.push("estado = ?")
-      updateValues.push(clienteData.estado)
+      updateValues.push(clienteData.estado.toUpperCase())
     }
     if (clienteData.cep !== undefined) {
       updateFields.push("cep = ?")
@@ -291,7 +291,7 @@ export async function updateCliente(id: number, clienteData: Partial<Cliente>): 
     }
     if (clienteData.contato !== undefined) {
       updateFields.push("contato = ?")
-      updateValues.push(clienteData.contato)
+      updateValues.push(clienteData.contato.toUpperCase())
     }
     if (clienteData.distancia_km !== undefined) {
       updateFields.push("distancia_km = ?")
@@ -299,19 +299,19 @@ export async function updateCliente(id: number, clienteData: Partial<Cliente>): 
     }
     if (clienteData.sindico !== undefined) {
       updateFields.push("sindico = ?")
-      updateValues.push(clienteData.sindico)
+      updateValues.push(clienteData.sindico.toUpperCase())
     }
     if (clienteData.rg_sindico !== undefined) {
       updateFields.push("rg_sindico = ?")
-      updateValues.push(clienteData.rg_sindico)
+      updateValues.push(clienteData.rg_sindico.toUpperCase())
     }
     if (clienteData.cpf_sindico !== undefined) {
       updateFields.push("cpf_sindico = ?")
-      updateValues.push(clienteData.cpf_sindico)
+      updateValues.push(clienteData.cpf_sindico.toUpperCase())
     }
     if (clienteData.zelador !== undefined) {
       updateFields.push("zelador = ?")
-      updateValues.push(clienteData.zelador)
+      updateValues.push(clienteData.zelador.toUpperCase())
     }
     if (clienteData.tem_contrato !== undefined) {
       updateFields.push("tem_contrato = ?")
@@ -323,7 +323,7 @@ export async function updateCliente(id: number, clienteData: Partial<Cliente>): 
     }
     if (clienteData.observacoes !== undefined) {
       updateFields.push("observacoes = ?")
-      updateValues.push(clienteData.observacoes)
+      updateValues.push(clienteData.observacoes.toUpperCase())
     }
     if (clienteData.status !== undefined) {
       updateFields.push("status = ?")
@@ -331,11 +331,11 @@ export async function updateCliente(id: number, clienteData: Partial<Cliente>): 
     }
     if (clienteData.nome_adm !== undefined) {
       updateFields.push("nome_adm = ?")
-      updateValues.push(clienteData.nome_adm)
+      updateValues.push(clienteData.nome_adm.toUpperCase())
     }
     if (clienteData.contato_adm !== undefined) {
       updateFields.push("contato_adm = ?")
-      updateValues.push(clienteData.contato_adm)
+      updateValues.push(clienteData.contato_adm.toUpperCase())
     }
     if (clienteData.telefone_adm !== undefined) {
       updateFields.push("telefone_adm = ?")
@@ -343,7 +343,7 @@ export async function updateCliente(id: number, clienteData: Partial<Cliente>): 
     }
     if (clienteData.email_adm !== undefined) {
       updateFields.push("email_adm = ?")
-      updateValues.push(clienteData.email_adm)
+      updateValues.push(clienteData.email_adm.toLowerCase())
     }
 
     if (updateFields.length === 0) {
@@ -351,7 +351,6 @@ export async function updateCliente(id: number, clienteData: Partial<Cliente>): 
       return await getClienteById(id)
     }
 
-    // Adicionar ID no final dos valores
     updateValues.push(id)
 
     const query = `UPDATE clientes SET ${updateFields.join(", ")} WHERE id = ?`

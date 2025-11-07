@@ -37,12 +37,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const data = await request.json()
 
     const result = await query(
-      `
-      INSERT INTO ordens_servico_assinaturas 
+      `INSERT INTO ordens_servico_assinaturas 
       (ordem_servico_id, tipo_assinatura, assinatura_base64, nome_assinante, data_assinatura)
-      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    `,
-      [id, data.tipo_assinatura, data.assinatura_base64, data.nome_assinante],
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [id, data.tipo_assinatura, data.assinatura_base64, data.nome_assinante?.toUpperCase()],
     )
 
     return NextResponse.json({

@@ -54,17 +54,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     console.log("Dados do item:", data)
 
     const result = await query(
-      `
-      INSERT INTO ordens_servico_itens 
+      `INSERT INTO ordens_servico_itens 
       (ordem_servico_id, equipamento_id, equipamento_nome, quantidade, observacoes, situacao, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `,
+      VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
       [
         id,
         data.equipamento_id,
-        data.equipamento_nome,
+        data.equipamento_nome?.toUpperCase(),
         data.quantidade || 1,
-        data.observacoes || null,
+        data.observacoes?.toUpperCase() || null,
         data.situacao || "pendente",
       ],
     )

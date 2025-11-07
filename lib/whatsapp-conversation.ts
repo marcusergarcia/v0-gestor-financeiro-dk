@@ -337,7 +337,6 @@ export async function createClient(data: {
   try {
     console.log("[v0] 📝 Cadastrando novo cliente:", data.nome)
 
-    // Extrair código (6 primeiros dígitos do CNPJ)
     const cnpjLimpo = data.cnpj.replace(/\D/g, "")
     const codigo = cnpjLimpo.substring(0, 6)
 
@@ -350,16 +349,16 @@ export async function createClient(data: {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         codigo,
-        data.nome,
-        data.cnpj,
+        data.nome.toUpperCase(),
+        data.cnpj.toUpperCase(),
         data.cep || null,
-        data.endereco || null,
-        data.bairro || null,
-        data.cidade || null,
-        data.estado || null,
+        data.endereco?.toUpperCase() || null,
+        data.bairro?.toUpperCase() || null,
+        data.cidade?.toUpperCase() || null,
+        data.estado?.toUpperCase() || null,
         data.telefone,
-        data.email || null,
-        data.sindico || null,
+        data.email?.toLowerCase() || null,
+        data.sindico?.toUpperCase() || null,
         data.distanciaKm || null,
         data.latitude || null,
         data.longitude || null,

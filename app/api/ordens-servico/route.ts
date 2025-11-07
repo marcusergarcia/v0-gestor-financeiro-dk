@@ -188,27 +188,27 @@ export async function POST(request: NextRequest) {
         nome_responsavel, situacao) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        numero,
+        numero?.toUpperCase(),
         cliente_id,
         contrato_id || null,
-        contrato_numero || null,
-        tecnico_name,
-        tecnico_email || null,
-        solicitado_por || null,
+        contrato_numero?.toUpperCase() || null,
+        tecnico_name?.toUpperCase(),
+        tecnico_email?.toLowerCase() || null,
+        solicitado_por?.toUpperCase() || null,
         data_atual || null,
         data_agendamento || null,
         periodo_agendamento || null,
         data_execucao || null,
         horario_entrada || null,
         horario_saida || null,
-        tipo_servico,
-        relatorio_visita || null,
-        descricao_defeito || null,
-        necessidades_cliente || null,
-        servico_realizado || null,
-        observacoes || null,
-        responsavel || null,
-        nome_responsavel || null,
+        tipo_servico?.toUpperCase(),
+        relatorio_visita?.toUpperCase() || null,
+        descricao_defeito?.toUpperCase() || null,
+        necessidades_cliente?.toUpperCase() || null,
+        servico_realizado?.toUpperCase() || null,
+        observacoes?.toUpperCase() || null,
+        responsavel?.toUpperCase() || null,
+        nome_responsavel?.toUpperCase() || null,
         situacao,
       ],
     )
@@ -216,7 +216,6 @@ export async function POST(request: NextRequest) {
     const ordemId = (insertResult as any).insertId
     console.log("[v0] Ordem criada com ID:", ordemId)
 
-    // Inserir equipamentos
     if (equipamentos && equipamentos.length > 0) {
       console.log("[v0] Inserindo", equipamentos.length, "equipamentos")
       for (const equipamento of equipamentos) {
@@ -227,9 +226,9 @@ export async function POST(request: NextRequest) {
           [
             ordemId,
             equipamento.equipamento_id,
-            equipamento.equipamento_nome,
+            equipamento.equipamento_nome?.toUpperCase(),
             equipamento.quantidade || 1,
-            equipamento.observacoes || null,
+            equipamento.observacoes?.toUpperCase() || null,
             equipamento.situacao || "pendente",
           ],
         )
@@ -237,7 +236,6 @@ export async function POST(request: NextRequest) {
       console.log("[v0] Equipamentos inseridos com sucesso")
     }
 
-    // Inserir fotos
     if (fotos && fotos.length > 0) {
       console.log("[v0] Inserindo", fotos.length, "fotos")
       for (const foto of fotos) {
@@ -245,12 +243,17 @@ export async function POST(request: NextRequest) {
           `INSERT INTO ordens_servico_fotos 
            (ordem_servico_id, nome_arquivo, caminho_arquivo, tipo_foto, descricao) 
            VALUES (?, ?, ?, ?, ?)`,
-          [ordemId, foto.nome_arquivo, foto.caminho_arquivo, foto.tipo_foto, foto.descricao || null],
+          [
+            ordemId,
+            foto.nome_arquivo?.toUpperCase(),
+            foto.caminho_arquivo,
+            foto.tipo_foto,
+            foto.descricao?.toUpperCase() || null,
+          ],
         )
       }
     }
 
-    // Inserir assinaturas
     if (assinaturas && assinaturas.length > 0) {
       console.log("[v0] Inserindo", assinaturas.length, "assinaturas")
       for (const assinatura of assinaturas) {
@@ -258,7 +261,7 @@ export async function POST(request: NextRequest) {
           `INSERT INTO ordens_servico_assinaturas 
            (ordem_servico_id, tipo_assinatura, assinatura_base64, nome_assinante, data_assinatura) 
            VALUES (?, ?, ?, ?, NOW())`,
-          [ordemId, assinatura.tipo_assinatura, assinatura.assinatura_base64, assinatura.nome_assinante],
+          [ordemId, assinatura.tipo_assinatura, assinatura.assinatura_base64, assinatura.nome_assinante?.toUpperCase()],
         )
       }
     }
