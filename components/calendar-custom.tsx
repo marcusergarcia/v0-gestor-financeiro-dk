@@ -138,18 +138,31 @@ export function CalendarCustom({
               key={day.toISOString()}
               onClick={() => handleDateClick(day)}
               className={cn(
-                "aspect-square p-0 font-normal rounded-md hover:bg-accent hover:text-accent-foreground transition-colors relative",
-                highlighted && "bg-cyan-100 font-semibold text-cyan-900",
-                selected && "bg-primary text-primary-foreground",
-                today && !selected && "border-2 border-primary",
+                "aspect-square p-0 font-normal rounded-lg hover:bg-accent hover:text-accent-foreground transition-all relative border-2 border-transparent",
+                highlighted &&
+                  !selected &&
+                  "bg-gradient-to-br from-emerald-50 to-teal-100 border-emerald-300 font-semibold text-emerald-900 shadow-sm",
+                selected &&
+                  "bg-gradient-to-br from-indigo-600 to-purple-600 text-white border-indigo-400 shadow-lg ring-2 ring-indigo-200",
+                today && !selected && "border-2 border-orange-400 bg-orange-50 font-semibold",
                 "text-sm",
               )}
             >
               {day.getDate()}
               {(periods.manha || periods.tarde) && (
-                <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5">
-                  {periods.manha && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" title="Manhã"></div>}
-                  {periods.tarde && <div className="w-1.5 h-1.5 rounded-full bg-orange-500" title="Tarde"></div>}
+                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
+                  {periods.manha && (
+                    <div
+                      className="w-2 h-2 rounded-full bg-blue-600 border border-blue-800 shadow-sm"
+                      title="Manhã"
+                    ></div>
+                  )}
+                  {periods.tarde && (
+                    <div
+                      className="w-2 h-2 rounded-full bg-orange-600 border border-orange-800 shadow-sm"
+                      title="Tarde"
+                    ></div>
+                  )}
                 </div>
               )}
             </button>

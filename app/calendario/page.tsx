@@ -224,18 +224,22 @@ export default function CalendarioPage() {
               datesWithPeriods={getDatesWithPeriods()}
               className="rounded-md border shadow-sm"
             />
-            <div className="mt-4 p-3 bg-cyan-50 rounded-lg border border-cyan-200 space-y-2">
-              <div className="flex items-center gap-2 text-sm text-cyan-700">
-                <div className="w-4 h-4 bg-cyan-100 border-2 border-cyan-400 rounded"></div>
+            <div className="mt-4 p-3 bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg border-2 border-slate-200 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <div className="w-5 h-5 bg-gradient-to-br from-emerald-50 to-teal-100 border-2 border-emerald-300 rounded"></div>
                 <span>Dias com agendamentos</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-blue-700">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span>Manhã</span>
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <div className="w-5 h-5 bg-gradient-to-br from-indigo-600 to-purple-600 border-2 border-indigo-400 rounded shadow"></div>
+                <span>Dia selecionado</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-orange-700">
-                <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                <span>Tarde</span>
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
+                <div className="w-3 h-3 bg-blue-600 border border-blue-800 rounded-full shadow-sm"></div>
+                <span>Manhã (9h-12h)</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm font-medium text-orange-700">
+                <div className="w-3 h-3 bg-orange-600 border border-orange-800 rounded-full shadow-sm"></div>
+                <span>Tarde (13h-17h)</span>
               </div>
             </div>
           </CardContent>
