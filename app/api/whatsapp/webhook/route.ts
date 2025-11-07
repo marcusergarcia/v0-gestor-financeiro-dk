@@ -343,7 +343,10 @@ async function handleCodigoCliente(from: string, message: string, data: any) {
         `CNPJ: ${cliente.cnpj || "Não informado"}\n\n` +
         `Agora escolha uma opção:\n\n` +
         `*1* - Criar ordem de serviço\n` +
-        `*2* - Consultar ordem de serviço\n\n` +
+        `*2* - Consultar ordem aberta\n` +
+        `*3* - Consultar ordem finalizada\n` +
+        `*4* - Consultar ordem agendada\n` +
+        `*5* - Sair\n\n` +
         `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
     )
   }
@@ -437,7 +440,6 @@ async function handleCadastroConfirmarClienteExistente(from: string, message: st
   const opcao = message.trim()
 
   if (opcao === "1") {
-    // Confirmar cliente existente - ir para menu principal
     const cliente = data.clienteExistente
     await updateConversationState(from, "menu", {
       ...data,
@@ -452,7 +454,10 @@ async function handleCadastroConfirmarClienteExistente(from: string, message: st
         `CNPJ: ${cliente.cnpj}\n\n` +
         `Agora escolha uma opção:\n\n` +
         `*1* - Criar ordem de serviço\n` +
-        `*2* - Consultar ordem de serviço\n\n` +
+        `*2* - Consultar ordem aberta\n` +
+        `*3* - Consultar ordem finalizada\n` +
+        `*4* - Consultar ordem agendada\n` +
+        `*5* - Sair\n\n` +
         `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
     )
   } else if (opcao === "2") {
@@ -739,7 +744,10 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
           `\n` +
           `Agora escolha uma opção:\n\n` +
           `*1* - Criar ordem de serviço\n` +
-          `*2* - Consultar ordem de serviço\n\n` +
+          `*2* - Consultar ordem aberta\n` +
+          `*3* - Consultar ordem finalizada\n` +
+          `*4* - Consultar ordem agendada\n` +
+          `*5* - Sair\n\n` +
           `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
       )
     } catch (error) {
@@ -784,7 +792,10 @@ async function handleSelecionarCliente(from: string, message: string, data: any)
         `Código: ${cliente.codigo}\n\n` +
         `Agora escolha uma opção:\n\n` +
         `*1* - Criar ordem de serviço\n` +
-        `*2* - Consultar ordem de serviço\n\n` +
+        `*2* - Consultar ordem aberta\n` +
+        `*3* - Consultar ordem finalizada\n` +
+        `*4* - Consultar ordem agendada\n` +
+        `*5* - Sair\n\n` +
         `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
     )
   } else {
@@ -872,6 +883,7 @@ async function handleMenuOption(from: string, option: string, data: any) {
 
   switch (option) {
     case "1":
+      // Criar ordem de serviço
       await updateConversationState(from, "criar_os_tipo_servico", data)
       await sendMessage(
         from,
@@ -886,18 +898,22 @@ async function handleMenuOption(from: string, option: string, data: any) {
       break
 
     case "2":
+      // Consultar ordem aberta
       await handleConsultarPorSituacao(from, data, "aberta")
       break
 
     case "3":
+      // Consultar ordem finalizada
       await handleConsultarPorSituacao(from, data, "concluida")
       break
 
     case "4":
+      // Consultar ordem agendada
       await handleConsultarPorSituacao(from, data, "agendada")
       break
 
     case "5":
+      // Sair
       await restartConversation(from)
       await sendMessage(
         from,
@@ -1241,7 +1257,10 @@ async function handleOrderDescription(from: string, description: string, data: a
       "🔔 Você receberá atualizações sobre o andamento do serviço.\n\n" +
       "Deseja fazer mais alguma coisa?\n\n" +
       "*1* - Criar outra OS\n" +
-      "*2* - Consultar OS\n\n" +
+      "*2* - Consultar ordem aberta\n" +
+      "*3* - Consultar ordem finalizada\n" +
+      "*4* - Consultar ordem agendada\n" +
+      "*5* - Sair\n\n" +
       "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_"
 
     await sendMessage(from, mensagemConfirmacao)
@@ -1508,7 +1527,10 @@ async function handleConsultarOSSelecionar(from: string, message: string, data: 
   mensagem +=
     `\n\nDeseja fazer mais alguma coisa?\n\n` +
     `*1* - Criar nova OS\n` +
-    `*2* - Consultar outra OS\n\n` +
+    `*2* - Consultar ordem aberta\n` +
+    `*3* - Consultar ordem finalizada\n` +
+    `*4* - Consultar ordem agendada\n` +
+    `*5* - Sair\n\n` +
     `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`
 
   await updateConversationState(from, "menu", data)
