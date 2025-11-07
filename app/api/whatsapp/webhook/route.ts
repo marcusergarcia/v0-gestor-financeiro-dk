@@ -730,10 +730,15 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
       const codigo = data.cnpj.replace(/\D/g, "").substring(0, 6)
 
       await updateConversationState(from, "menu", {
-        ...data,
         clienteId,
         clienteNome: data.nome,
+        codigo,
+        cnpj: data.cnpj,
       })
+
+      console.log("[v0] ✅ Cliente cadastrado com ID:", clienteId)
+      console.log("[v0] ✅ Estado atualizado para 'menu' com clienteId:", clienteId)
+
       await sendMessage(
         from,
         `✅ *Cadastro realizado com sucesso!*\n\n` +
@@ -875,7 +880,12 @@ async function handleCadastroCidade(from: string, message: string, data: any) {
 }
 
 async function handleMenuOption(from: string, option: string, data: any) {
+  console.log("[v0] 📋 handleMenuOption chamado")
+  console.log("[v0] 📋 Opção selecionada:", option)
+  console.log("[v0] 📋 Dados recebidos:", JSON.stringify(data, null, 2))
+
   if (!data.clienteId) {
+    console.log("[v0] ❌ Cliente ID não encontrado no handleMenuOption")
     await sendMessage(from, "❌ Erro: Cliente não identificado. Vou reiniciar a conversa.")
     await sendTipoClienteMenu(from)
     return
@@ -884,6 +894,7 @@ async function handleMenuOption(from: string, option: string, data: any) {
   switch (option) {
     case "1":
       // Criar ordem de serviço
+      console.log("[v0] ✅ Iniciando criação de OS para cliente:", data.clienteId)
       await updateConversationState(from, "criar_os_tipo_servico", data)
       await sendMessage(
         from,
