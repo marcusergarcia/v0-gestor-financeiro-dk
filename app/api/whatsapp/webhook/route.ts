@@ -1081,6 +1081,24 @@ async function handleDataAgendamento(from: string, message: string, data: any) {
 async function handlePeriodoAgendamento(from: string, message: string, data: any) {
   const opcao = message.trim()
 
+  if (opcao === "3") {
+    await updateConversationState(from, "criar_os_data_agendamento", {
+      ...data,
+      dataAgendamento: undefined,
+      dataAgendamentoFormatada: undefined,
+    })
+    await sendMessage(
+      from,
+      "📅 *Escolher Nova Data*\n\n" +
+        "Digite a data desejada para o atendimento:\n\n" +
+        "📋 Formato: DD/MM/AAAA\n" +
+        "Exemplo: _15/01/2025_\n\n" +
+        "⚠️ Apenas dias úteis (segunda a sexta)\n\n" +
+        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+    )
+    return
+  }
+
   let periodo: string
   let periodoLabel: string
 
