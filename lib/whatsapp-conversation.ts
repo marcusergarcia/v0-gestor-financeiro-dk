@@ -449,7 +449,7 @@ export async function checkAgendamentoDisponivel(
        FROM ordens_servico 
        WHERE data_agendamento = ? 
        AND periodo_agendamento = ? 
-       AND situacao = 'agendada'`,
+       AND situacao IN ('agendada', 'em_andamento')`,
       [data, periodo],
     )
 

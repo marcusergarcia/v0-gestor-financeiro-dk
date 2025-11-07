@@ -144,6 +144,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (data_agendamento && periodo_agendamento) {
+      console.log("[v0] Verificando disponibilidade de agendamento:", data_agendamento, periodo_agendamento)
+
+      const agendamentoExistente = await query(
+        `SELECT id, numero FROM ordens_servico 
+         WHERE data_agendamento = ? 
+         AND periodo_agendamento = ? 
+         AND situacao IN ('agendada', 'em_andamento')`,
+        [data_agendamento, periodo_agendamento],
+      )
+
+      if ((agendamentoExistente as any[]).length > 0) {
+        const ordemExistente = (agendamentoExistente as any[])[0]
+        console.log("[v0] Validação falhou: agendamento duplicado")
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Já existe uma ordem agendada para esta data e período (OS #${ordemExistente.numero}). Não é permitido agendar duas ordens no mesmo dia e período.`,
+          },
+          { status: 400 },
+        )
+      }
+    }
+
     // Verificar se o número já existe
     const existingOrder = await query("SELECT id FROM ordens_servico WHERE numero = ?", [numero])
 

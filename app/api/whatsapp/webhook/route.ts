@@ -1058,8 +1058,10 @@ async function handleDataAgendamento(from: string, message: string, data: any) {
     from,
     `✅ Data selecionada: *${dataStr}*\n\n` +
       "Agora escolha o período:\n\n" +
-      "*1* - Manhã (08:00 - 12:00)\n" +
-      "*2* - Tarde (13:00 - 18:00)\n\n" +
+      "*1* - Manhã (09:00 - 12:00)\n" +
+      "*2* - Tarde (13:00 - 17:00)\n\n" +
+      "⚠️ *Importante:* Não é possível agendar duas ordens no mesmo período.\n" +
+      "Apenas dias úteis (segunda a sexta).\n\n" +
       "_Digite o número da opção desejada_\n\n" +
       "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
   )
@@ -1073,33 +1075,34 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
 
   if (opcao === "1") {
     periodo = "manha"
-    periodoLabel = "Manhã (08:00 - 12:00)"
+    periodoLabel = "Manhã (09:00 - 12:00)"
   } else if (opcao === "2") {
     periodo = "tarde"
-    periodoLabel = "Tarde (13:00 - 18:00)"
+    periodoLabel = "Tarde (13:00 - 17:00)"
   } else {
     await sendMessage(
       from,
       "❌ Opção inválida.\n\n" +
         "Digite:\n" +
-        "*1* - Manhã (08:00 - 12:00)\n" +
-        "*2* - Tarde (13:00 - 18:00)\n\n" +
+        "*1* - Manhã (09:00 - 12:00)\n" +
+        "*2* - Tarde (13:00 - 17:00)\n\n" +
         "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
     )
     return
   }
 
-  // Verificar disponibilidade
   const { disponivel, count } = await checkAgendamentoDisponivel(data.dataAgendamento, periodo)
 
   if (!disponivel) {
     await sendMessage(
       from,
-      `⚠️ *Período já escolhido*\n\n` +
-        `Já existe ${count} agendamento(s) para ${data.dataAgendamentoFormatada} no período da ${periodoLabel.split(" ")[0]}.\n\n` +
-        `Por favor, escolha outro período:\n\n` +
-        `*1* - Manhã (08:00 - 12:00)\n` +
-        `*2* - Tarde (13:00 - 18:00)\n\n` +
+      `⚠️ *Período Indisponível*\n\n` +
+        `Já existe agendamento para ${data.dataAgendamentoFormatada} no período da ${periodoLabel.split(" ")[0]}.\n\n` +
+        `❌ *Não é permitido agendar duas ordens no mesmo dia e período.*\n\n` +
+        `Por favor, escolha outro período ou outra data:\n\n` +
+        `*1* - Manhã (09:00 - 12:00)\n` +
+        `*2* - Tarde (13:00 - 17:00)\n` +
+        `*3* - Escolher outra data\n\n` +
         `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
     )
     return
@@ -1116,7 +1119,11 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
     `✅ *Agendamento Confirmado*\n\n` +
       `📅 Data: ${data.dataAgendamentoFormatada}\n` +
       `🕐 Período: ${periodoLabel}\n\n` +
-      `⚠️ *Agendamento sujeito a confirmação*\n\n` +
+      `⚠️ *Agendamento sujeito a confirmação*\n` +
+      `📋 Horário de atendimento:\n` +
+      `   - Manhã: 09:00 às 12:00\n` +
+      `   - Tarde: 13:00 às 17:00\n` +
+      `   - Apenas dias úteis (segunda a sexta)\n\n` +
       `Agora, qual é o *seu nome*?\n` +
       `(Pessoa que está solicitando o serviço)\n\n` +
       `Exemplo: _Maria Santos_\n\n` +
