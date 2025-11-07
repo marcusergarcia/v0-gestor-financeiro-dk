@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
         os.solicitado_por,
         os.data_atual,
         os.data_agendamento,
+        os.periodo_agendamento,
         os.data_execucao,
         os.horario_entrada,
         os.horario_saida,
@@ -98,6 +99,7 @@ export async function POST(request: NextRequest) {
       solicitado_por,
       data_atual,
       data_agendamento,
+      periodo_agendamento,
       data_execucao,
       horario_entrada,
       horario_saida,
@@ -156,11 +158,11 @@ export async function POST(request: NextRequest) {
     const insertResult = await query(
       `INSERT INTO ordens_servico 
        (numero, cliente_id, contrato_id, contrato_numero, tecnico_name, tecnico_email, 
-        solicitado_por, data_atual, data_agendamento, data_execucao, horario_entrada, 
-        horario_saida, tipo_servico, relatorio_visita, descricao_defeito, 
+        solicitado_por, data_atual, data_agendamento, periodo_agendamento, data_execucao, 
+        horario_entrada, horario_saida, tipo_servico, relatorio_visita, descricao_defeito, 
         necessidades_cliente, servico_realizado, observacoes, responsavel, 
         nome_responsavel, situacao) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         numero,
         cliente_id,
@@ -171,6 +173,7 @@ export async function POST(request: NextRequest) {
         solicitado_por || null,
         data_atual || null,
         data_agendamento || null,
+        periodo_agendamento || null,
         data_execucao || null,
         horario_entrada || null,
         horario_saida || null,
