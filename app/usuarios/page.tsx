@@ -163,6 +163,7 @@ export default function UsuariosPage() {
       documentos: "Documentos",
       financeiro: "Financeiro",
       ordem_servico: "OS",
+      calendario: "Calendário", // Adicionando label para calendário
       relatorios: "Relatórios",
       usuarios: "Usuários",
       logs: "Logs",
