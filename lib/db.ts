@@ -13,8 +13,6 @@ const pool = mysql.createPool({
   idleTimeout: 60000,
   queueLimit: 0,
   acquireTimeout: 30000, // 30 segundos
-  timeout: 30000,
-  charset: "utf8mb4",
   // SSL para produção se necessário
   ssl:
     process.env.DB_SSL === "true"
@@ -27,6 +25,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
+  charset: "utf8mb4", // Removida opção 'timeout' que causava warning no MySQL2
 })
 
 // Verificar conexão no startup
