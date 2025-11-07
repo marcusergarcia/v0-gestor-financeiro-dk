@@ -1,0 +1,161 @@
+"use client"
+
+import * as React from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+
+interface CalendarCustomProps {
+  selectedDate?: Date
+  onDateSelect?: (date: Date) => void
+  highlightedDates?: Date[]
+  datesWithPeriods?: { date: Date; manha: boolean; tarde: boolean }[]
+  className?: string
+}
+
+export function CalendarCustom({
+  selectedDate,
+  onDateSelect,
+  highlightedDates = [],
+  datesWithPeriods = [],
+  className,
+}: CalendarCustomProps) {
+  const [currentMonth, setCurrentMonth] = React.useState(selectedDate || new Date())
+
+  const daysOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+  const monthNames = [
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+  ]
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const daysInMonth = lastDay.getDate()
+    const startingDayOfWeek = firstDay.getDay()
+
+    const days: (Date | null)[] = []
+
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null)
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(new Date(year, month, day))
+    }
+
+    return days
+  }
+
+  const isSameDay = (date1: Date, date2: Date) => {
+    return (
+      date1.getDate() === date2.getDate() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getFullYear() === date2.getFullYear()
+    )
+  }
+
+  const isHighlighted = (date: Date) => {
+    return highlightedDates.some((d) => isSameDay(d, date))
+  }
+
+  const getPeriodIndicators = (date: Date) => {
+    const periodData = datesWithPeriods.find((d) => isSameDay(d.date, date))
+    return periodData || { manha: false, tarde: false }
+  }
+
+  const isSelected = (date: Date) => {
+    return selectedDate ? isSameDay(date, selectedDate) : false
+  }
+
+  const isToday = (date: Date) => {
+    return isSameDay(date, new Date())
+  }
+
+  const handlePreviousMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
+  }
+
+  const handleNextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
+  }
+
+  const handleDateClick = (date: Date) => {
+    if (onDateSelect) {
+      onDateSelect(date)
+    }
+  }
+
+  const days = getDaysInMonth(currentMonth)
+
+  return (
+    <div className={cn("p-4", className)}>
+      <div className="flex items-center justify-between mb-4">
+        <Button variant="outline" size="icon" onClick={handlePreviousMonth} className="h-8 w-8 bg-transparent">
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <div className="font-semibold">
+          {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+        </div>
+        <Button variant="outline" size="icon" onClick={handleNextMonth} className="h-8 w-8 bg-transparent">
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {daysOfWeek.map((day) => (
+          <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+            {day}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((day, index) => {
+          if (!day) {
+            return <div key={`empty-${index}`} className="aspect-square" />
+          }
+
+          const highlighted = isHighlighted(day)
+          const selected = isSelected(day)
+          const today = isToday(day)
+          const periods = getPeriodIndicators(day)
+
+          return (
+            <button
+              key={day.toISOString()}
+              onClick={() => handleDateClick(day)}
+              className={cn(
+                "aspect-square p-0 font-normal rounded-md hover:bg-accent hover:text-accent-foreground transition-colors relative",
+                highlighted && "bg-cyan-100 font-semibold text-cyan-900",
+                selected && "bg-primary text-primary-foreground",
+                today && !selected && "border-2 border-primary",
+                "text-sm",
+              )}
+            >
+              {day.getDate()}
+              {(periods.manha || periods.tarde) && (
+                <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5">
+                  {periods.manha && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" title="Manhã"></div>}
+                  {periods.tarde && <div className="w-1.5 h-1.5 rounded-full bg-orange-500" title="Tarde"></div>}
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

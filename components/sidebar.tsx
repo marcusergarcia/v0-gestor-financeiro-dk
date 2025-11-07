@@ -23,6 +23,7 @@ import {
   ChevronRight,
   X,
   Home,
+  Calendar,
 } from "lucide-react"
 import { useSidebar } from "@/components/sidebar-provider"
 import { usePermissions } from "@/hooks/use-permissions"
@@ -48,6 +49,12 @@ const menuItems: MenuItem[] = [
     title: "Ordem de Serviço",
     href: "/ordem-servico",
     icon: Wrench,
+    permission: "ordem_servico",
+  },
+  {
+    title: "Calendário", // Added item for Calendar
+    href: "/calendario",
+    icon: Calendar,
     permission: "ordem_servico",
   },
   {
