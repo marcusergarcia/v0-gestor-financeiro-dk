@@ -16,11 +16,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Gerar número baseado na data atual
     const hoje = new Date()
-    const ano = hoje.getFullYear()
-    const mes = String(hoje.getMonth() + 1).padStart(2, "0")
-    const dia = String(hoje.getDate()).padStart(2, "0")
+    const hojeUTC = new Date(hoje.getTime() + hoje.getTimezoneOffset() * 60000)
+    const hojeBrasilia = new Date(hojeUTC.getTime() - 3 * 60 * 60 * 1000)
+
+    const ano = hojeBrasilia.getFullYear()
+    const mes = String(hojeBrasilia.getMonth() + 1).padStart(2, "0")
+    const dia = String(hojeBrasilia.getDate()).padStart(2, "0")
 
     const prefixoMes = `${ano}${mes}`
     const prefixoDia = `${ano}${mes}${dia}`
