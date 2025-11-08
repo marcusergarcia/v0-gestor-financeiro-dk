@@ -222,11 +222,10 @@ export default function EditarOrdemServicoPage() {
 
         console.log("[Frontend] Dados do usuário logado:", user)
 
-        // Se os campos estiverem vazios ou com valores padrão, preencher automaticamente
         if (
           user &&
           (!ordemServico.tecnico_name ||
-            ordemServico.tecnico_name === "A definir" ||
+            ordemServico.tecnico_name === "A DEFINIR" ||
             ordemServico.tecnico_name.trim() === "")
         ) {
           console.log("[Frontend] Preenchendo nome do técnico automaticamente:", user.nome)
@@ -527,7 +526,7 @@ export default function EditarOrdemServicoPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.JSON(itemData),
+        body: JSON.stringify(itemData),
       })
 
       const data = await response.json()
