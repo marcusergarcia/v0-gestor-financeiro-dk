@@ -224,19 +224,21 @@ export default function EditarOrdemServicoPage() {
 
         if (
           user &&
+          user.nome &&
           (!ordemServico.tecnico_name ||
             ordemServico.tecnico_name === "A DEFINIR" ||
-            ordemServico.tecnico_name.trim() === "")
+            ordemServico.tecnico_name.trim() === "" ||
+            ordemServico.tecnico_name.toUpperCase() === "A DEFINIR")
         ) {
           console.log("[Frontend] Preenchendo nome do técnico automaticamente:", user.nome)
-          setTecnicoName(user.nome || "")
+          setTecnicoName(user.nome.toUpperCase())
         } else {
           setTecnicoName(ordemServico.tecnico_name || "")
         }
 
-        if (user && (!ordemServico.tecnico_email || ordemServico.tecnico_email.trim() === "")) {
+        if (user && user.email && (!ordemServico.tecnico_email || ordemServico.tecnico_email.trim() === "")) {
           console.log("[Frontend] Preenchendo email do técnico automaticamente:", user.email)
-          setTecnicoEmail(user.email || "")
+          setTecnicoEmail(user.email.toLowerCase())
         } else {
           setTecnicoEmail(ordemServico.tecnico_email || "")
         }
