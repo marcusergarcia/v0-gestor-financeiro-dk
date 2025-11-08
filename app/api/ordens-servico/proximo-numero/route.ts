@@ -16,13 +16,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const hoje = new Date()
-    const hojeUTC = new Date(hoje.getTime() + hoje.getTimezoneOffset() * 60000)
-    const hojeBrasilia = new Date(hojeUTC.getTime() - 3 * 60 * 60 * 1000)
+    const agora = new Date()
+    const brasiliaDateString = agora.toLocaleString("en-US", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
 
-    const ano = hojeBrasilia.getFullYear()
-    const mes = String(hojeBrasilia.getMonth() + 1).padStart(2, "0")
-    const dia = String(hojeBrasilia.getDate()).padStart(2, "0")
+    // Parse da data no formato MM/DD/YYYY
+    const [mes, dia, ano] = brasiliaDateString.split("/")
 
     const prefixoMes = `${ano}${mes}`
     const prefixoDia = `${ano}${mes}${dia}`
