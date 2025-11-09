@@ -71,8 +71,47 @@ async function processUserMessage(from: string, messageBody: string) {
     // Buscar estado atual da conversa
     const state = await getConversationState(from)
 
+    const normalizedMessage = messageBody.toLowerCase().trim()
+
+    if (normalizedMessage === "sair") {
+      console.log("[v0] 👋 Comando 'sair' detectado - finalizando conversa")
+      await clearConversationState(from)
+      await sendMessage(
+        from,
+        "👋 *Até logo!*\n\n" +
+          "Obrigado por usar nosso Sistema de Ordens de Serviço.\n\n" +
+          "Quando precisar, é só enviar uma mensagem que iniciaremos um novo atendimento! 😊",
+      )
+      return
+    }
+
+    if (normalizedMessage === "menu") {
+      console.log("[v0] 🏠 Comando 'menu' detectado - voltando ao início")
+      if (state?.data?.clienteId) {
+        // Se já tem cliente identificado, vai direto pro menu principal
+        await returnToMenu(from, state.data)
+      } else {
+        // Se não tem cliente, vai para identificação
+        await sendTipoClienteMenu(from)
+      }
+      return
+    }
+
     if (!state) {
-      console.log("[v0] 👋 Primeira interação detectada")
+      console.log("[v0] 👋 Nova conversa iniciada")
+      await sendMessage(
+        from,
+        "👋 *Bem-vindo ao Sistema de Ordens de Serviço Automatizado!*\n\n" +
+          "Estou aqui para ajudar você com:\n" +
+          "• Criação de ordens de serviço\n" +
+          "• Consulta de ordens abertas\n" +
+          "• Consulta de ordens finalizadas\n" +
+          "• Consulta de ordens agendadas\n\n" +
+          "💡 *Dica:* Digite *menu* a qualquer momento para voltar ao início.\n\n" +
+          "Vamos começar! 🚀",
+      )
+      // Pequeno delay para dar tempo de ler a mensagem de boas-vindas
+      await new Promise((resolve) => setTimeout(resolve, 1000))
       await sendTipoClienteMenu(from)
       return
     }
@@ -81,8 +120,6 @@ async function processUserMessage(from: string, messageBody: string) {
 
     console.log("[v0] 📊 Estado atual:", currentStage)
     console.log("[v0] 📦 Dados salvos:", state?.data)
-
-    const normalizedMessage = messageBody.toLowerCase().trim()
 
     const restartKeywords = [
       "voltar ao início",
@@ -94,7 +131,6 @@ async function processUserMessage(from: string, messageBody: string) {
       "comecar de novo",
       "reiniciar",
       "cancelar",
-      "sair",
     ]
 
     const shouldRestart = restartKeywords.some((keyword) => normalizedMessage.includes(keyword))
@@ -110,16 +146,13 @@ async function processUserMessage(from: string, messageBody: string) {
           "*1* - Já sou cliente\n" +
           "*2* - Primeiro contato\n\n" +
           "_Digite o número da opção desejada_\n\n" +
-          "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+          "💡 _Digite 'menu' para voltar ao início_",
       )
       return
     }
 
     if (
-      (normalizedMessage === "voltar" ||
-        normalizedMessage === "menu" ||
-        normalizedMessage === "0" ||
-        normalizedMessage === "voltar ao menu") &&
+      (normalizedMessage === "voltar" || normalizedMessage === "0" || normalizedMessage === "voltar ao menu") &&
       currentStage !== "tipo_cliente" &&
       currentStage !== "codigo_cliente" &&
       currentStage !== "nome_cliente" &&
@@ -280,7 +313,7 @@ async function handleTipoCliente(from: string, message: string, data: any) {
         "Para te identificar, digite os *6 primeiros dígitos do CNPJ* do seu condomínio.\n\n" +
         "📋 Formato: *12.345.6*XX/XXXX-XX\n\n" +
         "Exemplo: _123456_\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
   } else if (opcao === "2") {
     // Primeiro contato - iniciar cadastro
@@ -290,7 +323,7 @@ async function handleTipoCliente(from: string, message: string, data: any) {
       "👋 *Bem-vindo!*\n\n" +
         "Vou fazer seu cadastro rapidamente. 📝\n\n" +
         "Para começar, qual é o *nome do condomínio*?\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
   } else {
     await sendMessage(
@@ -299,7 +332,7 @@ async function handleTipoCliente(from: string, message: string, data: any) {
         "Digite:\n" +
         "*1* - Já sou cliente\n" +
         "*2* - Primeiro contato\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
   }
 }
@@ -313,7 +346,7 @@ async function handleCodigoCliente(from: string, message: string, data: any) {
       "❌ Código inválido.\n\n" +
         "Por favor, digite os *6 primeiros dígitos* do CNPJ.\n\n" +
         "Exemplo: _123456_\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -333,7 +366,7 @@ async function handleCodigoCliente(from: string, message: string, data: any) {
         `Deseja fazer um novo cadastro?\n\n` +
         `*1* - Sim, cadastrar\n` +
         `*2* - Não, tentar outro código\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else {
     await updateConversationState(from, "menu", {
@@ -353,7 +386,7 @@ async function handleCodigoCliente(from: string, message: string, data: any) {
         `*3* - Consultar ordem finalizada\n` +
         `*4* - Consultar ordem agendada\n` +
         `*5* - Sair\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   }
 }
@@ -365,7 +398,7 @@ async function handleNomeCliente(from: string, message: string, data: any) {
     await sendMessage(
       from,
       "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -378,7 +411,7 @@ async function handleNomeCliente(from: string, message: string, data: any) {
       `Agora, qual é o *CNPJ* do condomínio?\n\n` +
       `📋 Formato: XX.XXX.XXX/XXXX-XX\n\n` +
       `Exemplo: _12.345.678/0001-90_\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -392,7 +425,7 @@ async function handleCadastroCNPJ(from: string, message: string, data: any) {
       "❌ CNPJ inválido.\n\n" +
         "Por favor, digite o CNPJ completo (14 dígitos).\n\n" +
         "Exemplo: _12.345.678/0001-90_\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -423,7 +456,7 @@ async function handleCadastroCNPJ(from: string, message: string, data: any) {
         `É este cliente?\n\n` +
         `*1* - Sim, continuar\n` +
         `*2* - Não, fazer novo cadastro\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else {
     // CNPJ não existe - continuar cadastro
@@ -437,7 +470,7 @@ async function handleCadastroCNPJ(from: string, message: string, data: any) {
         `Agora, qual é o *CEP* do condomínio?\n\n` +
         `📮 Formato: XXXXX-XXX\n\n` +
         `Exemplo: _03295-000_\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   }
 }
@@ -464,7 +497,7 @@ async function handleCadastroConfirmarClienteExistente(from: string, message: st
         `*3* - Consultar ordem finalizada\n` +
         `*4* - Consultar ordem agendada\n` +
         `*5* - Sair\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else if (opcao === "2") {
     // Não é este cliente - continuar cadastro
@@ -478,7 +511,7 @@ async function handleCadastroConfirmarClienteExistente(from: string, message: st
         `Qual é o *CEP* do condomínio?\n\n` +
         `📮 Formato: XXXXX-XXX\n\n` +
         `Exemplo: _03295-000_\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else {
     await sendMessage(
@@ -487,7 +520,7 @@ async function handleCadastroConfirmarClienteExistente(from: string, message: st
         `Digite:\n` +
         `*1* - Sim, continuar\n` +
         `*2* - Não, fazer novo cadastro\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   }
 }
@@ -502,7 +535,7 @@ async function handleCadastroCEP(from: string, message: string, data: any) {
       "❌ CEP inválido.\n\n" +
         "Por favor, digite o CEP completo (8 dígitos).\n\n" +
         "Exemplo: _03295-000_\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -516,7 +549,7 @@ async function handleCadastroCEP(from: string, message: string, data: any) {
       "❌ CEP não encontrado.\n\n" +
         "Por favor, verifique o CEP e tente novamente.\n\n" +
         "Exemplo: _03295-000_\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -543,7 +576,7 @@ async function handleCadastroCEP(from: string, message: string, data: any) {
       `CEP: ${cepFormatado}\n\n` +
       `Agora, qual é o *número do imóvel*?\n\n` +
       `Exemplo: _123_\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -551,10 +584,7 @@ async function handleCadastroNumero(from: string, message: string, data: any) {
   const numero = message.trim()
 
   if (!numero) {
-    await sendMessage(
-      from,
-      "❌ Por favor, digite o número do imóvel.\n\n" + "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
-    )
+    await sendMessage(from, "❌ Por favor, digite o número do imóvel.\n\n" + "💡 _Digite 'menu' para voltar ao início_")
     return
   }
 
@@ -578,7 +608,7 @@ async function handleCadastroNumero(from: string, message: string, data: any) {
       `Os dados estão corretos?\n\n` +
       `*1* - Sim, continuar\n` +
       `*2* - Não, corrigir endereço\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -603,7 +633,7 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
           `📏 Distância: ${distanciaResult.distanciaKm} km\n\n` +
           `Agora, qual é o *telefone* de contato?\n\n` +
           `Exemplo: _(11) 99999-9999_\n\n` +
-          `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+          `💡 _Digite 'menu' para voltar ao início_`,
       )
     } else {
       // Erro ao calcular distância - continuar sem distância
@@ -614,7 +644,7 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
         `✅ Endereço confirmado!\n\n` +
           `Agora, qual é o *telefone* de contato?\n\n` +
           `Exemplo: _(11) 99999-9999_\n\n` +
-          `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+          `💡 _Digite 'menu' para voltar ao início_`,
       )
     }
   } else if (opcao === "2") {
@@ -624,7 +654,7 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
       from,
       `📝 Ok! Digite o *endereço completo* do condomínio:\n\n` +
         `Exemplo: _Rua Exemplo, 123 - Bairro_\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else {
     await sendMessage(
@@ -633,7 +663,7 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
         `Digite:\n` +
         `*1* - Sim, continuar\n` +
         `*2* - Não, corrigir endereço\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   }
 }
@@ -646,7 +676,7 @@ async function handleCadastroTelefone(from: string, message: string, data: any) 
     `✅ Telefone registrado!\n\n` +
       `Agora, qual é o *email* para contato?\n\n` +
       `Exemplo: _contato@condominio.com.br_\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -661,7 +691,7 @@ async function handleCadastroEmail(from: string, message: string, data: any) {
       "❌ Email inválido.\n\n" +
         "Por favor, digite um email válido.\n\n" +
         "Exemplo: _contato@condominio.com.br_\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -672,7 +702,7 @@ async function handleCadastroEmail(from: string, message: string, data: any) {
     `✅ Email registrado!\n\n` +
       `Agora, qual é o *nome do síndico* do condomínio?\n\n` +
       `Exemplo: _João Silva_\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -683,7 +713,7 @@ async function handleCadastroSindico(from: string, message: string, data: any) {
     await sendMessage(
       from,
       "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -706,7 +736,7 @@ async function handleCadastroSindico(from: string, message: string, data: any) {
       `Está tudo correto?\n\n` +
       `*1* - Sim, cadastrar\n` +
       `*2* - Não, corrigir\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -759,7 +789,7 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
           `*3* - Consultar ordem finalizada\n` +
           `*4* - Consultar ordem agendada\n` +
           `*5* - Sair\n\n` +
-          `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+          `💡 _Digite 'menu' para voltar ao início_`,
       )
     } catch (error) {
       console.error("[v0] ❌ Erro ao cadastrar cliente:", error)
@@ -771,7 +801,7 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
     await updateConversationState(from, "nome_cliente", { tipo: "novo" })
     await sendMessage(
       from,
-      `🔄 Ok! Vamos recomeçar.\n\nQual é o *nome do condomínio*?\n\n💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `🔄 Ok! Vamos recomeçar.\n\nQual é o *nome do condomínio*?\n\n💡 _Digite 'menu' para voltar ao início_`,
     )
   } else {
     await sendMessage(
@@ -780,7 +810,7 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
         `Digite:\n` +
         `*1* - Sim, cadastrar\n` +
         `*2* - Não, corrigir\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   }
 }
@@ -807,13 +837,13 @@ async function handleSelecionarCliente(from: string, message: string, data: any)
         `*3* - Consultar ordem finalizada\n` +
         `*4* - Consultar ordem agendada\n` +
         `*5* - Sair\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else {
     await sendMessage(
       from,
       `❌ Opção inválida. Digite um número entre 1 e ${clientes.length}.\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   }
 }
@@ -832,7 +862,7 @@ async function handleClienteNaoEncontrado(from: string, message: string, data: a
       `📝 *Novo Cadastro*\n\n` +
         `Vou fazer seu cadastro!\n\n` +
         `Qual é o *nome do condomínio*?\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else if (opcao === "2") {
     // Tentar outro código
@@ -841,7 +871,7 @@ async function handleClienteNaoEncontrado(from: string, message: string, data: a
       from,
       `🔍 Ok! Digite os *6 primeiros dígitos do CNPJ* novamente:\n\n` +
         `Exemplo: _123456_\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else {
     await sendMessage(
@@ -850,7 +880,7 @@ async function handleClienteNaoEncontrado(from: string, message: string, data: a
         `Digite:\n` +
         `*1* - Sim, cadastrar\n` +
         `*2* - Não, tentar outro código\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   }
 }
@@ -863,7 +893,7 @@ async function handleCadastroEndereco(from: string, message: string, data: any) 
     `✅ Endereço registrado!\n\n` +
       `Qual é a sua *cidade*?\n\n` +
       `Exemplo: _São Paulo_\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -881,7 +911,7 @@ async function handleCadastroCidade(from: string, message: string, data: any) {
       `Está tudo correto?\n\n` +
       `*1* - Sim, cadastrar\n` +
       `*2* - Não, corrigir\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -910,7 +940,7 @@ async function handleMenuOption(from: string, option: string, data: any) {
           "*2* - Orçamento\n" +
           "*3* - Vistoria para Contrato\n\n" +
           "_Digite o número da opção desejada_\n\n" +
-          "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+          "💡 _Digite 'menu' para voltar ao início_",
       )
       break
 
@@ -930,13 +960,13 @@ async function handleMenuOption(from: string, option: string, data: any) {
       break
 
     case "5":
-      // Sair
-      await restartConversation(from)
+      console.log("[v0] 👋 Opção 5 (Sair) selecionada")
+      await clearConversationState(from)
       await sendMessage(
         from,
         "👋 *Até logo!*\n\n" +
-          "Obrigado por usar nosso atendimento.\n\n" +
-          "Quando precisar, é só enviar uma mensagem! 😊",
+          "Obrigado por usar nosso Sistema de Ordens de Serviço.\n\n" +
+          "Quando precisar, é só enviar uma mensagem que iniciaremos um novo atendimento! 😊",
       )
       break
 
@@ -950,7 +980,7 @@ async function handleMenuOption(from: string, option: string, data: any) {
           `*3* - Consultar ordem finalizada\n` +
           `*4* - Consultar ordem agendada\n` +
           `*5* - Sair\n\n` +
-          `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+          `💡 _Digite 'menu' para voltar ao início_`,
       )
   }
 }
@@ -978,7 +1008,7 @@ async function handleTipoServico(from: string, message: string, data: any) {
         "*1* - Manutenção\n" +
         "*2* - Orçamento\n" +
         "*3* - Vistoria para Contrato\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -1003,7 +1033,7 @@ async function handleTipoServico(from: string, message: string, data: any) {
         "📋 Formato: DD/MM/AAAA\n" +
         "Exemplo: _15/01/2025_\n\n" +
         "⚠️ Apenas dias úteis (segunda a sexta)\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -1035,7 +1065,7 @@ async function handleTipoServico(from: string, message: string, data: any) {
       `Confirma este agendamento?\n\n` +
       `*1* - Sim, confirmar\n` +
       `*2* - Não, escolher outra data\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -1053,7 +1083,7 @@ async function handleTipoAtendimento(from: string, message: string, data: any) {
         "Antes de continuar, qual é o *seu nome*?\n" +
         "(Pessoa que está solicitando o serviço)\n\n" +
         "Exemplo: _Maria Santos_\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
   } else if (opcao === "2") {
     // Agendar - pedir data
@@ -1068,7 +1098,7 @@ async function handleTipoAtendimento(from: string, message: string, data: any) {
         "📋 Formato: DD/MM/AAAA\n" +
         "Exemplo: _15/01/2025_\n\n" +
         "⚠️ Apenas dias úteis (segunda a sexta)\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
   } else {
     await sendMessage(
@@ -1077,7 +1107,7 @@ async function handleTipoAtendimento(from: string, message: string, data: any) {
         "Digite:\n" +
         "*1* - Para hoje\n" +
         "*2* - Agendar para data específica\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
   }
 }
@@ -1096,7 +1126,7 @@ async function handleDataAgendamento(from: string, message: string, data: any) {
         "📋 Formato: DD/MM/AAAA\n" +
         "Exemplo: _15/01/2025_\n\n" +
         "⚠️ Apenas dias úteis (segunda a sexta)\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -1120,7 +1150,7 @@ async function handleDataAgendamento(from: string, message: string, data: any) {
       "- Não é possível agendar duas ordens no mesmo período\n" +
       "- Apenas dias úteis (segunda a sexta)\n\n" +
       "_Digite o número da opção desejada_\n\n" +
-      "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+      "💡 _Digite 'menu' para voltar ao início_",
   )
 }
 
@@ -1140,7 +1170,7 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
         "📋 Formato: DD/MM/AAAA\n" +
         "Exemplo: _15/01/2025_\n\n" +
         "⚠️ Apenas dias úteis (segunda a sexta)\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -1162,7 +1192,7 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
         "*1* - Manhã (09:00 - 12:00)\n" +
         "*2* - Tarde (13:00 - 17:00)\n" +
         "*3* - Escolher outra data\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -1185,7 +1215,7 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
         `*1* - Manhã (09:00 - 12:00)\n` +
         `*2* - Tarde (13:00 - 17:00)\n` +
         `*3* - Escolher outra data\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
     return
   }
@@ -1209,7 +1239,7 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
       `Agora, qual é o *seu nome*?\n` +
       `(Pessoa que está solicitando o serviço)\n\n` +
       `Exemplo: _Maria Santos_\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -1220,7 +1250,7 @@ async function handleCriarOSSolicitante(from: string, message: string, data: any
     await sendMessage(
       from,
       "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -1238,7 +1268,7 @@ async function handleCriarOSSolicitante(from: string, message: string, data: any
       `✅ Nome registrado: *${solicitante}*\n\n` +
         `Agora, descreva o problema ou serviço necessário:\n\n` +
         `Exemplo: _Verificar câmeras do hall do bloco A_\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else {
     await sendMessage(
@@ -1246,7 +1276,7 @@ async function handleCriarOSSolicitante(from: string, message: string, data: any
       `✅ Nome registrado: *${solicitante}*\n\n` +
         `Agora, descreva o problema ou serviço necessário:\n\n` +
         `Exemplo: _Verificar câmeras do hall do bloco A_\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   }
 }
@@ -1341,7 +1371,7 @@ async function handleOrderDescription(from: string, description: string, data: a
     }
 
     mensagemConfirmacao +=
-      `📝 Descrição: ${description}\n` +
+      `\n📝 Descrição: ${description}\n` +
       `✍️ Solicitado por: ${solicitadoPor}\n\n` +
       "🔔 Você receberá atualizações sobre o andamento do serviço.\n\n" +
       "Deseja fazer mais alguma coisa?\n\n" +
@@ -1350,7 +1380,7 @@ async function handleOrderDescription(from: string, description: string, data: a
       "*3* - Consultar ordem finalizada\n" +
       "*4* - Consultar ordem agendada\n" +
       "*5* - Sair\n\n" +
-      "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_"
+      "💡 _Digite 'menu' para voltar ao início_"
 
     await sendMessage(from, mensagemConfirmacao)
     await updateConversationState(from, "menu", data)
@@ -1381,8 +1411,8 @@ async function handleQueryOrder(from: string, orderId: string, data: any) {
         from,
         "❌ *Ordem não encontrada*\n\n" +
           `Não encontramos a ordem de serviço número *${orderId}*.\n\n` +
-          "Verifique o número e tente novamente ou digite *voltar* para retornar ao menu.\n\n" +
-          "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+          "Verifique o número e tente novamente ou digite *menu* para retornar ao menu.\n\n" +
+          "💡 _Digite 'menu' para voltar ao início_",
       )
       return
     }
@@ -1419,7 +1449,7 @@ async function handleQueryOrder(from: string, orderId: string, data: any) {
       "Deseja fazer mais alguma coisa?\n\n" +
       "*1* - Criar OS\n" +
       "*2* - Consultar outra OS\n\n" +
-      "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_"
+      "💡 _Digite 'menu' para voltar ao início_"
 
     await sendMessage(from, message)
     await updateConversationState(from, "menu", data)
@@ -1439,7 +1469,7 @@ async function handleConsultarOSCodigo(from: string, message: string, data: any)
       "❌ Código inválido.\n\n" +
         "Por favor, digite os *6 primeiros dígitos* do CNPJ.\n\n" +
         "Exemplo: _123456_\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
     return
   }
@@ -1452,8 +1482,8 @@ async function handleConsultarOSCodigo(from: string, message: string, data: any)
       from,
       `❌ *CNPJ não encontrado*\n\n` +
         `Não encontrei nenhum cliente com o código *${codigo}*.\n\n` +
-        `Digite outro código ou 'voltar' para retornar ao menu.\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `Digite outro código ou 'menu' para retornar ao menu.\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
     return
   }
@@ -1470,7 +1500,7 @@ async function handleConsultarOSCodigo(from: string, message: string, data: any)
         `Deseja criar uma nova ordem?\n\n` +
         `*1* - Criar ordem de serviço\n` +
         `*2* - Voltar ao menu\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
     return
   }
@@ -1522,7 +1552,7 @@ async function handleConsultarOSCodigo(from: string, message: string, data: any)
   })
 
   mensagem += `Digite o *número* da ordem para ver detalhes completos.\n\n`
-  mensagem += `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`
+  mensagem += `💡 _Digite 'menu' para voltar ao início_`
 
   await updateConversationState(from, "consultar_os_selecionar", {
     ...data,
@@ -1542,7 +1572,7 @@ async function handleConsultarOSSelecionar(from: string, message: string, data: 
       from,
       `❌ Opção inválida.\n\n` +
         `Digite um número entre 1 e ${ordens.length} para ver os detalhes da ordem.\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
     return
   }
@@ -1553,10 +1583,7 @@ async function handleConsultarOSSelecionar(from: string, message: string, data: 
   const ordem = await findOrdemById(ordemSelecionada.id)
 
   if (!ordem) {
-    await sendMessage(
-      from,
-      "❌ Erro ao buscar detalhes da ordem.\n\n" + "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
-    )
+    await sendMessage(from, "❌ Erro ao buscar detalhes da ordem.\n\n" + "💡 _Digite 'menu' para voltar ao início_")
     return
   }
 
@@ -1620,7 +1647,7 @@ async function handleConsultarOSSelecionar(from: string, message: string, data: 
     `*3* - Consultar ordem finalizada\n` +
     `*4* - Consultar ordem agendada\n` +
     `*5* - Sair\n\n` +
-    `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`
+    `💡 _Digite 'menu' para voltar ao início_`
 
   await updateConversationState(from, "menu", data)
   await sendMessage(from, mensagem)
@@ -1644,7 +1671,7 @@ async function returnToMenu(from: string, data: any) {
       `*3* - Consultar ordem finalizada\n` +
       `*4* - Consultar ordem agendada\n` +
       `*5* - Sair\n\n` +
-      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+      `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
@@ -1653,12 +1680,11 @@ async function sendTipoClienteMenu(from: string) {
   await updateConversationState(from, "tipo_cliente", {})
   await sendMessage(
     from,
-    "👋 *Bem-vindo ao Gestor Financeiro!*\n\n" +
-      "Para começarmos, preciso saber:\n\n" +
+    "Para começarmos, preciso saber:\n\n" +
       "*1* - Já sou cliente\n" +
       "*2* - Primeiro contato\n\n" +
       "_Digite o número da opção desejada_\n\n" +
-      "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+      "💡 _Digite 'menu' para voltar ao início_",
   )
 }
 
@@ -1737,7 +1763,7 @@ async function handleConsultarPorSituacao(from: string, data: any, situacao: str
         `*3* - Consultar ordem finalizada\n` +
         `*4* - Consultar ordem agendada\n` +
         `*5* - Sair\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
     return
   }
@@ -1781,7 +1807,7 @@ async function handleConsultarPorSituacao(from: string, data: any, situacao: str
   })
 
   mensagem += `Digite o *número* da ordem para ver detalhes completos.\n\n`
-  mensagem += `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`
+  mensagem += `💡 _Digite 'menu' para voltar ao início_`
 
   await updateConversationState(from, "consultar_os_selecionar", {
     ...data,
@@ -1807,7 +1833,7 @@ async function handleConfirmarAgendamento(from: string, message: string, data: a
         `Agora, qual é o *seu nome*?\n` +
         `(Pessoa que está solicitando o serviço)\n\n` +
         `Exemplo: _Maria Santos_\n\n` +
-        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else if (opcao === "2") {
     // Usuário quer escolher outra data manualmente
@@ -1825,7 +1851,7 @@ async function handleConfirmarAgendamento(from: string, message: string, data: a
         "📋 Formato: DD/MM/AAAA\n" +
         "Exemplo: _15/01/2025_\n\n" +
         "⚠️ Apenas dias úteis (segunda a sexta)\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
   } else {
     await sendMessage(
@@ -1834,7 +1860,7 @@ async function handleConfirmarAgendamento(from: string, message: string, data: a
         "Digite:\n" +
         "*1* - Sim, confirmar\n" +
         "*2* - Não, escolher outra data\n\n" +
-        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+        "💡 _Digite 'menu' para voltar ao início_",
     )
   }
 }
