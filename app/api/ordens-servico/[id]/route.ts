@@ -205,9 +205,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
         console.log("[v0] 📱 Telefone formatado:", telefoneFormatado)
 
-        // Buscar número da ordem
-        const ordemResult = await query("SELECT numero FROM ordens_servico WHERE id = ?", [id])
-        const ordemNumero = (ordemResult as any[])[0]?.numero
+        // Buscar dados completos da ordem para incluir na notificação
+        const ordemResult = await query(
+          "SELECT numero, tipo_servico, relatorio_visita, servico_realizado, necessidades_cliente FROM ordens_servico WHERE id = ?",
+          [id],
+        )
+        const ordem = (ordemResult as any[])[0]
 
         const situacaoMap: Record<string, string> = {
           aberta: "🔴 ABERTA",
@@ -216,14 +219,34 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           concluida: "✅ CONCLUÍDA",
         }
 
-        const mensagemNotificacao =
+        let mensagemNotificacao =
           `🔔 *Atualização de Ordem de Serviço*\n\n` +
           `Olá, *${cliente.nome}*!\n\n` +
           `A situação da sua ordem de serviço foi atualizada:\n\n` +
-          `📋 *Ordem:* #${ordemNumero}\n` +
-          `🔄 *Nova situação:* ${situacaoMap[situacaoFinal] || situacaoFinal}\n\n` +
-          `${situacaoFinal === "concluida" ? "✨ O serviço foi concluído com sucesso!\n\n" : ""}` +
-          `Se tiver dúvidas, entre em contato conosco! 📞`
+          `📋 *Ordem:* #${ordem?.numero}\n` +
+          `🔄 *Nova situação:* ${situacaoMap[situacaoFinal] || situacaoFinal}\n\n`
+
+        // Se a situação for concluída, incluir relatório da visita ou serviço realizado
+        if (situacaoFinal === "concluida") {
+          mensagemNotificacao += "✨ *O serviço foi concluído com sucesso!*\n\n"
+
+          // Incluir necessidades do cliente se for preventiva e estiver preenchida
+          if (ordem?.tipo_servico === "preventiva" && ordem?.necessidades_cliente) {
+            mensagemNotificacao += `📝 *Necessidades do Cliente:*\n${ordem.necessidades_cliente}\n\n`
+          }
+
+          // Incluir relatório da visita se estiver preenchido
+          if (ordem?.relatorio_visita) {
+            mensagemNotificacao += `📄 *Relatório da Visita:*\n${ordem.relatorio_visita}\n\n`
+          }
+
+          // Incluir serviço realizado se estiver preenchido
+          if (ordem?.servico_realizado) {
+            mensagemNotificacao += `🔧 *Serviço Realizado:*\n${ordem.servico_realizado}\n\n`
+          }
+        }
+
+        mensagemNotificacao += `Se tiver dúvidas, entre em contato conosco! 📞`
 
         console.log("[v0] 💬 Mensagem preparada:", mensagemNotificacao)
 
