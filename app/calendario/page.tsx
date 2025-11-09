@@ -11,7 +11,7 @@ import Link from "next/link"
 import type { OrdemServico } from "@/types/ordem-servico"
 import { useLogos } from "@/hooks/use-logos"
 
-type PeriodFilter = "all" | "manha" | "tarde"
+type PeriodFilter = "all" | "manha" | "tarde" | "integral"
 
 export default function CalendarioPage() {
   const [loading, setLoading] = useState(true)
@@ -59,6 +59,8 @@ export default function CalendarioPage() {
       ordens = ordens.filter((os) => os.periodo_agendamento === "manha")
     } else if (periodFilter === "tarde") {
       ordens = ordens.filter((os) => os.periodo_agendamento === "tarde")
+    } else if (periodFilter === "integral") {
+      ordens = ordens.filter((os) => os.periodo_agendamento === "integral")
     }
 
     setOrdensDoDay(ordens)
@@ -71,18 +73,20 @@ export default function CalendarioPage() {
   }
 
   const getDatesWithPeriods = () => {
-    const periodsMap = new Map<string, { manha: boolean; tarde: boolean }>()
+    const periodsMap = new Map<string, { manha: boolean; tarde: boolean; integral: boolean }>()
 
     ordensAgendadas
       .filter((os) => os.data_agendamento)
       .forEach((os) => {
         const dateKey = os.data_agendamento!.split("T")[0]
-        const existing = periodsMap.get(dateKey) || { manha: false, tarde: false }
+        const existing = periodsMap.get(dateKey) || { manha: false, tarde: false, integral: false }
 
         if (os.periodo_agendamento === "manha") {
           existing.manha = true
         } else if (os.periodo_agendamento === "tarde") {
           existing.tarde = true
+        } else if (os.periodo_agendamento === "integral") {
+          existing.integral = true
         }
 
         periodsMap.set(dateKey, existing)
@@ -97,12 +101,14 @@ export default function CalendarioPage() {
   const getPeriodoLabel = (periodo?: string) => {
     if (periodo === "manha") return "Manhã"
     if (periodo === "tarde") return "Tarde"
+    if (periodo === "integral") return "Integral"
     return "Não especificado"
   }
 
   const getPeriodoBadgeColor = (periodo?: string) => {
     if (periodo === "manha") return "bg-blue-100 text-blue-800 border-blue-300"
     if (periodo === "tarde") return "bg-orange-100 text-orange-800 border-orange-300"
+    if (periodo === "integral") return "bg-green-100 text-green-800 border-green-300"
     return "bg-gray-100 text-gray-800"
   }
 
@@ -115,6 +121,7 @@ export default function CalendarioPage() {
 
   const totalManha = ordensAgendadas.filter((os) => os.periodo_agendamento === "manha").length
   const totalTarde = ordensAgendadas.filter((os) => os.periodo_agendamento === "tarde").length
+  const totalIntegral = ordensAgendadas.filter((os) => os.periodo_agendamento === "integral").length
 
   if (loading) {
     return (
@@ -150,7 +157,7 @@ export default function CalendarioPage() {
       </div>
 
       {/* Stats Cards - Made cards clickable for filtering */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card
           className="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200 cursor-pointer transition-all hover:shadow-md"
           onClick={() => setPeriodFilter("all")}
@@ -178,7 +185,7 @@ export default function CalendarioPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-800">{totalManha}</div>
-            <p className="text-xs text-blue-600">período da manhã</p>
+            <p className="text-xs text-blue-600">período da manhã (9h-12h)</p>
             {periodFilter === "manha" && <Badge className="mt-2 bg-blue-600 text-white">Filtro ativo</Badge>}
           </CardContent>
         </Card>
@@ -195,8 +202,25 @@ export default function CalendarioPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-orange-800">{totalTarde}</div>
-            <p className="text-xs text-orange-600">período da tarde</p>
+            <p className="text-xs text-orange-600">período da tarde (13h-17h)</p>
             {periodFilter === "tarde" && <Badge className="mt-2 bg-orange-600 text-white">Filtro ativo</Badge>}
+          </CardContent>
+        </Card>
+
+        <Card
+          className={`bg-gradient-to-br from-green-50 to-green-100 border-green-200 cursor-pointer transition-all hover:shadow-md ${
+            periodFilter === "integral" ? "ring-2 ring-green-600" : ""
+          }`}
+          onClick={() => handlePeriodFilterClick("integral")}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-700">Integral</CardTitle>
+            <Clock className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-800">{totalIntegral}</div>
+            <p className="text-xs text-green-600">período integral (9h-17h)</p>
+            {periodFilter === "integral" && <Badge className="mt-2 bg-green-600 text-white">Filtro ativo</Badge>}
           </CardContent>
         </Card>
       </div>
@@ -241,6 +265,10 @@ export default function CalendarioPage() {
                 <div className="w-3 h-3 bg-orange-600 border border-orange-800 rounded-full shadow-sm"></div>
                 <span>Tarde (13h-17h)</span>
               </div>
+              <div className="flex items-center gap-2 text-sm font-medium text-green-700">
+                <div className="w-3 h-3 bg-green-600 border border-green-800 rounded-full shadow-sm"></div>
+                <span>Integral (9h-17h)</span>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -257,7 +285,7 @@ export default function CalendarioPage() {
                   </CardTitle>
                   <CardDescription className="text-blue-100 text-xs">
                     {ordensDoDay.length} ordem(ns) agendada(s)
-                    {periodFilter !== "all" && ` - ${periodFilter === "manha" ? "Manhã" : "Tarde"}`}
+                    {periodFilter !== "all" && ` - ${getPeriodoLabel(periodFilter)}`}
                   </CardDescription>
                 </div>
               </div>
@@ -270,7 +298,7 @@ export default function CalendarioPage() {
                 <p className="text-gray-500 font-medium">Nenhuma ordem agendada</p>
                 <p className="text-sm text-gray-400 mt-1">
                   {periodFilter !== "all"
-                    ? "Nenhuma ordem para este período. Clique nos cards acima para mudar o filtro."
+                    ? `Nenhuma ordem para este período (${getPeriodoLabel(periodFilter)}). Clique nos cards acima para mudar o filtro.`
                     : "Selecione outro dia no calendário"}
                 </p>
               </div>

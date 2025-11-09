@@ -449,14 +449,22 @@ export async function checkAgendamentoDisponivel(
   try {
     console.log("[v0] 🔍 Verificando disponibilidade de agendamento para:", data, periodo)
 
-    const result = await query(
-      `SELECT COUNT(*) as count 
-       FROM ordens_servico 
-       WHERE data_agendamento = ? 
-       AND periodo_agendamento = ? 
-       AND situacao IN ('agendada', 'em_andamento')`,
-      [data, periodo],
-    )
+    let whereClause = ""
+    const params: any[] = []
+
+    if (periodo === "integral") {
+      // Se quiser agendar integral, não pode ter nenhum agendamento neste dia
+      whereClause = `WHERE data_agendamento = ? AND situacao IN ('agendada', 'em_andamento')`
+      params.push(data)
+    } else if (periodo === "manha" || periodo === "tarde") {
+      // Se quiser agendar manhã ou tarde, não pode ter integral nem o mesmo período
+      whereClause = `WHERE data_agendamento = ? 
+         AND (periodo_agendamento = ? OR periodo_agendamento = 'integral')
+         AND situacao IN ('agendada', 'em_andamento')`
+      params.push(data, periodo)
+    }
+
+    const result = await query(`SELECT COUNT(*) as count FROM ordens_servico ${whereClause}`, params)
 
     const count = (result as any[])[0]?.count || 0
     const disponivel = count === 0

@@ -91,7 +91,7 @@ export default function NovaOrdemServicoPage() {
     descricao_defeito: "",
     contrato_numero: "Cliente sem contrato",
     data_agendamento: "",
-    periodo_agendamento: "" as "" | "manha" | "tarde",
+    periodo_agendamento: "" as "" | "manha" | "tarde" | "integral",
   })
 
   // Gerar número da OS quando cliente for selecionado
@@ -310,7 +310,7 @@ export default function NovaOrdemServicoPage() {
     if (desejaAgendar && !formData.periodo_agendamento) {
       toast({
         title: "Período obrigatório",
-        description: "Selecione o período (Manhã ou Tarde) para o agendamento.",
+        description: "Selecione o período (Manhã, Tarde ou Integral) para o agendamento.",
         variant: "destructive",
       })
       return
@@ -506,12 +506,12 @@ export default function NovaOrdemServicoPage() {
                         )}
                         <span className="font-medium text-blue-900">{clienteSelecionado.nome}</span>
                         {clienteTemContrato ? (
-                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 text-xs">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Com Contrato
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50">
+                          <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 text-xs">
                             <XCircle className="h-3 w-3 mr-1" />
                             Sem Contrato
                           </Badge>
@@ -736,7 +736,7 @@ export default function NovaOrdemServicoPage() {
                           <Label htmlFor="periodo_agendamento">Período *</Label>
                           <Select
                             value={formData.periodo_agendamento}
-                            onValueChange={(value: "manha" | "tarde") =>
+                            onValueChange={(value: "manha" | "tarde" | "integral") =>
                               setFormData((prev) => ({ ...prev, periodo_agendamento: value }))
                             }
                           >
@@ -744,11 +744,14 @@ export default function NovaOrdemServicoPage() {
                               <SelectValue placeholder="Selecione o período" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="manha">Manhã</SelectItem>
-                              <SelectItem value="tarde">Tarde</SelectItem>
+                              <SelectItem value="manha">Manhã (9h-12h)</SelectItem>
+                              <SelectItem value="tarde">Tarde (13h-17h)</SelectItem>
+                              <SelectItem value="integral">Integral (9h-17h)</SelectItem>
                             </SelectContent>
                           </Select>
-                          <div className="text-xs text-gray-500 mt-1">Horário de funcionamento: Segunda a Sexta</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            Horário de funcionamento: Segunda a Sexta-feira
+                          </div>
                         </div>
                       </div>
                     )}
@@ -949,7 +952,11 @@ export default function NovaOrdemServicoPage() {
                           <div className="flex justify-between">
                             <span className="text-gray-600">Período:</span>
                             <span className="font-medium text-cyan-600">
-                              {formData.periodo_agendamento === "manha" ? "Manhã" : "Tarde"}
+                              {formData.periodo_agendamento === "manha"
+                                ? "Manhã (9h-12h)"
+                                : formData.periodo_agendamento === "tarde"
+                                  ? "Tarde (13h-17h)"
+                                  : "Integral (9h-17h)"}
                             </span>
                           </div>
                         )}
@@ -1007,7 +1014,7 @@ export default function NovaOrdemServicoPage() {
                         !formData.data_atual ||
                         !formData.solicitado_por ||
                         (desejaAgendar && !formData.data_agendamento) ||
-                        (desejaAgendar && !formData.periodo_agendamento) // Adicionada verificação do período
+                        (desejaAgendar && !formData.periodo_agendamento)
                       }
                       className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
                     >

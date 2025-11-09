@@ -9,7 +9,7 @@ export interface OrdemServico {
   solicitado_por?: string
   data_atual: string
   data_agendamento?: string
-  periodo_agendamento?: "manha" | "tarde"
+  periodo_agendamento?: "manha" | "tarde" | "integral"
   data_execucao?: string
   horario_entrada?: string
   horario_saida?: string
@@ -71,7 +71,7 @@ export interface CreateOrdemServicoData {
   solicitado_por?: string
   data_atual: string
   data_agendamento?: string
-  periodo_agendamento?: "manha" | "tarde"
+  periodo_agendamento?: "manha" | "tarde" | "integral"
   data_execucao?: string
   horario_entrada?: string
   horario_saida?: string

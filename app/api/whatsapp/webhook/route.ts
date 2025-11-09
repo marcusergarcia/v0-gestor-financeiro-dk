@@ -1070,9 +1070,12 @@ async function handleDataAgendamento(from: string, message: string, data: any) {
     `✅ Data selecionada: *${dataStr}*\n\n` +
       "Agora escolha o período:\n\n" +
       "*1* - Manhã (09:00 - 12:00)\n" +
-      "*2* - Tarde (13:00 - 17:00)\n\n" +
-      "⚠️ *Importante:* Não é possível agendar duas ordens no mesmo período.\n" +
-      "Apenas dias úteis (segunda a sexta).\n\n" +
+      "*2* - Tarde (13:00 - 17:00)\n" +
+      "*3* - Integral (09:00 - 17:00) - Dia completo\n\n" +
+      "⚠️ *Importante:* \n" +
+      "- Não é possível agendar duas ordens no mesmo período\n" +
+      "- O período INTEGRAL ocupa manhã E tarde\n" +
+      "- Apenas dias úteis (segunda a sexta)\n\n" +
       "_Digite o número da opção desejada_\n\n" +
       "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
   )
@@ -1081,7 +1084,7 @@ async function handleDataAgendamento(from: string, message: string, data: any) {
 async function handlePeriodoAgendamento(from: string, message: string, data: any) {
   const opcao = message.trim()
 
-  if (opcao === "3") {
+  if (opcao === "4") {
     await updateConversationState(from, "criar_os_data_agendamento", {
       ...data,
       dataAgendamento: undefined,
@@ -1108,13 +1111,18 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
   } else if (opcao === "2") {
     periodo = "tarde"
     periodoLabel = "Tarde (13:00 - 17:00)"
+  } else if (opcao === "3") {
+    periodo = "integral"
+    periodoLabel = "Integral (09:00 - 17:00)"
   } else {
     await sendMessage(
       from,
       "❌ Opção inválida.\n\n" +
         "Digite:\n" +
         "*1* - Manhã (09:00 - 12:00)\n" +
-        "*2* - Tarde (13:00 - 17:00)\n\n" +
+        "*2* - Tarde (13:00 - 17:00)\n" +
+        "*3* - Integral (09:00 - 17:00)\n" +
+        "*4* - Escolher outra data\n\n" +
         "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
     )
     return
@@ -1123,15 +1131,24 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
   const { disponivel, count } = await checkAgendamentoDisponivel(data.dataAgendamento, periodo)
 
   if (!disponivel) {
+    let mensagemIndisponivel = ""
+
+    if (periodo === "integral") {
+      mensagemIndisponivel = `Já existe agendamento nesta data. O período INTEGRAL ocupa o dia todo e não pode ser agendado se já existir manhã ou tarde.`
+    } else {
+      mensagemIndisponivel = `Já existe agendamento para ${data.dataAgendamentoFormatada} no período selecionado ou no período INTEGRAL.`
+    }
+
     await sendMessage(
       from,
       `⚠️ *Período Indisponível*\n\n` +
-        `Já existe agendamento para ${data.dataAgendamentoFormatada} no período da ${periodoLabel.split(" ")[0]}.\n\n` +
+        `${mensagemIndisponivel}\n\n` +
         `❌ *Não é permitido agendar duas ordens no mesmo dia e período.*\n\n` +
         `Por favor, escolha outro período ou outra data:\n\n` +
         `*1* - Manhã (09:00 - 12:00)\n` +
         `*2* - Tarde (13:00 - 17:00)\n` +
-        `*3* - Escolher outra data\n\n` +
+        `*3* - Integral (09:00 - 17:00)\n` +
+        `*4* - Escolher outra data\n\n` +
         `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
     )
     return
@@ -1152,6 +1169,7 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
       `📋 Horário de atendimento:\n` +
       `   - Manhã: 09:00 às 12:00\n` +
       `   - Tarde: 13:00 às 17:00\n` +
+      `   - Integral: 09:00 às 17:00\n` +
       `   - Apenas dias úteis (segunda a sexta)\n\n` +
       `Agora, qual é o *seu nome*?\n` +
       `(Pessoa que está solicitando o serviço)\n\n` +
@@ -1247,10 +1265,10 @@ async function handleOrderDescription(from: string, description: string, data: a
 
     console.log("[v0] 💾 Inserindo ordem no banco...")
     const insertResult = await query(
-      `INSERT INTO ordens_servico 
-       (numero, cliente_id, tecnico_name, tecnico_email, data_atual, tipo_servico, 
-        descricao_defeito, responsavel, nome_responsavel, solicitado_por, situacao, 
-        data_agendamento, periodo_agendamento, created_at) 
+      `INSERT INTO ordens_servico
+       (numero, cliente_id, tecnico_name, tecnico_email, data_atual, tipo_servico,
+        descricao_defeito, responsavel, nome_responsavel, solicitado_por, situacao,
+        data_agendamento, periodo_agendamento, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         numeroOrdem,
@@ -1313,8 +1331,8 @@ async function handleQueryOrder(from: string, orderId: string, data: any) {
   try {
     // Buscar ordem pelo número
     const result = await query(
-      `SELECT 
-        os.numero, os.situacao, os.data_atual, os.tipo_servico, 
+      `SELECT
+        os.numero, os.situacao, os.data_atual, os.tipo_servico,
         os.descricao_defeito, os.servico_realizado, os.tecnico_name,
         c.nome as cliente_nome
        FROM ordens_servico os

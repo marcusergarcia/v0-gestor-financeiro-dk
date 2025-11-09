@@ -147,21 +147,44 @@ export async function POST(request: NextRequest) {
     if (data_agendamento && periodo_agendamento) {
       console.log("[v0] Verificando disponibilidade de agendamento:", data_agendamento, periodo_agendamento)
 
+      let whereClause = ""
+      const params: any[] = []
+
+      if (periodo_agendamento === "integral") {
+        // Se quiser agendar integral, não pode ter nenhum agendamento neste dia
+        whereClause = `WHERE data_agendamento = ? AND situacao IN ('agendada', 'em_andamento')`
+        params.push(data_agendamento)
+      } else if (periodo_agendamento === "manha" || periodo_agendamento === "tarde") {
+        // Se quiser agendar manhã ou tarde, não pode ter integral nem o mesmo período
+        whereClause = `WHERE data_agendamento = ? 
+           AND (periodo_agendamento = ? OR periodo_agendamento = 'integral')
+           AND situacao IN ('agendada', 'em_andamento')`
+        params.push(data_agendamento, periodo_agendamento)
+      }
+
       const agendamentoExistente = await query(
-        `SELECT id, numero FROM ordens_servico 
-         WHERE data_agendamento = ? 
-         AND periodo_agendamento = ? 
-         AND situacao IN ('agendada', 'em_andamento')`,
-        [data_agendamento, periodo_agendamento],
+        `SELECT id, numero, periodo_agendamento FROM ordens_servico ${whereClause}`,
+        params,
       )
 
       if ((agendamentoExistente as any[]).length > 0) {
         const ordemExistente = (agendamentoExistente as any[])[0]
+        const periodoExistente = ordemExistente.periodo_agendamento
+
+        let mensagemErro = ""
+        if (periodoExistente === "integral") {
+          mensagemErro = `Já existe uma ordem agendada para PERÍODO INTEGRAL nesta data (OS #${ordemExistente.numero}). O período integral ocupa o dia todo (manhã e tarde).`
+        } else if (periodo_agendamento === "integral") {
+          mensagemErro = `Não é possível agendar período INTEGRAL porque já existe ordem no período da ${periodoExistente} (OS #${ordemExistente.numero}).`
+        } else {
+          mensagemErro = `Já existe uma ordem agendada para esta data e período (OS #${ordemExistente.numero}).`
+        }
+
         console.log("[v0] Validação falhou: agendamento duplicado")
         return NextResponse.json(
           {
             success: false,
-            error: `Já existe uma ordem agendada para esta data e período (OS #${ordemExistente.numero}). Não é permitido agendar duas ordens no mesmo dia e período.`,
+            error: `${mensagemErro} Não é permitido agendar duas ordens no mesmo dia e período.`,
           },
           { status: 400 },
         )
@@ -186,7 +209,7 @@ export async function POST(request: NextRequest) {
         horario_entrada, horario_saida, tipo_servico, relatorio_visita, descricao_defeito, 
         necessidades_cliente, servico_realizado, observacoes, responsavel, 
         nome_responsavel, situacao) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         numero?.toUpperCase(),
         cliente_id,
