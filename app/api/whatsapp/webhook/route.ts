@@ -301,6 +301,14 @@ async function processUserMessage(from: string, messageBody: string) {
         await handleConfirmarAgendamento(from, messageBody, state?.data || {})
         break
 
+      case "criar_os_contato_nome":
+        await handleCriarOSContatoNome(from, messageBody, state?.data || {})
+        break
+
+      case "criar_os_contato_telefone":
+        await handleCriarOSContatoTelefone(from, messageBody, state?.data || {})
+        break
+
       default:
         await sendTipoClienteMenu(from)
     }
@@ -835,8 +843,6 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
           `*${data.nome}*\n` +
           `Código: ${codigo}\n` +
           `CNPJ: ${data.cnpj}\n` +
-          `Pessoa de Contato: ${data.solicitanteNome}\n` + // Mostrar pessoa de contato
-          `Telefone: ${data.solicitanteTelefone}\n` + // Mostrar telefone
           (data.distanciaKm ? `Distância: ${data.distanciaKm} km\n` : "") +
           `\n` +
           `Agora escolha uma opção:\n\n` +
@@ -1879,8 +1885,8 @@ async function handleConfirmarAgendamento(from: string, message: string, data: a
   const opcao = message.trim()
 
   if (opcao === "1") {
-    // Confirmar agendamento sugerido
-    await updateConversationState(from, "criar_os_solicitante", data)
+    // Confirmar agendamento sugerido - agora pedir nome do contato
+    await updateConversationState(from, "criar_os_contato_nome", data)
     await sendMessage(
       from,
       `✅ *Agendamento Confirmado*\n\n` +
@@ -1919,4 +1925,71 @@ async function handleConfirmarAgendamento(from: string, message: string, data: a
         "💡 _Digite 'menu' para voltar ao início_",
     )
   }
+}
+
+async function handleCriarOSContatoNome(from: string, message: string, data: any) {
+  const contatoNome = message.trim().toUpperCase()
+
+  if (!contatoNome || contatoNome.length < 3) {
+    await sendMessage(
+      from,
+      "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.\n\n" +
+        "💡 _Digite 'menu' para voltar ao início_",
+    )
+    return
+  }
+
+  // Atualizar campo contato na tabela clientes
+  try {
+    console.log("[v0] 📝 Atualizando campo contato do cliente ID:", data.clienteId)
+    await query("UPDATE clientes SET contato = ? WHERE id = ?", [contatoNome, data.clienteId])
+    console.log("[v0] ✅ Campo contato atualizado com sucesso")
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao atualizar contato:", error)
+  }
+
+  await updateConversationState(from, "criar_os_contato_telefone", {
+    ...data,
+    contatoNome,
+  })
+
+  await sendMessage(
+    from,
+    `✅ Nome registrado: *${contatoNome}*\n\n` +
+      `Agora, qual é o *seu telefone*?\n\n` +
+      `Exemplo: _(11) 99999-9999_\n\n` +
+      `💡 _Digite 'menu' para voltar ao início_`,
+  )
+}
+
+async function handleCriarOSContatoTelefone(from: string, message: string, data: any) {
+  const contatoTelefone = message.trim()
+
+  if (!contatoTelefone) {
+    await sendMessage(from, "❌ Por favor, digite um telefone válido.\n\n" + "💡 _Digite 'menu' para voltar ao início_")
+    return
+  }
+
+  // Atualizar campo telefone na tabela clientes
+  try {
+    console.log("[v0] 📝 Atualizando campo telefone do cliente ID:", data.clienteId)
+    await query("UPDATE clientes SET telefone = ? WHERE id = ?", [contatoTelefone, data.clienteId])
+    console.log("[v0] ✅ Campo telefone atualizado com sucesso")
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao atualizar telefone:", error)
+  }
+
+  await updateConversationState(from, "create_order_desc", {
+    ...data,
+    contatoTelefone,
+    solicitanteOS: data.contatoNome, // Usar o nome do contato como solicitante
+  })
+
+  await sendMessage(
+    from,
+    `✅ Telefone registrado: *${contatoTelefone}*\n\n` +
+      `Agora, descreva o problema ou serviço necessário:\n\n` +
+      `Exemplo: _Verificar câmeras do hall do bloco A_\n\n` +
+      `💡 _Digite 'menu' para voltar ao início_`,
+  )
 }
