@@ -835,6 +835,8 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
           `*${data.nome}*\n` +
           `Código: ${codigo}\n` +
           `CNPJ: ${data.cnpj}\n` +
+          `Pessoa de Contato: ${data.solicitanteNome}\n` + // Mostrar pessoa de contato
+          `Telefone: ${data.solicitanteTelefone}\n` + // Mostrar telefone
           (data.distanciaKm ? `Distância: ${data.distanciaKm} km\n` : "") +
           `\n` +
           `Agora escolha uma opção:\n\n` +

@@ -56,6 +56,7 @@ export interface ConversationState {
     nomeBuscado?: string
     clientesEncontrados?: any[]
     ordemId?: number
+    contato?: string // Adicionado campo contato para pessoa de contato
   }
 }
 
@@ -337,6 +338,7 @@ export async function createClient(data: {
   telefone: string
   email?: string
   sindico?: string
+  contato?: string // Adicionado campo contato para pessoa de contato
   distanciaKm?: number
   latitude?: number
   longitude?: number
@@ -352,8 +354,8 @@ export async function createClient(data: {
     const result = await query(
       `INSERT INTO clientes (
         codigo, nome, cnpj, cep, endereco, bairro, cidade, estado, 
-        telefone, email, sindico, distancia_km, latitude, longitude, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        telefone, email, sindico, contato, distancia_km, latitude, longitude, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         codigo,
         data.nome.toUpperCase(),
@@ -366,6 +368,7 @@ export async function createClient(data: {
         data.telefone,
         data.email?.toLowerCase() || null,
         data.sindico?.toUpperCase() || null,
+        data.contato?.toUpperCase() || null, // Adicionado contato convertido para maiúsculas
         data.distanciaKm || null,
         data.latitude || null,
         data.longitude || null,
