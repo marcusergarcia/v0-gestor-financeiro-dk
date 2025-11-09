@@ -132,6 +132,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     console.log("Atualizando ordem de serviço ID:", id)
     console.log("Dados recebidos:", data)
 
+    const ordemAnteriorResult = await query("SELECT situacao, cliente_id FROM ordens_servico WHERE id = ?", [id])
+    const ordemAnterior = (ordemAnteriorResult as any[])[0]
+    const situacaoAnterior = ordemAnterior?.situacao
+    const clienteId = ordemAnterior?.cliente_id
+
     const situacaoFinal = data.situacao || "aberta"
 
     const result = await query(
@@ -178,6 +183,61 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     console.log("Resultado da atualização:", result)
     console.log("Situação atualizada para:", situacaoFinal)
+
+    if (situacaoAnterior && situacaoAnterior !== situacaoFinal && clienteId) {
+      console.log("[v0] 🔔 Detectada mudança de situação:", situacaoAnterior, "→", situacaoFinal)
+
+      // Buscar telefone do cliente para enviar notificação
+      const clienteResult = await query("SELECT telefone, nome FROM clientes WHERE id = ?", [clienteId])
+      const cliente = (clienteResult as any[])[0]
+
+      if (cliente?.telefone) {
+        console.log("[v0] 📱 Enviando notificação para:", cliente.telefone)
+
+        // Buscar número da ordem
+        const ordemResult = await query("SELECT numero FROM ordens_servico WHERE id = ?", [id])
+        const ordemNumero = (ordemResult as any[])[0]?.numero
+
+        const situacaoMap: Record<string, string> = {
+          aberta: "🔴 ABERTA",
+          agendada: "📅 AGENDADA",
+          em_andamento: "🟡 EM ANDAMENTO",
+          concluida: "✅ CONCLUÍDA",
+        }
+
+        const mensagemNotificacao =
+          `🔔 *Atualização de Ordem de Serviço*\n\n` +
+          `Olá, *${cliente.nome}*!\n\n` +
+          `A situação da sua ordem de serviço foi atualizada:\n\n` +
+          `📋 *Ordem:* #${ordemNumero}\n` +
+          `🔄 *Nova situação:* ${situacaoMap[situacaoFinal] || situacaoFinal}\n\n` +
+          `${situacaoFinal === "concluida" ? "✨ O serviço foi concluído com sucesso!\n\n" : ""}` +
+          `Se tiver dúvidas, entre em contato conosco! 📞`
+
+        // Enviar notificação via WhatsApp
+        try {
+          const whatsappResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/whatsapp/send`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: cliente.telefone,
+                message: mensagemNotificacao,
+              }),
+            },
+          )
+
+          if (whatsappResponse.ok) {
+            console.log("[v0] ✅ Notificação enviada com sucesso!")
+          } else {
+            console.error("[v0] ❌ Erro ao enviar notificação:", await whatsappResponse.text())
+          }
+        } catch (error) {
+          console.error("[v0] ❌ Erro ao enviar notificação via WhatsApp:", error)
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,

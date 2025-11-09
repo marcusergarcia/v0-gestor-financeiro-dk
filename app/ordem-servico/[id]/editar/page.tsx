@@ -170,6 +170,19 @@ export default function EditarOrdemServicoPage() {
     return partes.length > 0 ? partes.join(" - ") : "Endereço não disponível"
   }
 
+  const isOrdemAgendada = ordem?.situacao === "agendada"
+  const isDiaExecucao = (): boolean => {
+    if (!ordem?.data_agendamento) return true // Se não tem agendamento, pode mudar
+
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+
+    const dataAgenda = new Date(ordem.data_agendamento.split("T")[0] + "T12:00:00")
+    dataAgenda.setHours(0, 0, 0, 0)
+
+    return hoje.getTime() >= dataAgenda.getTime()
+  }
+
   // Carregar dados iniciais
   useEffect(() => {
     const carregarDados = async () => {
@@ -265,9 +278,16 @@ export default function EditarOrdemServicoPage() {
         setResponsavel(ordemServico.responsavel || "")
         setNomeResponsavel(ordemServico.nome_responsavel || "")
 
-        // Definir situação: se for "aberta" ou "agendada", mudar para "em_andamento" por padrão na edição
         const situacaoAtual = ordemServico.situacao || "aberta"
-        if (situacaoAtual === "aberta" || situacaoAtual === "agendada") {
+        if (situacaoAtual === "agendada") {
+          // Se é ordem agendada e NÃO é o dia da execução, manter como agendada
+          if (!isDiaExecucao()) {
+            setSituacao("agendada")
+          } else {
+            // Se é o dia da execução, pode mudar para em_andamento
+            setSituacao("em_andamento")
+          }
+        } else if (situacaoAtual === "aberta") {
           setSituacao("em_andamento")
         } else {
           setSituacao(situacaoAtual)
@@ -892,13 +912,33 @@ export default function EditarOrdemServicoPage() {
 
                   <Separator />
 
+                  {isOrdemAgendada && !isDiaExecucao() && (
+                    <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <Calendar className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-semibold text-orange-900">Ordem Agendada</p>
+                          <p className="text-sm text-orange-700 mt-1">
+                            Esta ordem está agendada para{" "}
+                            {ordem?.data_agendamento
+                              ? new Date(ordem.data_agendamento.split("T")[0] + "T12:00:00").toLocaleDateString("pt-BR")
+                              : "data indefinida"}
+                            . A situação só poderá ser alterada no dia da execução.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <Separator />
+
                   {/* Campo de Situação */}
                   <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-3 md:p-4 rounded-lg border-2 border-blue-200">
                     <Label htmlFor="situacao" className="text-xs md:text-base font-semibold flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
                       Situação da Ordem *
                     </Label>
-                    <Select value={situacao} onValueChange={setSituacao}>
+                    <Select value={situacao} onValueChange={setSituacao} disabled={isOrdemAgendada && !isDiaExecucao()}>
                       <SelectTrigger className="mt-2 bg-white h-9 md:h-10 text-xs md:text-sm">
                         <SelectValue />
                       </SelectTrigger>
@@ -930,6 +970,7 @@ export default function EditarOrdemServicoPage() {
                       </SelectContent>
                     </Select>
                     <p className="text-[10px] md:text-xs text-gray-600 mt-2">
+                      {isOrdemAgendada && !isDiaExecucao() && "⚠️ A situação poderá ser alterada apenas no dia agendado"}
                       {situacao === "agendada" && "Serviço agendado para data futura"}
                       {situacao === "em_andamento" && "Serviço está sendo executado"}
                       {situacao === "concluida" && "Serviço finalizado"}

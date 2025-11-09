@@ -163,7 +163,8 @@ async function processUserMessage(from: string, messageBody: string) {
       currentStage !== "cadastro_telefone" &&
       currentStage !== "cadastro_email" &&
       currentStage !== "cadastro_sindico" &&
-      currentStage !== "cadastro_solicitante" &&
+      currentStage !== "cadastro_solicitante_nome" && // Adicionado
+      currentStage !== "cadastro_solicitante_telefone" && // Adicionado
       currentStage !== "cadastro_confirmar" &&
       currentStage !== "criar_os_tipo_atendimento" &&
       currentStage !== "criar_os_data_agendamento" &&
@@ -228,6 +229,15 @@ async function processUserMessage(from: string, messageBody: string) {
 
       case "cadastro_cidade":
         await handleCadastroCidade(from, messageBody, state?.data || {})
+        break
+
+      // Novos estados para capturar nome e telefone do solicitante
+      case "cadastro_solicitante_nome":
+        await handleCadastroSolicitanteNome(from, messageBody, state?.data || {})
+        break
+
+      case "cadastro_solicitante_telefone":
+        await handleCadastroSolicitanteTelefone(from, messageBody, state?.data || {})
         break
 
       case "cadastro_confirmar":
@@ -718,7 +728,48 @@ async function handleCadastroSindico(from: string, message: string, data: any) {
     return
   }
 
-  await updateConversationState(from, "cadastro_confirmar", { ...data, sindico })
+  await updateConversationState(from, "cadastro_solicitante_nome", { ...data, sindico })
+  await sendMessage(
+    from,
+    `✅ Síndico registrado: *${sindico}*\n\n` +
+      `Agora, qual é o *seu nome*?\n` +
+      `(Pessoa que está solicitando o cadastro)\n\n` +
+      `Exemplo: _Maria Santos_\n\n` +
+      `💡 _Digite 'menu' para voltar ao início_`,
+  )
+}
+
+async function handleCadastroSolicitanteNome(from: string, message: string, data: any) {
+  const solicitanteNome = message.trim()
+
+  if (!solicitanteNome || solicitanteNome.length < 3) {
+    await sendMessage(
+      from,
+      "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.\n\n" +
+        "💡 _Digite 'menu' para voltar ao início_",
+    )
+    return
+  }
+
+  await updateConversationState(from, "cadastro_solicitante_telefone", { ...data, solicitanteNome })
+  await sendMessage(
+    from,
+    `✅ Nome registrado: *${solicitanteNome}*\n\n` +
+      `Agora, qual é o *seu telefone*?\n\n` +
+      `Exemplo: _(11) 99999-9999_\n\n` +
+      `💡 _Digite 'menu' para voltar ao início_`,
+  )
+}
+
+async function handleCadastroSolicitanteTelefone(from: string, message: string, data: any) {
+  const solicitanteTelefone = message.trim()
+
+  if (!solicitanteTelefone) {
+    await sendMessage(from, "❌ Por favor, digite um telefone válido.\n\n" + "💡 _Digite 'menu' para voltar ao início_")
+    return
+  }
+
+  await updateConversationState(from, "cadastro_confirmar", { ...data, solicitanteTelefone })
   await sendMessage(
     from,
     `📋 *Confirme seus dados:*\n\n` +
@@ -728,9 +779,11 @@ async function handleCadastroSindico(from: string, message: string, data: any) {
       `*Endereço:* ${data.endereco}\n` +
       `*Bairro:* ${data.bairro}\n` +
       `*Cidade:* ${data.cidade} - ${data.estado}\n` +
-      `*Telefone:* ${data.telefone}\n` +
+      `*Telefone Principal:* ${data.telefone}\n` +
       `*Email:* ${data.email}\n` +
-      `*Síndico:* ${sindico}\n` +
+      `*Síndico:* ${data.sindico}\n` +
+      `*Pessoa de Contato:* ${data.solicitanteNome}\n` +
+      `*Telefone de Contato:* ${solicitanteTelefone}\n` +
       (data.distanciaKm ? `*Distância:* ${data.distanciaKm} km\n` : "") +
       `\n` +
       `Está tudo correto?\n\n` +
@@ -755,9 +808,10 @@ async function handleCadastroConfirmar(from: string, message: string, data: any)
         bairro: data.bairro,
         cidade: data.cidade,
         estado: data.estado,
-        telefone: data.telefone,
+        telefone: data.solicitanteTelefone || data.telefone, // Usar telefone do solicitante
         email: data.email,
         sindico: data.sindico,
+        contato: data.solicitanteNome, // Nome da pessoa que está solicitando
         distanciaKm: data.distanciaKm,
         latitude: data.latitude,
         longitude: data.longitude,

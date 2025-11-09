@@ -123,6 +123,18 @@ export default function CalendarioPage() {
   const totalTarde = ordensAgendadas.filter((os) => os.periodo_agendamento === "tarde").length
   const totalIntegral = ordensAgendadas.filter((os) => os.periodo_agendamento === "integral").length
 
+  const podeExecutar = (dataAgendamento: string | undefined): boolean => {
+    if (!dataAgendamento) return false
+
+    const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+
+    const dataAgenda = new Date(dataAgendamento.split("T")[0] + "T12:00:00")
+    dataAgenda.setHours(0, 0, 0, 0)
+
+    return hoje.getTime() === dataAgenda.getTime()
+  }
+
   if (loading) {
     return (
       <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 bg-gradient-to-br from-slate-50 to-orange-50/30">
@@ -358,11 +370,22 @@ export default function CalendarioPage() {
                             Visualizar
                           </Button>
                         </Link>
-                        <Link href={`/ordem-servico/${os.id}/editar`} className="flex-1">
-                          <Button variant="outline" size="sm" className="w-full bg-green-50 hover:bg-green-100">
+                        {podeExecutar(os.data_agendamento) ? (
+                          <Link href={`/ordem-servico/${os.id}/editar`} className="flex-1">
+                            <Button variant="outline" size="sm" className="w-full bg-green-50 hover:bg-green-100">
+                              Executar
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 bg-gray-100 text-gray-400 cursor-not-allowed"
+                            disabled
+                          >
                             Executar
                           </Button>
-                        </Link>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
