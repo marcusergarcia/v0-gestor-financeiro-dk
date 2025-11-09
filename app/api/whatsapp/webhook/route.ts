@@ -15,6 +15,7 @@ import {
   findOrdensAbertas,
   findOrdemById,
   findOrdensBySituacao,
+  getNextAvailablePeriod, // Importando nova função de agendamento automático
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
 
@@ -250,6 +251,11 @@ async function processUserMessage(from: string, messageBody: string) {
 
       case "wait_agent":
         await returnToMenu(from, state.data || {})
+        break
+
+      // Novo estado para confirmar agendamento automático
+      case "criar_os_confirmar_agendamento":
+        await handleConfirmarAgendamento(from, messageBody, state?.data || {})
         break
 
       default:
@@ -977,20 +983,59 @@ async function handleTipoServico(from: string, message: string, data: any) {
     return
   }
 
-  await updateConversationState(from, "criar_os_tipo_atendimento", {
+  console.log("[v0] 🔍 Calculando próximo período disponível...")
+  const proximoPeriodo = await getNextAvailablePeriod()
+
+  if (!proximoPeriodo) {
+    // Não foi possível calcular - pedir para usuário escolher manualmente
+    await updateConversationState(from, "criar_os_data_agendamento", {
+      ...data,
+      tipoServico,
+      tipoServicoLabel,
+      tipoAtendimento: "agendado", // Assumir agendado se não puder calcular automaticamente
+    })
+    await sendMessage(
+      from,
+      `✅ *Tipo de serviço: ${tipoServicoLabel}*\n\n` +
+        "Não foi possível calcular automaticamente o próximo período disponível.\n\n" +
+        "📅 *Escolher Data Manualmente*\n\n" +
+        "Digite a data desejada para o atendimento:\n\n" +
+        "📋 Formato: DD/MM/AAAA\n" +
+        "Exemplo: _15/01/2025_\n\n" +
+        "⚠️ Apenas dias úteis (segunda a sexta)\n\n" +
+        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+    )
+    return
+  }
+
+  // Sugerir o próximo período disponível
+  await updateConversationState(from, "criar_os_confirmar_agendamento", {
     ...data,
     tipoServico,
     tipoServicoLabel,
+    tipoAtendimento: "agendado",
+    dataAgendamento: proximoPeriodo.data,
+    dataAgendamentoFormatada: proximoPeriodo.dataFormatada,
+    periodoAgendamento: proximoPeriodo.periodo,
+    periodoAgendamentoLabel: proximoPeriodo.periodoLabel,
   })
 
   await sendMessage(
     from,
     `✅ *Tipo de serviço: ${tipoServicoLabel}*\n\n` +
-      "O atendimento é para hoje ou deseja agendar?\n\n" +
-      "*1* - Para hoje\n" +
-      "*2* - Agendar para data específica\n\n" +
-      "_Digite o número da opção desejada_\n\n" +
-      "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+      `📅 *Próximo período disponível:*\n` +
+      `Data: *${proximoPeriodo.dataFormatada}*\n` +
+      `Período: *${proximoPeriodo.periodoLabel}*\n\n` +
+      `⚠️ *Importante:*\n` +
+      `- Agendamento sujeito a confirmação\n` +
+      `- Horários de atendimento:\n` +
+      `  • Manhã: 09:00 às 12:00\n` +
+      `  • Tarde: 13:00 às 17:00\n` +
+      `- Apenas dias úteis (segunda a sexta)\n\n` +
+      `Confirma este agendamento?\n\n` +
+      `*1* - Sim, confirmar\n` +
+      `*2* - Não, escolher outra data\n\n` +
+      `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
   )
 }
 
@@ -1755,4 +1800,51 @@ async function handleConsultarPorSituacao(from: string, data: any, situacao: str
   })
 
   await sendMessage(from, mensagem)
+}
+
+// Nova função para lidar com a confirmação do agendamento
+async function handleConfirmarAgendamento(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  if (opcao === "1") {
+    // Confirmar agendamento sugerido
+    await updateConversationState(from, "criar_os_solicitante", data)
+    await sendMessage(
+      from,
+      `✅ *Agendamento Confirmado*\n\n` +
+        `📅 Data: ${data.dataAgendamentoFormatada}\n` +
+        `🕐 Período: ${data.periodoAgendamentoLabel}\n\n` +
+        `Agora, qual é o *seu nome*?\n` +
+        `(Pessoa que está solicitando o serviço)\n\n` +
+        `Exemplo: _Maria Santos_\n\n` +
+        `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
+    )
+  } else if (opcao === "2") {
+    // Usuário quer escolher outra data manualmente
+    await updateConversationState(from, "criar_os_data_agendamento", {
+      ...data,
+      dataAgendamento: undefined,
+      dataAgendamentoFormatada: undefined,
+      periodoAgendamento: undefined,
+      periodoAgendamentoLabel: undefined,
+    })
+    await sendMessage(
+      from,
+      `📅 *Escolher Outra Data*\n\n` +
+        "Digite a data desejada para o atendimento:\n\n" +
+        "📋 Formato: DD/MM/AAAA\n" +
+        "Exemplo: _15/01/2025_\n\n" +
+        "⚠️ Apenas dias úteis (segunda a sexta)\n\n" +
+        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+    )
+  } else {
+    await sendMessage(
+      from,
+      "❌ Opção inválida.\n\n" +
+        "Digite:\n" +
+        "*1* - Sim, confirmar\n" +
+        "*2* - Não, escolher outra data\n\n" +
+        "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
+    )
+  }
 }

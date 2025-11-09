@@ -21,6 +21,7 @@ export enum ConversationStage {
   MENU = "menu",
   CRIAR_OS_TIPO_SERVICO = "criar_os_tipo_servico",
   CRIAR_OS_TIPO_ATENDIMENTO = "criar_os_tipo_atendimento",
+  CRIAR_OS_CONFIRMAR_AGENDAMENTO = "criar_os_confirmar_agendamento", // Novo estágio para confirmação de agendamento automático
   CRIAR_OS_DATA_AGENDAMENTO = "criar_os_data_agendamento",
   CRIAR_OS_PERIODO_AGENDAMENTO = "criar_os_periodo_agendamento",
   CRIAR_OS_SOLICITANTE = "criar_os_solicitante",
@@ -640,5 +641,132 @@ export async function findOrdensBySituacao(clienteId: number, situacao: string):
   } catch (error) {
     console.error("[v0] ❌ Erro ao buscar ordens por situação:", error)
     return []
+  }
+}
+
+export async function getNextAvailablePeriod(): Promise<{
+  data: string
+  dataFormatada: string
+  periodo: string
+  periodoLabel: string
+} | null> {
+  try {
+    console.log("[v0] 📅 Calculando próximo período disponível...")
+
+    // Obter hora atual de Brasília
+    const agora = new Date()
+    const brasiliaDateString = agora.toLocaleString("en-US", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+
+    const [datePart, timePart] = brasiliaDateString.split(", ")
+    const [mes, dia, ano] = datePart.split("/")
+    const [hora] = timePart.split(":")
+
+    const horaAtual = Number.parseInt(hora)
+    console.log("[v0] 🕐 Hora atual em Brasília:", horaAtual)
+
+    // Buscar feriados ativos
+    const feriadosResult = await query("SELECT data FROM feriados WHERE ativo = 1")
+    const feriadosSet = new Set(
+      (feriadosResult as any[]).map((f: any) => {
+        const date = new Date(f.data)
+        return date.toISOString().split("T")[0]
+      }),
+    )
+
+    // Função para verificar se é dia útil
+    const isDiaUtil = (date: Date): boolean => {
+      const diaSemana = date.getDay()
+      const isWeekend = diaSemana === 0 || diaSemana === 6
+      const dateStr = date.toISOString().split("T")[0]
+      const isFeriado = feriadosSet.has(dateStr)
+      return !isWeekend && !isFeriado
+    }
+
+    // Função para obter próximo dia útil
+    const getProximoDiaUtil = (startDate: Date): Date => {
+      const nextDay = new Date(startDate)
+      nextDay.setDate(nextDay.getDate() + 1)
+      while (!isDiaUtil(nextDay)) {
+        nextDay.setDate(nextDay.getDate() + 1)
+      }
+      return nextDay
+    }
+
+    // Data atual
+    let dataVerificar = new Date(`${ano}-${mes}-${dia}T00:00:00`)
+    let periodo: string
+    let periodoLabel: string
+
+    // Determinar período baseado na hora atual
+    if (horaAtual < 12) {
+      // Manhã atual - tentar tarde do mesmo dia
+      periodo = "tarde"
+      periodoLabel = "Tarde (13:00 - 17:00)"
+      console.log("[v0] 🌅 Período atual: Manhã, tentando agendar para Tarde")
+    } else {
+      // Tarde/Noite - tentar manhã do próximo dia útil
+      dataVerificar = getProximoDiaUtil(dataVerificar)
+      periodo = "manha"
+      periodoLabel = "Manhã (09:00 - 12:00)"
+      console.log("[v0] 🌆 Período atual: Tarde/Noite, tentando agendar para próxima Manhã")
+    }
+
+    // Verificar disponibilidade e buscar próximo período disponível
+    let tentativas = 0
+    const maxTentativas = 30 // Máximo 30 dias úteis no futuro
+
+    while (tentativas < maxTentativas) {
+      // Verificar se é dia útil
+      if (!isDiaUtil(dataVerificar)) {
+        console.log("[v0] ⚠️ Data não é dia útil, pulando para próximo dia útil")
+        dataVerificar = getProximoDiaUtil(dataVerificar)
+        continue
+      }
+
+      const dataStr = dataVerificar.toISOString().split("T")[0]
+      const { disponivel } = await checkAgendamentoDisponivel(dataStr, periodo)
+
+      if (disponivel) {
+        // Período disponível encontrado!
+        const dataFormatada = `${dataVerificar.getDate().toString().padStart(2, "0")}/${(dataVerificar.getMonth() + 1).toString().padStart(2, "0")}/${dataVerificar.getFullYear()}`
+
+        console.log("[v0] ✅ Período disponível encontrado:", dataFormatada, periodo)
+
+        return {
+          data: dataStr,
+          dataFormatada,
+          periodo,
+          periodoLabel,
+        }
+      }
+
+      // Período não disponível - tentar próximo período
+      if (periodo === "manha") {
+        // Tentar tarde do mesmo dia
+        periodo = "tarde"
+        periodoLabel = "Tarde (13:00 - 17:00)"
+      } else {
+        // Tentar manhã do próximo dia útil
+        dataVerificar = getProximoDiaUtil(dataVerificar)
+        periodo = "manha"
+        periodoLabel = "Manhã (09:00 - 12:00)"
+      }
+
+      tentativas++
+    }
+
+    console.log("[v0] ⚠️ Não foi possível encontrar período disponível nos próximos 30 dias úteis")
+    return null
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao calcular próximo período disponível:", error)
+    return null
   }
 }
