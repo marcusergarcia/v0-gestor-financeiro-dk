@@ -651,7 +651,7 @@ export async function getNextAvailablePeriod(): Promise<{
   periodoLabel: string
 } | null> {
   try {
-    console.log("[v0] 📅 Calculando próximo período disponível...")
+    console.log("[v0] 📅 Calculando próximo período disponível (apenas manhã e tarde)...")
 
     // Obter hora atual de Brasília
     const agora = new Date()
@@ -700,6 +700,27 @@ export async function getNextAvailablePeriod(): Promise<{
       return nextDay
     }
 
+    const isPeriodoDisponivel = async (dataStr: string, periodo: string): Promise<boolean> => {
+      // Verificar se existe período integral neste dia (bloqueia tudo)
+      const integralResult = await query(
+        `SELECT COUNT(*) as count FROM ordens_servico 
+         WHERE data_agendamento = ? 
+         AND periodo_agendamento = 'integral'
+         AND situacao IN ('agendada', 'em_andamento')`,
+        [dataStr],
+      )
+
+      const temIntegral = (integralResult as any[])[0]?.count > 0
+      if (temIntegral) {
+        console.log("[v0] ⚠️ Dia tem período integral agendado - dia inteiro ocupado")
+        return false
+      }
+
+      // Verificar se o período específico está disponível
+      const { disponivel } = await checkAgendamentoDisponivel(dataStr, periodo)
+      return disponivel
+    }
+
     // Data atual
     let dataVerificar = new Date(`${ano}-${mes}-${dia}T00:00:00`)
     let periodo: string
@@ -732,7 +753,7 @@ export async function getNextAvailablePeriod(): Promise<{
       }
 
       const dataStr = dataVerificar.toISOString().split("T")[0]
-      const { disponivel } = await checkAgendamentoDisponivel(dataStr, periodo)
+      const disponivel = await isPeriodoDisponivel(dataStr, periodo)
 
       if (disponivel) {
         // Período disponível encontrado!
