@@ -142,8 +142,7 @@ export function CalendarCustom({
                 highlighted &&
                   !selected &&
                   "bg-gradient-to-br from-emerald-50 to-teal-100 border-emerald-300 font-semibold text-emerald-900 shadow-sm",
-                selected &&
-                  "bg-gradient-to-br from-indigo-600 to-purple-600 text-white border-indigo-400 shadow-lg ring-2 ring-indigo-200",
+                selected && "border-red-500",
                 today && !selected && "border-2 border-orange-400 bg-orange-50 font-semibold",
                 "text-sm",
               )}
