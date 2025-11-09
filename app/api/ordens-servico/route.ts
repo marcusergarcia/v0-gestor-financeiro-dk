@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
         horario_entrada, horario_saida, tipo_servico, relatorio_visita, descricao_defeito, 
         necessidades_cliente, servico_realizado, observacoes, responsavel, 
         nome_responsavel, situacao) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         numero?.toUpperCase(),
         cliente_id,
