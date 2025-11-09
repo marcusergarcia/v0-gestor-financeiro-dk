@@ -9,7 +9,7 @@ interface CalendarCustomProps {
   selectedDate?: Date
   onDateSelect?: (date: Date) => void
   highlightedDates?: Date[]
-  datesWithPeriods?: { date: Date; manha: boolean; tarde: boolean }[]
+  datesWithPeriods?: { date: Date; manha: boolean; tarde: boolean; integral: boolean }[]
   className?: string
 }
 
@@ -73,7 +73,7 @@ export function CalendarCustom({
 
   const getPeriodIndicators = (date: Date) => {
     const periodData = datesWithPeriods.find((d) => isSameDay(d.date, date))
-    return periodData || { manha: false, tarde: false }
+    return periodData || { manha: false, tarde: false, integral: false }
   }
 
   const isSelected = (date: Date) => {
@@ -144,11 +144,12 @@ export function CalendarCustom({
                   "bg-gradient-to-br from-emerald-50 to-teal-100 border-emerald-300 font-semibold text-emerald-900 shadow-sm",
                 selected && "border-red-500",
                 today && !selected && "border-2 border-orange-400 bg-orange-50 font-semibold",
-                "text-sm",
+                "text-sm flex flex-col items-center justify-center",
               )}
             >
-              {day.getDate()}
-              {(periods.manha || periods.tarde) && (
+              {today && <span className="text-[8px] font-bold text-orange-600 leading-none mb-0.5">Hoje</span>}
+              <span className={today ? "text-xs" : ""}>{day.getDate()}</span>
+              {(periods.manha || periods.tarde || periods.integral) && (
                 <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-1">
                   {periods.manha && (
                     <div
@@ -160,6 +161,12 @@ export function CalendarCustom({
                     <div
                       className="w-2 h-2 rounded-full bg-orange-600 border border-orange-800 shadow-sm"
                       title="Tarde"
+                    ></div>
+                  )}
+                  {periods.integral && (
+                    <div
+                      className="w-2 h-2 rounded-full bg-green-600 border border-green-800 shadow-sm"
+                      title="Integral"
                     ></div>
                   )}
                 </div>
