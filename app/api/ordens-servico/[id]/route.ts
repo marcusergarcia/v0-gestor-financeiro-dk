@@ -129,13 +129,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const data = await request.json()
 
-    console.log("Atualizando ordem de serviço ID:", id)
-    console.log("Dados recebidos:", data)
+    console.log("[v0] 📝 Atualizando ordem de serviço ID:", id)
+    console.log("[v0] 📝 Dados recebidos:", data)
 
     const ordemAnteriorResult = await query("SELECT situacao, cliente_id FROM ordens_servico WHERE id = ?", [id])
     const ordemAnterior = (ordemAnteriorResult as any[])[0]
     const situacaoAnterior = ordemAnterior?.situacao
     const clienteId = ordemAnterior?.cliente_id
+
+    console.log("[v0] 🔍 Situação anterior:", situacaoAnterior)
+    console.log("[v0] 🔍 Cliente ID:", clienteId)
 
     const situacaoFinal = data.situacao || "aberta"
 
@@ -181,8 +184,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       ],
     )
 
-    console.log("Resultado da atualização:", result)
-    console.log("Situação atualizada para:", situacaoFinal)
+    console.log("[v0] ✅ Ordem atualizada, situação final:", situacaoFinal)
 
     if (situacaoAnterior && situacaoAnterior !== situacaoFinal && clienteId) {
       console.log("[v0] 🔔 Detectada mudança de situação:", situacaoAnterior, "→", situacaoFinal)
@@ -191,8 +193,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       const clienteResult = await query("SELECT telefone, nome FROM clientes WHERE id = ?", [clienteId])
       const cliente = (clienteResult as any[])[0]
 
+      console.log("[v0] 👤 Cliente encontrado:", cliente?.nome)
+      console.log("[v0] 📞 Telefone original:", cliente?.telefone)
+
       if (cliente?.telefone) {
-        console.log("[v0] 📱 Enviando notificação para:", cliente.telefone)
+        let telefoneFormatado = cliente.telefone.replace(/\D/g, "")
+
+        if (!telefoneFormatado.startsWith("55")) {
+          telefoneFormatado = "55" + telefoneFormatado
+        }
+
+        console.log("[v0] 📱 Telefone formatado:", telefoneFormatado)
 
         // Buscar número da ordem
         const ordemResult = await query("SELECT numero FROM ordens_servico WHERE id = ?", [id])
@@ -214,29 +225,38 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           `${situacaoFinal === "concluida" ? "✨ O serviço foi concluído com sucesso!\n\n" : ""}` +
           `Se tiver dúvidas, entre em contato conosco! 📞`
 
-        // Enviar notificação via WhatsApp
+        console.log("[v0] 💬 Mensagem preparada:", mensagemNotificacao)
+
         try {
-          const whatsappResponse = await fetch(
-            `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/whatsapp/send`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: cliente.telefone,
-                message: mensagemNotificacao,
-              }),
-            },
-          )
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+          console.log("[v0] 🌐 URL da aplicação:", appUrl)
+
+          const whatsappResponse = await fetch(`${appUrl}/api/whatsapp/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: telefoneFormatado,
+              message: mensagemNotificacao,
+            }),
+          })
+
+          const responseText = await whatsappResponse.text()
+          console.log("[v0] 📡 Resposta da API WhatsApp (status):", whatsappResponse.status)
+          console.log("[v0] 📡 Resposta da API WhatsApp (body):", responseText)
 
           if (whatsappResponse.ok) {
             console.log("[v0] ✅ Notificação enviada com sucesso!")
           } else {
-            console.error("[v0] ❌ Erro ao enviar notificação:", await whatsappResponse.text())
+            console.error("[v0] ❌ Erro ao enviar notificação:", responseText)
           }
         } catch (error) {
           console.error("[v0] ❌ Erro ao enviar notificação via WhatsApp:", error)
         }
+      } else {
+        console.log("[v0] ⚠️ Cliente não tem telefone cadastrado, notificação não enviada")
       }
+    } else {
+      console.log("[v0] ℹ️ Sem mudança de situação ou sem cliente, notificação não enviada")
     }
 
     return NextResponse.json({
@@ -245,7 +265,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       situacao: situacaoFinal,
     })
   } catch (error) {
-    console.error("Erro ao atualizar ordem de serviço:", error)
+    console.error("[v0] ❌ Erro ao atualizar ordem de serviço:", error)
     return NextResponse.json(
       { success: false, message: "Erro interno do servidor", error: String(error) },
       { status: 500 },
