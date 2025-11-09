@@ -1115,11 +1115,9 @@ async function handleDataAgendamento(from: string, message: string, data: any) {
     `✅ Data selecionada: *${dataStr}*\n\n` +
       "Agora escolha o período:\n\n" +
       "*1* - Manhã (09:00 - 12:00)\n" +
-      "*2* - Tarde (13:00 - 17:00)\n" +
-      "*3* - Integral (09:00 - 17:00) - Dia completo\n\n" +
+      "*2* - Tarde (13:00 - 17:00)\n\n" +
       "⚠️ *Importante:* \n" +
       "- Não é possível agendar duas ordens no mesmo período\n" +
-      "- O período INTEGRAL ocupa manhã E tarde\n" +
       "- Apenas dias úteis (segunda a sexta)\n\n" +
       "_Digite o número da opção desejada_\n\n" +
       "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
@@ -1129,7 +1127,7 @@ async function handleDataAgendamento(from: string, message: string, data: any) {
 async function handlePeriodoAgendamento(from: string, message: string, data: any) {
   const opcao = message.trim()
 
-  if (opcao === "4") {
+  if (opcao === "3") {
     await updateConversationState(from, "criar_os_data_agendamento", {
       ...data,
       dataAgendamento: undefined,
@@ -1156,9 +1154,6 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
   } else if (opcao === "2") {
     periodo = "tarde"
     periodoLabel = "Tarde (13:00 - 17:00)"
-  } else if (opcao === "3") {
-    periodo = "integral"
-    periodoLabel = "Integral (09:00 - 17:00)"
   } else {
     await sendMessage(
       from,
@@ -1166,8 +1161,7 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
         "Digite:\n" +
         "*1* - Manhã (09:00 - 12:00)\n" +
         "*2* - Tarde (13:00 - 17:00)\n" +
-        "*3* - Integral (09:00 - 17:00)\n" +
-        "*4* - Escolher outra data\n\n" +
+        "*3* - Escolher outra data\n\n" +
         "💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_",
     )
     return
@@ -1178,10 +1172,8 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
   if (!disponivel) {
     let mensagemIndisponivel = ""
 
-    if (periodo === "integral") {
-      mensagemIndisponivel = `Já existe agendamento nesta data. O período INTEGRAL ocupa o dia todo e não pode ser agendado se já existir manhã ou tarde.`
-    } else {
-      mensagemIndisponivel = `Já existe agendamento para ${data.dataAgendamentoFormatada} no período selecionado ou no período INTEGRAL.`
+    if (count > 0) {
+      mensagemIndisponivel = `Já existe agendamento para ${data.dataAgendamentoFormatada} no período selecionado ou o dia está com período INTEGRAL reservado.`
     }
 
     await sendMessage(
@@ -1192,8 +1184,7 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
         `Por favor, escolha outro período ou outra data:\n\n` +
         `*1* - Manhã (09:00 - 12:00)\n` +
         `*2* - Tarde (13:00 - 17:00)\n` +
-        `*3* - Integral (09:00 - 17:00)\n` +
-        `*4* - Escolher outra data\n\n` +
+        `*3* - Escolher outra data\n\n` +
         `💡 _Digite 'voltar' para menu ou 'sair' para reiniciar_`,
     )
     return
@@ -1214,7 +1205,6 @@ async function handlePeriodoAgendamento(from: string, message: string, data: any
       `📋 Horário de atendimento:\n` +
       `   - Manhã: 09:00 às 12:00\n` +
       `   - Tarde: 13:00 às 17:00\n` +
-      `   - Integral: 09:00 às 17:00\n` +
       `   - Apenas dias úteis (segunda a sexta)\n\n` +
       `Agora, qual é o *seu nome*?\n` +
       `(Pessoa que está solicitando o serviço)\n\n` +
