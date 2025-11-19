@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,21 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  ArrowLeft,
-  Save,
-  FileText,
-  User,
-  Clock,
-  Package,
-  CheckCircle,
-  XCircle,
-  Calendar,
-  Shield,
-  DollarSign,
-  Plus,
-  Trash2,
-} from "lucide-react"
+import { ArrowLeft, Save, FileText, User, Clock, Package, CheckCircle, XCircle, Calendar, Shield, DollarSign, Plus, Trash2 } from 'lucide-react'
 import { ClienteCombobox, type Cliente } from "@/components/cliente-combobox"
 import { EquipamentoCombobox } from "@/components/equipamento-combobox"
 import { useToast } from "@/hooks/use-toast"
@@ -417,21 +403,22 @@ export default function NovaOrdemServicoPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="container mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+      <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex-1">
+              <h1 className="text-2xl sm:text-4xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
                 Nova Ordem de Serviço
               </h1>
-              <p className="text-gray-600 mt-1">Crie uma nova ordem de serviço</p>
+              <p className="text-sm sm:text-base text-gray-600 mt-1">Crie uma nova ordem de serviço</p>
               {numeroOS && (
-                <div className="flex items-center gap-2 mt-2">
-                  <FileText className="h-4 w-4 text-gray-500" />
-                  <Badge variant="outline" className="font-mono text-sm">
-                    Número: {numeroOS}
-                  </Badge>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-gray-500 shrink-0" />
+                    <Badge variant="outline" className="font-mono text-xs sm:text-sm">
+                      Número: {numeroOS}
+                    </Badge>
+                  </div>
                   <Badge
                     className={
                       desejaAgendar
@@ -440,39 +427,37 @@ export default function NovaOrdemServicoPage() {
                     }
                   >
                     <Clock className="h-3 w-3 mr-1" />
-                    Será criada como {desejaAgendar ? "AGENDADA" : "ABERTA"}
+                    {desejaAgendar ? "AGENDADA" : "ABERTA"}
                   </Badge>
                 </div>
               )}
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.back()} className="bg-transparent">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => router.back()} className="bg-transparent w-full sm:w-auto min-h-[44px]">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar
+          </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Formulário Principal */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Dados do Cliente */}
             <Card className="border-0 shadow-lg bg-white">
-              <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg p-4 lg:p-6">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <User className="h-5 w-5" />
+              <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg p-4">
+                <CardTitle className="text-white flex items-center gap-2 text-base sm:text-lg">
+                  <User className="h-5 w-5 shrink-0" />
                   Dados do Cliente
                 </CardTitle>
-                <CardDescription className="text-blue-100">
+                <CardDescription className="text-blue-100 text-sm">
                   Selecione o cliente e configure os parâmetros
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="cliente">Cliente *</Label>
-                    <div className="flex gap-2">
+                    <Label htmlFor="cliente" className="text-sm">Cliente *</Label>
+                    <div className="flex flex-col sm:flex-row gap-2 mt-2">
                       <div className="flex-1">
                         <ClienteCombobox
                           value={clienteSelecionado}
@@ -481,48 +466,46 @@ export default function NovaOrdemServicoPage() {
                         />
                       </div>
                       {!clienteSelecionado && (
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowNovoClienteDialog(true)}
-                            className="bg-green-50 hover:bg-green-100 text-green-600 border-green-200 hover:border-green-300"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Novo Cliente
-                          </Button>
-                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowNovoClienteDialog(true)}
+                          className="bg-green-50 hover:bg-green-100 text-green-600 border-green-200 hover:border-green-300 w-full sm:w-auto min-h-[44px]"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Novo Cliente
+                        </Button>
                       )}
                     </div>
                   </div>
 
                   {clienteSelecionado && (
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="flex items-center gap-2 mb-2">
+                    <div className="p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
                         {clienteSelecionado.codigo && (
-                          <Badge variant="outline" className="font-mono">
+                          <Badge variant="outline" className="font-mono text-xs">
                             {clienteSelecionado.codigo}
                           </Badge>
                         )}
-                        <span className="font-medium text-blue-900">{clienteSelecionado.nome}</span>
+                        <span className="font-medium text-blue-900 text-sm break-all">{clienteSelecionado.nome}</span>
                         {clienteTemContrato ? (
-                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 text-xs">
+                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50 text-xs shrink-0">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Com Contrato
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 text-xs">
+                          <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 text-xs shrink-0">
                             <XCircle className="h-3 w-3 mr-1" />
                             Sem Contrato
                           </Badge>
                         )}
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-xs sm:text-sm text-gray-600 space-y-1">
                         <div>ID: {clienteSelecionado.id}</div>
-                        {clienteSelecionado.cnpj && <div>CNPJ: {clienteSelecionado.cnpj}</div>}
+                        {clienteSelecionado.cnpj && <div className="break-all">CNPJ: {clienteSelecionado.cnpj}</div>}
                         {clienteSelecionado.cpf && <div>CPF: {clienteSelecionado.cpf}</div>}
-                        {clienteSelecionado.endereco && <div>Endereço: {clienteSelecionado.endereco}</div>}
-                        {clienteSelecionado.email && <div>Email: {clienteSelecionado.email}</div>}
+                        {clienteSelecionado.endereco && <div className="break-words">Endereço: {clienteSelecionado.endereco}</div>}
+                        {clienteSelecionado.email && <div className="break-all">Email: {clienteSelecionado.email}</div>}
                         {clienteSelecionado.telefone && <div>Telefone: {clienteSelecionado.telefone}</div>}
                         {clienteSelecionado.distancia_km && <div>Distância: {clienteSelecionado.distancia_km} km</div>}
                       </div>
@@ -560,13 +543,13 @@ export default function NovaOrdemServicoPage() {
                   </div>
 
                   {contratoConservacao && (
-                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Shield className="h-5 w-5 text-green-600" />
-                        <span className="font-medium text-green-900">Contrato de Conservação</span>
+                    <div className="p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <Shield className="h-5 w-5 text-green-600 shrink-0" />
+                        <span className="font-medium text-green-900 text-sm sm:text-base">Contrato de Conservação</span>
                         <Badge
                           variant="outline"
-                          className={`text-sm ${
+                          className={`text-xs sm:text-sm ${
                             contratoConservacao.status === "ativo"
                               ? "text-green-600 border-green-200 bg-green-50"
                               : "text-orange-600 border-orange-200 bg-orange-50"
@@ -643,23 +626,23 @@ export default function NovaOrdemServicoPage() {
 
             {/* Informações Básicas */}
             <Card className="border-0 shadow-lg bg-white">
-              <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-lg p-4 lg:p-6">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
+              <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-lg p-4">
+                <CardTitle className="text-white flex items-center gap-2 text-base sm:text-lg">
+                  <Clock className="h-5 w-5 shrink-0" />
                   Informações Básicas
                 </CardTitle>
-                <CardDescription className="text-purple-100">Dados iniciais da ordem de serviço</CardDescription>
+                <CardDescription className="text-purple-100 text-sm">Dados iniciais da ordem de serviço</CardDescription>
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="tipo_servico">Tipo de Serviço *</Label>
+                      <Label htmlFor="tipo_servico" className="text-sm">Tipo de Serviço *</Label>
                       <Select
                         value={formData.tipo_servico}
                         onValueChange={(value) => setFormData((prev) => ({ ...prev, tipo_servico: value }))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="min-h-[44px]">
                           <SelectValue placeholder="Selecione o tipo" />
                         </SelectTrigger>
                         <SelectContent>
@@ -672,24 +655,26 @@ export default function NovaOrdemServicoPage() {
                     </div>
 
                     <div>
-                      <Label htmlFor="data_atual">Data de Criação *</Label>
+                      <Label htmlFor="data_atual" className="text-sm">Data de Criação *</Label>
                       <Input
                         id="data_atual"
                         type="date"
                         value={formData.data_atual}
                         onChange={(e) => setFormData((prev) => ({ ...prev, data_atual: e.target.value }))}
+                        className="min-h-[44px]"
                       />
                       <div className="text-xs text-gray-500 mt-1">Data em que a ordem foi criada</div>
                     </div>
                   </div>
 
                   <div>
-                    <Label htmlFor="solicitado_por">Solicitado Por *</Label>
+                    <Label htmlFor="solicitado_por" className="text-sm">Solicitado Por *</Label>
                     <Input
                       id="solicitado_por"
                       value={formData.solicitado_por}
                       onChange={(e) => setFormData((prev) => ({ ...prev, solicitado_por: e.target.value }))}
                       placeholder="Nome de quem solicitou o serviço"
+                      className="min-h-[44px]"
                     />
                   </div>
 
@@ -702,11 +687,11 @@ export default function NovaOrdemServicoPage() {
                         checked={desejaAgendar}
                         onCheckedChange={(checked) => {
                           setDesejaAgendar(checked as boolean)
-                          // Limpar data de agendamento se desmarcar
                           if (!checked) {
                             setFormData((prev) => ({ ...prev, data_agendamento: "", periodo_agendamento: "" }))
                           }
                         }}
+                        className="h-5 w-5"
                       />
                       <Label
                         htmlFor="deseja_agendar"
@@ -717,15 +702,16 @@ export default function NovaOrdemServicoPage() {
                     </div>
 
                     {desejaAgendar && (
-                      <div className="pl-6 space-y-4">
+                      <div className="pl-0 sm:pl-6 space-y-4">
                         <div>
-                          <Label htmlFor="data_agendamento">Data de Agendamento *</Label>
+                          <Label htmlFor="data_agendamento" className="text-sm">Data de Agendamento *</Label>
                           <Input
                             id="data_agendamento"
                             type="date"
                             value={formData.data_agendamento}
                             onChange={(e) => setFormData((prev) => ({ ...prev, data_agendamento: e.target.value }))}
                             min={formData.data_atual}
+                            className="min-h-[44px]"
                           />
                           <div className="text-xs text-gray-500 mt-1">
                             Data em que a visita está agendada para ser realizada
@@ -733,14 +719,14 @@ export default function NovaOrdemServicoPage() {
                         </div>
 
                         <div>
-                          <Label htmlFor="periodo_agendamento">Período *</Label>
+                          <Label htmlFor="periodo_agendamento" className="text-sm">Período *</Label>
                           <Select
                             value={formData.periodo_agendamento}
                             onValueChange={(value: "manha" | "tarde" | "integral") =>
                               setFormData((prev) => ({ ...prev, periodo_agendamento: value }))
                             }
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="min-h-[44px]">
                               <SelectValue placeholder="Selecione o período" />
                             </SelectTrigger>
                             <SelectContent>
@@ -762,17 +748,17 @@ export default function NovaOrdemServicoPage() {
 
             {/* Equipamentos */}
             <Card className="border-0 shadow-lg bg-white">
-              <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-t-lg p-4 lg:p-6">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Package className="h-5 w-5" />
+              <CardHeader className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-t-lg p-4">
+                <CardTitle className="text-white flex items-center gap-2 text-base sm:text-lg">
+                  <Package className="h-5 w-5 shrink-0" />
                   Equipamentos
                 </CardTitle>
-                <CardDescription className="text-indigo-100">Equipamentos do contrato e adicionais</CardDescription>
+                <CardDescription className="text-indigo-100 text-sm">Equipamentos do contrato e adicionais</CardDescription>
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="space-y-4">
                   <div>
-                    <Label>Adicionar Equipamento Adicional</Label>
+                    <Label className="text-sm">Adicionar Equipamento Adicional</Label>
                     <EquipamentoCombobox
                       onSelect={handleEquipamentoSelect}
                       placeholder="Selecione um equipamento adicional..."
@@ -787,7 +773,7 @@ export default function NovaOrdemServicoPage() {
                     <div className="space-y-3">
                       <Separator />
                       <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-gray-900">Equipamentos Selecionados</h4>
+                        <h4 className="font-medium text-gray-900 text-sm">Equipamentos Selecionados</h4>
                         <Badge variant="outline" className="text-xs">
                           {equipamentosSelecionados.filter((eq) => eq.do_contrato).length} do contrato +{" "}
                           {equipamentosSelecionados.filter((eq) => !eq.do_contrato).length} adicionais
@@ -799,7 +785,7 @@ export default function NovaOrdemServicoPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <Package className="h-4 w-4 text-gray-500" />
-                              <span className="font-medium text-gray-900">{equipamento.nome}</span>
+                              <span className="font-medium text-gray-900 text-sm">{equipamento.nome}</span>
                               {equipamento.do_contrato ? (
                                 <Badge
                                   variant="outline"
@@ -834,7 +820,7 @@ export default function NovaOrdemServicoPage() {
                   {equipamentosSelecionados.length === 0 && (
                     <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                       <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                      <div className="text-gray-600">Nenhum equipamento selecionado</div>
+                      <div className="text-gray-600 text-sm">Nenhum equipamento selecionado</div>
                       <div className="text-sm text-gray-500">
                         {clienteTemContrato && formData.tipo_servico === "preventiva"
                           ? "Os equipamentos do contrato foram carregados automaticamente"
@@ -849,25 +835,26 @@ export default function NovaOrdemServicoPage() {
             {/* Descrições */}
             {formData.tipo_servico !== "preventiva" && (
               <Card className="border-0 shadow-lg bg-white">
-                <CardHeader className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-t-lg p-4 lg:p-6">
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
+                <CardHeader className="bg-gradient-to-r from-teal-500 to-cyan-600 text-white rounded-t-lg p-4">
+                  <CardTitle className="text-white flex items-center gap-2 text-base sm:text-lg">
+                    <FileText className="h-5 w-5 shrink-0" />
                     Descrição do Problema
                   </CardTitle>
-                  <CardDescription className="text-teal-100">
+                  <CardDescription className="text-teal-100 text-sm">
                     Descreva o defeito ou serviço a ser realizado
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="space-y-4">
                     <div>
-                      <Label htmlFor="descricao_defeito">Descrição do Problema/Defeito</Label>
+                      <Label htmlFor="descricao_defeito" className="text-sm">Descrição do Problema/Defeito</Label>
                       <Textarea
                         id="descricao_defeito"
                         value={formData.descricao_defeito}
                         onChange={(e) => setFormData((prev) => ({ ...prev, descricao_defeito: e.target.value }))}
                         placeholder="Descreva o defeito apresentado ou serviço a ser realizado"
                         rows={6}
+                        className="mt-2"
                       />
                     </div>
                   </div>
@@ -876,23 +863,23 @@ export default function NovaOrdemServicoPage() {
             )}
           </div>
 
-          {/* Resumo */}
-          <div className="space-y-6">
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-50 to-red-50 sticky top-6">
-              <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-t-lg p-4 lg:p-6">
-                <CardTitle className="text-white flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
+          {/* Resumo - Lateral em desktop, abaixo em mobile */}
+          <div className="space-y-4 sm:space-y-6 lg:sticky lg:top-6 lg:self-start">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-50 to-red-50">
+              <CardHeader className="bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-t-lg p-4">
+                <CardTitle className="text-white flex items-center gap-2 text-base sm:text-lg">
+                  <FileText className="h-5 w-5 shrink-0" />
                   Resumo da Ordem
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="space-y-4">
                   <div
                     className={`p-3 border rounded-lg ${desejaAgendar ? "bg-cyan-50 border-cyan-200" : "bg-yellow-50 border-yellow-200"}`}
                   >
                     <div className={`flex items-center gap-2 ${desejaAgendar ? "text-cyan-800" : "text-yellow-800"}`}>
-                      {desejaAgendar ? <Calendar className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
-                      <span className="text-sm font-medium">
+                      {desejaAgendar ? <Calendar className="h-4 w-4 shrink-0" /> : <Clock className="h-4 w-4 shrink-0" />}
+                      <span className="text-xs sm:text-sm font-medium">
                         A ordem será criada como {desejaAgendar ? "AGENDADA" : "ABERTA"}
                       </span>
                     </div>
@@ -1016,7 +1003,7 @@ export default function NovaOrdemServicoPage() {
                         (desejaAgendar && !formData.data_agendamento) ||
                         (desejaAgendar && !formData.periodo_agendamento)
                       }
-                      className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
+                      className="w-full bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 min-h-[48px] text-sm sm:text-base"
                     >
                       <Save className="h-4 w-4 mr-2" />
                       {loading ? "Criando..." : desejaAgendar ? "Criar Ordem Agendada" : "Criar Ordem Aberta"}

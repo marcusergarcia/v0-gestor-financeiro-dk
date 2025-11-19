@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, Plus } from "lucide-react"
+import { Check, ChevronsUpDown, Plus } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -132,30 +132,35 @@ export function ClienteCombobox({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className="w-full justify-between bg-transparent"
+            className="w-full justify-between bg-transparent min-h-[44px] px-3 sm:px-4"
             disabled={disabled}
           >
             {value ? (
-              <div className="flex items-center gap-2 truncate">
+              <div className="flex items-center gap-1.5 sm:gap-2 truncate max-w-full overflow-hidden">
                 {value.codigo && (
-                  <Badge variant="outline" className="text-xs font-mono">
+                  <Badge variant="outline" className="text-xs font-mono shrink-0">
                     {value.codigo}
                   </Badge>
                 )}
-                <span className="truncate">{value.nome}</span>
+                <span className="truncate text-sm sm:text-base">{value.nome}</span>
                 {value.tem_contrato && (
-                  <Badge variant="outline" className="text-xs text-green-600 border-green-200">
+                  <Badge variant="outline" className="text-xs text-green-600 border-green-200 shrink-0 hidden sm:inline-flex">
                     Contrato
                   </Badge>
                 )}
               </div>
             ) : (
-              placeholder
+              <span className="text-sm sm:text-base">{placeholder}</span>
             )}
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0" style={{ width: "var(--radix-popover-trigger-width)" }}>
+        <PopoverContent 
+          className="w-[calc(100vw-2rem)] sm:w-[400px] md:w-[500px] p-0" 
+          align="start"
+          side="bottom"
+          sideOffset={4}
+        >
           <Command shouldFilter={false}>
             <CommandInput
               placeholder="Buscar cliente..."
@@ -163,7 +168,7 @@ export function ClienteCombobox({
               onValueChange={setSearchTerm}
               className="h-9"
             />
-            <CommandList className="max-h-[300px] overflow-y-auto">
+            <CommandList className="max-h-[50vh] sm:max-h-[300px] overflow-y-auto">
               <CommandEmpty>
                 {loading ? (
                   <div className="flex items-center justify-center py-4">
@@ -171,7 +176,7 @@ export function ClienteCombobox({
                     <span className="ml-2">Carregando...</span>
                   </div>
                 ) : (
-                  <div className="py-4 text-center">
+                  <div className="py-4 text-center px-2">
                     <p className="text-sm text-gray-500 mb-2">Nenhum cliente encontrado</p>
                     {showNewClientButton && (
                       <Button
@@ -195,28 +200,30 @@ export function ClienteCombobox({
                     key={cliente.id}
                     value={cliente.id}
                     onSelect={() => handleSelectCliente(cliente)}
-                    className="flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                    className="flex items-center justify-between cursor-pointer hover:bg-gray-50 px-2 sm:px-3 py-2"
                   >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
                       <Check
                         className={cn("h-4 w-4 shrink-0", value?.id === cliente.id ? "opacity-100" : "opacity-0")}
                       />
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
                         {cliente.codigo && (
                           <Badge variant="outline" className="text-xs font-mono shrink-0">
                             {cliente.codigo}
                           </Badge>
                         )}
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium truncate">{cliente.nome}</div>
+                          <div className="font-medium truncate text-sm">{cliente.nome}</div>
                           <div className="text-xs text-gray-500 truncate">
-                            {cliente.cnpj && `CNPJ: ${cliente.cnpj}`}
-                            {cliente.cpf && `CPF: ${cliente.cpf}`}
-                            {cliente.email && ` • ${cliente.email}`}
+                            {cliente.cnpj && `${cliente.cnpj}`}
+                            {cliente.cpf && `${cliente.cpf}`}
+                            {cliente.email && (
+                              <span className="hidden sm:inline"> • {cliente.email}</span>
+                            )}
                           </div>
                         </div>
                         {cliente.tem_contrato && (
-                          <Badge variant="outline" className="text-xs text-green-600 border-green-200 shrink-0">
+                          <Badge variant="outline" className="text-xs text-green-600 border-green-200 shrink-0 hidden sm:inline-flex">
                             Contrato
                           </Badge>
                         )}

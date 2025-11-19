@@ -66,6 +66,19 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  input,
+  select,
+  textarea,
+  button {
+    @apply min-h-[44px] sm:min-h-[40px];
+  }
+  
+  /* Melhorar legibilidade de texto em mobile */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 }
 
 /* Gradiente personalizado para o background */
@@ -183,11 +196,32 @@
   background-clip: text;
 }
 
+@layer components {
+  [data-radix-popper-content-wrapper] {
+    max-width: calc(100vw - 1rem) !important;
+  }
+}
+
 /* Responsividade melhorada */
 @media (max-width: 768px) {
   .container-mobile {
     padding-left: 1rem;
     padding-right: 1rem;
+  }
+  
+  /* Garantir que badges não quebrem layout em mobile */
+  .badge {
+    @apply text-xs px-1.5 py-0.5;
+  }
+  
+  /* Melhorar espaçamento de botões em mobile */
+  .button-group {
+    @apply flex flex-col gap-2;
+  }
+  
+  /* Garantir que combobox não transborde */
+  [role="combobox"] {
+    @apply max-w-full overflow-hidden;
   }
 }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Check, ChevronsUpDown, Search, AlertCircle } from "lucide-react"
+import { Check, ChevronsUpDown, Search, AlertCircle } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -109,19 +109,19 @@ export function EquipamentoCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between bg-white hover:bg-gray-50"
+          className="w-full justify-between bg-white hover:bg-gray-50 min-h-[44px] px-3 sm:px-4"
           disabled={disabled}
         >
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 text-gray-400" />
-            <span className={selectedEquipamento ? "text-gray-900" : "text-gray-500"}>
+          <div className="flex items-center gap-2 truncate max-w-full">
+            <Search className="h-4 w-4 text-gray-400 shrink-0" />
+            <span className={cn("truncate text-sm sm:text-base", selectedEquipamento ? "text-gray-900" : "text-gray-500")}>
               {selectedEquipamento ? selectedEquipamento.nome : placeholder}
             </span>
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[300px] p-0" align="start">
+      <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[350px] md:w-[400px] p-0" align="start">
         <Command>
           <CommandInput
             placeholder="Buscar equipamento..."
@@ -150,7 +150,7 @@ export function EquipamentoCombobox({
             ) : (
               <>
                 <CommandEmpty>
-                  <div className="text-center py-4">
+                  <div className="text-center py-4 px-2">
                     <p className="text-sm text-gray-500">Nenhum equipamento encontrado.</p>
                     {equipamentos.length === 0 && (
                       <p className="text-xs text-gray-400 mt-1">
@@ -167,10 +167,10 @@ export function EquipamentoCombobox({
                       onSelect={() => handleSelect(equipamento)}
                       className="flex items-center justify-between p-2 cursor-pointer hover:bg-gray-50"
                     >
-                      <span className="font-medium">{equipamento.nome}</span>
+                      <span className="font-medium text-sm truncate">{equipamento.nome}</span>
                       <Check
                         className={cn(
-                          "ml-auto h-4 w-4",
+                          "ml-auto h-4 w-4 shrink-0",
                           selectedEquipamento?.id === equipamento.id ? "opacity-100" : "opacity-0",
                         )}
                       />

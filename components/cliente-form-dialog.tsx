@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, Save, User, Lock, Search, MapPinned } from "lucide-react"
+import { Plus, Save, User, Lock, Search, MapPinned } from 'lucide-react'
 import { useCep } from "@/hooks/use-cep"
 import { useDistancia } from "@/hooks/use-distancia"
 
@@ -232,7 +232,7 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
           )}
         </DialogTrigger>
       )}
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-4xl max-h-[90vh] overflow-y-auto sm:w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
@@ -245,7 +245,7 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
           {/* Dados Básicos */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Dados Básicos</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="nome">Nome *</Label>
                 <Input
@@ -272,7 +272,7 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {documentoUtilizado !== "cpf" && (
                 <div>
                   <Label htmlFor="cnpj">CNPJ</Label>
@@ -309,7 +309,7 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
           {/* Contato */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Contato</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -335,7 +335,7 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
           {/* Endereço */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Endereço</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="cep">CEP</Label>
                 <div className="relative">
@@ -372,7 +372,7 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
                 rows={2}
               />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="cidade">Cidade</Label>
                 <Input
@@ -429,7 +429,7 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
           {/* Administradora */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Administradora (Opcional)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="nome_adm">Nome da Administradora</Label>
                 <Input
@@ -449,7 +449,7 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="telefone_adm">Telefone</Label>
                 <Input
@@ -472,11 +472,11 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
             </div>
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={loading}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={loading} className="w-full sm:w-auto">
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !formData.nome.trim() || (!formData.cnpj && !formData.cpf)}>
+            <Button type="submit" disabled={loading || !formData.nome.trim() || (!formData.cnpj && !formData.cpf)} className="w-full sm:w-auto">
               <Save className="h-4 w-4 mr-2" />
               {loading ? "Salvando..." : "Salvar Cliente"}
             </Button>
