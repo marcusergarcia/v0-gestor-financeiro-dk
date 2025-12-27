@@ -14,7 +14,6 @@ const pool = mysql.createPool({
   maxIdle: 10,
   idleTimeout: 60000,
   queueLimit: 0,
-  acquireTimeout: 60000,
   charset: "utf8mb4",
   // Configurações de performance
   supportBigNumbers: true,

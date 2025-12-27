@@ -12,8 +12,6 @@ const pool = mysql.createPool({
   maxIdle: 5,
   idleTimeout: 60000,
   queueLimit: 0,
-  acquireTimeout: 30000, // 30 segundos
-  // SSL para produção se necessário
   ssl:
     process.env.DB_SSL === "true"
       ? {

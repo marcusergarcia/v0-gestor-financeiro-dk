@@ -348,11 +348,25 @@ export async function POST(request: NextRequest) {
           } else {
             console.error("[v0] Detalhes do erro:", JSON.stringify(error, null, 2))
           }
+
+          let mensagemErro = "Erro ao criar boleto no PagSeguro. Verifique os dados do cliente e tente novamente."
+
+          if (error instanceof Error && error.message.includes("ACCESS_DENIED")) {
+            mensagemErro =
+              "⚠️ Acesso negado pelo PagSeguro. O IP/domínio do servidor não está na whitelist da sua conta PagSeguro. Entre em contato com o suporte do PagSeguro para liberar o acesso da API."
+          } else if (error instanceof Error && error.message.includes("403")) {
+            mensagemErro =
+              "⚠️ Acesso negado pelo PagSeguro (403). Verifique se sua conta tem permissão para criar boletos ou se o domínio está na whitelist."
+          } else if (error instanceof Error && error.message.includes("401")) {
+            mensagemErro = "⚠️ Token de autenticação inválido. Verifique o PAGSEGURO_TOKEN nas variáveis de ambiente."
+          }
+
           return NextResponse.json(
             {
               success: false,
-              message: "Erro ao criar boleto no PagSeguro. Verifique os dados do cliente e tente novamente.",
+              message: mensagemErro,
               error: error instanceof Error ? error.message : "Erro desconhecido",
+              details: "Consulte os logs do servidor para mais informações.",
             },
             { status: 400 },
           )
