@@ -51,6 +51,13 @@ export async function POST(request: NextRequest) {
   try {
     const { clienteId, numeroNota, valorTotal, observacoes, parcelas, formaPagamento } = await request.json()
 
+    console.log("[v0] Dados recebidos para criar boleto:", {
+      clienteId,
+      numeroNota,
+      valorTotal,
+      parcelas: parcelas.length,
+    })
+
     if (!clienteId || !numeroNota || !valorTotal || !parcelas || parcelas.length === 0) {
       return NextResponse.json(
         {
@@ -107,9 +114,12 @@ export async function POST(request: NextRequest) {
     }
 
     const cliente = clientes[0]
+    console.log("[v0] Cliente encontrado:", cliente.nome)
 
     const pagseguroToken = process.env.PAGSEGURO_TOKEN
     const pagseguroHabilitado = pagseguroToken && pagseguroToken !== "test_token_temporario"
+
+    console.log("[v0] PagSeguro habilitado:", pagseguroHabilitado, "Token presente:", !!pagseguroToken)
 
     // Inserir cada parcela como um boleto separado
     for (let i = 0; i < parcelas.length; i++) {
@@ -125,6 +135,8 @@ export async function POST(request: NextRequest) {
 
       if (pagseguroHabilitado) {
         try {
+          console.log("[v0] Tentando criar boleto no PagSeguro para parcela", parcela.parcela)
+
           const { getPagSeguroAPI } = await import("@/lib/pagseguro")
           const pagseguro = getPagSeguroAPI()
 
@@ -152,7 +164,7 @@ export async function POST(request: NextRequest) {
             description: `Boleto ${numeroBoleto}${observacoes ? ` - ${observacoes}` : ""}`,
             due_date: dataVencimentoAjustada,
             instruction_lines: {
-              line_1: observacoes?.substring(0, 100),
+              line_1: observacoes?.substring(0, 100) || "Pagamento de serviço",
             },
             holder: {
               name: cliente.nome,
@@ -177,12 +189,18 @@ export async function POST(request: NextRequest) {
           })
 
           pagseguroData = boletoPagSeguro
-          console.log("[Boleto PagSeguro] Criado:", boletoPagSeguro)
+          console.log("[v0] Boleto PagSeguro criado com sucesso:", {
+            id: boletoPagSeguro.id,
+            barcode: boletoPagSeguro.payment_method?.boleto?.barcode ? "Presente" : "Ausente",
+            formatted_barcode: boletoPagSeguro.payment_method?.boleto?.formatted_barcode ? "Presente" : "Ausente",
+            links: boletoPagSeguro.links?.length || 0,
+          })
         } catch (error) {
-          console.error("[Boleto PagSeguro] Erro ao criar:", error)
+          console.error("[v0] Erro ao criar boleto no PagSeguro:", error)
+          console.error("[v0] Detalhes do erro:", error instanceof Error ? error.message : "Erro desconhecido")
         }
       } else {
-        console.log("[Boleto] PagSeguro não configurado, criando boleto apenas no sistema interno")
+        console.log("[v0] PagSeguro não configurado, criando boleto apenas no sistema interno")
       }
 
       await query(
@@ -217,20 +235,24 @@ export async function POST(request: NextRequest) {
           observacoes || null,
           formaPagamento || "boleto",
           pagseguroData?.id || null,
-          pagseguroData?.payment_method?.boleto?.barcode || null,
           pagseguroData?.payment_method?.boleto?.formatted_barcode || null,
+          pagseguroData?.payment_method?.boleto?.barcode || null,
           pagseguroData?.links?.find((l: any) => l.rel === "PRINT")?.href || null,
           pagseguroData?.links?.find((l: any) => l.rel === "PAY")?.href || null,
         ],
       )
+
+      console.log("[v0] Boleto salvo no banco:", numeroBoleto)
     }
+
+    console.log("[v0] Todos os boletos criados com sucesso")
 
     return NextResponse.json({
       success: true,
       message: `${parcelas.length} boleto(s) criado(s) com sucesso!`,
     })
   } catch (error) {
-    console.error("Erro ao criar boletos:", error)
+    console.error("[v0] Erro ao criar boletos:", error)
     return NextResponse.json(
       {
         success: false,

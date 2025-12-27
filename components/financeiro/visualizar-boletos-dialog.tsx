@@ -7,7 +7,19 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency, formatDate } from "@/lib/utils"
-import { Eye, Calendar, FileText, CheckCircle, Clock, AlertCircle, XCircle, X } from "lucide-react"
+import {
+  Eye,
+  Calendar,
+  FileText,
+  CheckCircle,
+  Clock,
+  AlertCircle,
+  XCircle,
+  X,
+  Printer,
+  Download,
+  CreditCard,
+} from "lucide-react"
 
 interface Boleto {
   id: number
@@ -22,6 +34,11 @@ interface Boleto {
   total_parcelas: number
   observacoes?: string
   created_at: string
+  pagseguro_id?: string
+  linha_digitavel?: string
+  codigo_barras?: string
+  link_pdf?: string
+  link_impressao?: string
 }
 
 interface VisualizarBoletosDialogProps {
@@ -34,9 +51,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
   const [boletos, setBoletos] = useState<Boleto[]>([])
   const [loading, setLoading] = useState(false)
 
-  // Função para extrair o número base (sem o sufixo da parcela)
   const extrairNumeroBase = (numero: string): string => {
-    // Remove sufixos como -01, -02, etc.
     return numero.replace(/-\d+$/, "")
   }
 
@@ -50,14 +65,12 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
     try {
       setLoading(true)
 
-      // Extrair o número base para buscar todas as parcelas relacionadas
       const numeroBaseLimpo = extrairNumeroBase(numeroBase)
 
       const response = await fetch(`/api/boletos?numeroBase=${encodeURIComponent(numeroBaseLimpo)}`)
       const result = await response.json()
 
       if (result.success) {
-        // Processar e ordenar boletos por parcela
         const boletosProcessados = result.data
           .map((boleto: any) => ({
             ...boleto,
@@ -157,6 +170,15 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
   const clienteNome = boletos.length > 0 ? boletos[0].cliente_nome : ""
   const numeroBaseLimpo = extrairNumeroBase(numeroBase)
 
+  const copiarLinhaDigitavel = (linhaDigitavel: string) => {
+    navigator.clipboard.writeText(linhaDigitavel)
+    alert("Linha digitável copiada para a área de transferência!")
+  }
+
+  const abrirPDF = (url: string) => {
+    window.open(url, "_blank")
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto border-0 shadow-2xl">
@@ -182,7 +204,6 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Resumo */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-blue-100">
                 <CardHeader className="pb-2">
@@ -237,7 +258,6 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
               </Card>
             </div>
 
-            {/* Tabela de Boletos */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -262,7 +282,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                           <TableHead className="font-semibold">Vencimento</TableHead>
                           <TableHead className="font-semibold">Status</TableHead>
                           <TableHead className="font-semibold">Data Pagamento</TableHead>
-                          <TableHead className="font-semibold">Observações</TableHead>
+                          <TableHead className="font-semibold">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -272,6 +292,12 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                               <Badge variant="outline" className="font-mono">
                                 {boleto.numero}
                               </Badge>
+                              {boleto.pagseguro_id && (
+                                <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">
+                                  <CreditCard className="h-3 w-3 mr-1" />
+                                  PagSeguro
+                                </Badge>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Badge variant="secondary" className="font-mono">
@@ -299,7 +325,42 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                               )}
                             </TableCell>
                             <TableCell>
-                              <div className="max-w-xs truncate">{boleto.observacoes || "-"}</div>
+                              <div className="flex flex-col gap-2">
+                                {boleto.linha_digitavel && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => copiarLinhaDigitavel(boleto.linha_digitavel!)}
+                                    className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 w-full justify-start"
+                                  >
+                                    <CreditCard className="h-4 w-4 mr-2" />
+                                    Copiar Linha Digitável
+                                  </Button>
+                                )}
+                                {boleto.link_pdf && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => abrirPDF(boleto.link_pdf!)}
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 w-full justify-start"
+                                  >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Baixar PDF
+                                  </Button>
+                                )}
+                                {boleto.link_impressao && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => abrirPDF(boleto.link_impressao!)}
+                                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 w-full justify-start"
+                                  >
+                                    <Printer className="h-4 w-4 mr-2" />
+                                    Imprimir Boleto
+                                  </Button>
+                                )}
+                                {!boleto.pagseguro_id && <span className="text-xs text-gray-500">Boleto interno</span>}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -310,7 +371,6 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
               </CardContent>
             </Card>
 
-            {/* Botão Fechar */}
             <div className="flex justify-end pt-4">
               <Button
                 onClick={() => onOpenChange(false)}
