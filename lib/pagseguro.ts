@@ -11,52 +11,71 @@ interface BoletoData {
     tax_id: string // CPF/CNPJ
     phone: string
   }
-  billing_address: {
+  items: Array<{
+    reference_id: string
+    name: string
+    quantity: number
+    unit_amount: number // em centavos
+  }>
+  shipping_address: {
     street: string
     number: string
     complement?: string
     locality: string
     city: string
-    region_code: string // UF
+    region_code: string
     country: string
     postal_code: string
   }
-  amount: {
-    value: number // Valor em centavos
-    currency: "BRL"
-  }
-  reference_id: string
-  description: string
-  due_date: string // YYYY-MM-DD
-  instruction_lines?: {
-    line_1?: string
-    line_2?: string
-  }
-  holder: {
-    name: string
-    tax_id: string
-    email: string
-    address: {
-      street: string
-      number: string
-      complement?: string
-      locality: string
-      city: string
-      region_code: string
-      country: string
-      postal_code: string
+  charges: {
+    reference_id: string
+    description: string
+    amount: {
+      value: number // em centavos
+      currency: "BRL"
     }
-  }
-  multa?: {
-    percentual: number // 0.01 a 99.99
-  }
-  juros?: {
-    percentual: number // 0.01 a 59.99 (ao mês)
-  }
-  desconto?: {
-    percentual: number // 0.01 a 99.99
-    data_limite: string // YYYY-MM-DD
-  }
+    payment_method: {
+      type: "BOLETO"
+      boleto: {
+        template: "COBRANCA" | "PROPOSTA"
+        due_date: string // YYYY-MM-DD
+        days_until_expiration: number
+        holder: {
+          name: string
+          tax_id: string
+          email: string
+          address: {
+            street: string
+            number: string
+            postal_code: string
+            locality: string
+            city: string
+            region: string
+            region_code: string
+            country: string
+          }
+        }
+        instruction_lines: {
+          line_1: string
+          line_2?: string
+        }
+      }
+    }
+    payment_instructions?: {
+      fine?: {
+        date: string // YYYY-MM-DD
+        value: number // Percentual * 100 (ex: 2% = 200)
+      }
+      interest?: {
+        date: string // YYYY-MM-DD
+        value: number // Percentual * 100 (ex: 0.033% = 3.3)
+      }
+      discounts?: Array<{
+        due_date: string // YYYY-MM-DD
+        value: number // Percentual * 100
+      }>
+    }
+  }[]
 }
 
 interface PayoutData {
@@ -145,20 +164,31 @@ export class PagSeguroAPI {
 
   // BOLETOS
   async criarBoleto(data: BoletoData) {
-    return this.request("/charges", "POST", {
-      reference_id: data.reference_id,
-      description: data.description,
-      amount: data.amount,
-      payment_method: {
-        type: "BOLETO",
-        boleto: {
-          due_date: data.due_date,
-          instruction_lines: data.instruction_lines,
-          holder: data.holder,
-        },
+    const payload = {
+      reference_id: data.charges[0].reference_id,
+      customer: {
+        name: data.customer.name,
+        email: data.customer.email,
+        tax_id: data.customer.tax_id,
+        phones: [
+          {
+            country: "55",
+            area: data.customer.phone.substring(0, 2),
+            number: data.customer.phone.substring(2),
+            type: "MOBILE",
+          },
+        ],
       },
-      notification_urls: [process.env.NEXT_PUBLIC_APP_URL + "/api/pagseguro/webhook"],
-    })
+      items: data.items,
+      shipping: {
+        address: data.shipping_address,
+      },
+      charges: data.charges,
+    }
+
+    console.log("[PagSeguro] Criando pedido com boleto:", JSON.stringify(payload, null, 2))
+
+    return this.request("/orders", "POST", payload)
   }
 
   async consultarBoleto(chargeId: string) {

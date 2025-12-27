@@ -1,6 +1,51 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 
+function normalizarEstado(estado: string | null | undefined): string {
+  if (!estado) return "SP" // Padrão SP se não fornecido
+
+  const estadoLimpo = estado.trim().toUpperCase()
+
+  // Se já tem 2 caracteres, retorna
+  if (estadoLimpo.length === 2) {
+    return estadoLimpo
+  }
+
+  // Mapeamento de nomes completos para siglas
+  const mapeamentoEstados: Record<string, string> = {
+    ACRE: "AC",
+    ALAGOAS: "AL",
+    AMAPA: "AP",
+    AMAZONAS: "AM",
+    BAHIA: "BA",
+    CEARA: "CE",
+    "DISTRITO FEDERAL": "DF",
+    "ESPIRITO SANTO": "ES",
+    GOIAS: "GO",
+    MARANHAO: "MA",
+    "MATO GROSSO": "MT",
+    "MATO GROSSO DO SUL": "MS",
+    "MINAS GERAIS": "MG",
+    PARA: "PA",
+    PARAIBA: "PB",
+    PARANA: "PR",
+    PERNAMBUCO: "PE",
+    PIAUI: "PI",
+    "RIO DE JANEIRO": "RJ",
+    "RIO GRANDE DO NORTE": "RN",
+    "RIO GRANDE DO SUL": "RS",
+    RONDONIA: "RO",
+    RORAIMA: "RR",
+    "SANTA CATARINA": "SC",
+    "SAO PAULO": "SP",
+    SERGIPE: "SE",
+    TOCANTINS: "TO",
+  }
+
+  const uf = mapeamentoEstados[estadoLimpo]
+  return uf || "SP" // Retorna SP como padrão se não encontrar
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -140,68 +185,124 @@ export async function POST(request: NextRequest) {
           const { getPagSeguroAPI } = await import("@/lib/pagseguro")
           const pagseguro = getPagSeguroAPI()
 
+          const ufNormalizada = normalizarEstado(cliente.estado)
+          console.log("[v0] Estado normalizado:", cliente.estado, "->", ufNormalizada)
+
+          const telefoneLimpo = (cliente.telefone || "11999999999").replace(/\D/g, "")
+          const telefoneCompleto = telefoneLimpo.length >= 10 ? telefoneLimpo : "11999999999"
+          const ddd = telefoneCompleto.substring(0, 2)
+          const numeroTelefone = telefoneCompleto.substring(2)
+
+          // Calcular data para multa e juros (D+1 após vencimento)
+          const dataVenc = new Date(dataVencimentoAjustada)
+          const dataMultaJuros = new Date(dataVenc)
+          dataMultaJuros.setDate(dataMultaJuros.getDate() + 1)
+          const dataMultaJurosStr = dataMultaJuros.toISOString().split("T")[0]
+
+          const taxId = (cliente.cnpj || cliente.cpf || "").replace(/\D/g, "")
+          const taxIdValido = taxId.length >= 11 ? taxId : "00000000000"
+          const emailValido =
+            cliente.email && cliente.email.includes("@") ? cliente.email : `cliente${clienteId}@sistema.com`
+          const cepValido = (cliente.cep || "").replace(/\D/g, "")
+          const cepCompleto = cepValido.length === 8 ? cepValido : "01310100"
+
           const boletoPagSeguro = await pagseguro.criarBoleto({
             customer: {
               name: cliente.nome,
-              email: cliente.email || "sem-email@placeholder.com",
-              tax_id: cliente.cnpj || cliente.cpf || "00000000000",
-              phone: cliente.telefone || "11999999999",
+              email: emailValido,
+              tax_id: taxIdValido,
+              phone: telefoneCompleto,
             },
-            billing_address: {
+            items: [
+              {
+                reference_id: numeroBoleto,
+                name: `Boleto ${numeroBoleto}`,
+                quantity: 1,
+                unit_amount: Math.round(parcela.valor * 100),
+              },
+            ],
+            shipping_address: {
               street: cliente.endereco || "Rua Principal",
               number: "1",
               locality: cliente.bairro || "Centro",
               city: cliente.cidade || "São Paulo",
-              region_code: cliente.estado || "SP",
-              country: "Brasil",
-              postal_code: cliente.cep || "00000000",
+              region_code: ufNormalizada,
+              country: "BRA",
+              postal_code: cepCompleto,
             },
-            amount: {
-              value: Math.round(parcela.valor * 100),
-              currency: "BRL",
-            },
-            reference_id: numeroBoleto,
-            description: `Boleto ${numeroBoleto}${observacoes ? ` - ${observacoes}` : ""}`,
-            due_date: dataVencimentoAjustada,
-            instruction_lines: {
-              line_1: observacoes?.substring(0, 100) || "Pagamento de serviço",
-            },
-            holder: {
-              name: cliente.nome,
-              tax_id: cliente.cnpj || cliente.cpf || "00000000000",
-              email: cliente.email || "sem-email@placeholder.com",
-              address: {
-                street: cliente.endereco || "Rua Principal",
-                number: "1",
-                locality: cliente.bairro || "Centro",
-                city: cliente.cidade || "São Paulo",
-                region_code: cliente.estado || "SP",
-                country: "Brasil",
-                postal_code: cliente.cep || "00000000",
+            charges: [
+              {
+                reference_id: numeroBoleto,
+                description: `Boleto ${numeroBoleto}${observacoes ? ` - ${observacoes}` : ""}`,
+                amount: {
+                  value: Math.round(parcela.valor * 100),
+                  currency: "BRL",
+                },
+                payment_method: {
+                  type: "BOLETO",
+                  boleto: {
+                    template: "COBRANCA",
+                    due_date: dataVencimentoAjustada,
+                    days_until_expiration: 45,
+                    holder: {
+                      name: cliente.nome,
+                      tax_id: taxIdValido,
+                      email: emailValido,
+                      address: {
+                        street: cliente.endereco || "Rua Principal",
+                        number: "1",
+                        postal_code: cepCompleto,
+                        locality: cliente.bairro || "Centro",
+                        city: cliente.cidade || "São Paulo",
+                        region_code: ufNormalizada,
+                        country: "Brasil",
+                      },
+                    },
+                    instruction_lines: {
+                      line_1: observacoes?.substring(0, 80) || "Pagamento de serviço",
+                      line_2: "Não receber após o vencimento",
+                    },
+                  },
+                },
+                payment_instructions: {
+                  fine: {
+                    date: dataMultaJurosStr,
+                    value: 200,
+                  },
+                  interest: {
+                    date: dataMultaJurosStr,
+                    value: 33,
+                  },
+                },
               },
-            },
-            multa: {
-              percentual: 2.0,
-            },
-            juros: {
-              percentual: 0.033,
-            },
+            ],
           })
 
           pagseguroData = boletoPagSeguro
           console.log("[v0] Boleto PagSeguro criado com sucesso:", {
             id: boletoPagSeguro.id,
-            barcode: boletoPagSeguro.payment_method?.boleto?.barcode ? "Presente" : "Ausente",
-            formatted_barcode: boletoPagSeguro.payment_method?.boleto?.formatted_barcode ? "Presente" : "Ausente",
-            links: boletoPagSeguro.links?.length || 0,
+            charge_id: boletoPagSeguro.charges?.[0]?.id,
+            status: boletoPagSeguro.charges?.[0]?.status,
+            barcode: boletoPagSeguro.charges?.[0]?.payment_method?.boleto?.formatted_barcode ? "Presente" : "Ausente",
+            links: boletoPagSeguro.charges?.[0]?.links?.length || 0,
           })
         } catch (error) {
           console.error("[v0] Erro ao criar boleto no PagSeguro:", error)
-          console.error("[v0] Detalhes do erro:", error instanceof Error ? error.message : "Erro desconhecido")
+          if (error instanceof Error) {
+            console.error("[v0] Mensagem de erro:", error.message)
+            console.error("[v0] Stack trace:", error.stack)
+          } else {
+            console.error("[v0] Detalhes do erro:", JSON.stringify(error, null, 2))
+          }
         }
       } else {
         console.log("[v0] PagSeguro não configurado, criando boleto apenas no sistema interno")
       }
+
+      const charge = pagseguroData?.charges?.[0]
+      const boletoInfo = charge?.payment_method?.boleto
+      const linkPDF = charge?.links?.find((l: any) => l.media === "application/pdf")?.href
+      const linkPNG = charge?.links?.find((l: any) => l.media === "image/png")?.href
 
       await query(
         `
@@ -234,11 +335,11 @@ export async function POST(request: NextRequest) {
           parcelas.length,
           observacoes || null,
           formaPagamento || "boleto",
-          pagseguroData?.id || null,
-          pagseguroData?.payment_method?.boleto?.formatted_barcode || null,
-          pagseguroData?.payment_method?.boleto?.barcode || null,
-          pagseguroData?.links?.find((l: any) => l.rel === "PRINT")?.href || null,
-          pagseguroData?.links?.find((l: any) => l.rel === "PAY")?.href || null,
+          charge?.id || null,
+          boletoInfo?.formatted_barcode || null,
+          boletoInfo?.barcode || null,
+          linkPDF || null,
+          linkPNG || null,
         ],
       )
 
