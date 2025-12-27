@@ -46,6 +46,39 @@ function normalizarEstado(estado: string | null | undefined): string {
   return uf || "SP" // Retorna SP como padrão se não encontrar
 }
 
+function obterNomeEstado(uf: string): string {
+  const mapeamentoUF: Record<string, string> = {
+    AC: "Acre",
+    AL: "Alagoas",
+    AP: "Amapá",
+    AM: "Amazonas",
+    BA: "Bahia",
+    CE: "Ceará",
+    DF: "Distrito Federal",
+    ES: "Espírito Santo",
+    GO: "Goiás",
+    MA: "Maranhão",
+    MT: "Mato Grosso",
+    MS: "Mato Grosso do Sul",
+    MG: "Minas Gerais",
+    PA: "Pará",
+    PB: "Paraíba",
+    PR: "Paraná",
+    PE: "Pernambuco",
+    PI: "Piauí",
+    RJ: "Rio de Janeiro",
+    RN: "Rio Grande do Norte",
+    RS: "Rio Grande do Sul",
+    RO: "Rondônia",
+    RR: "Roraima",
+    SC: "Santa Catarina",
+    SP: "São Paulo",
+    SE: "Sergipe",
+    TO: "Tocantins",
+  }
+  return mapeamentoUF[uf] || "São Paulo"
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -186,7 +219,8 @@ export async function POST(request: NextRequest) {
           const pagseguro = getPagSeguroAPI()
 
           const ufNormalizada = normalizarEstado(cliente.estado)
-          console.log("[v0] Estado normalizado:", cliente.estado, "->", ufNormalizada)
+          const nomeEstado = obterNomeEstado(ufNormalizada)
+          console.log("[v0] Estado normalizado:", cliente.estado, "->", ufNormalizada, "->", nomeEstado)
 
           const telefoneLimpo = (cliente.telefone || "11999999999").replace(/\D/g, "")
           const telefoneCompleto = telefoneLimpo.length >= 10 ? telefoneLimpo : "11999999999"
@@ -206,6 +240,25 @@ export async function POST(request: NextRequest) {
           const cepValido = (cliente.cep || "").replace(/\D/g, "")
           const cepCompleto = cepValido.length === 8 ? cepValido : "01310100"
 
+          const enderecoValido = (cliente.endereco || "Rua Principal").substring(0, 160)
+          const bairroValido = (cliente.bairro || "Centro").substring(0, 60)
+          const cidadeValida = (cliente.cidade || "São Paulo").substring(0, 90)
+          const numeroEndereco = cliente.numero || "S/N"
+
+          const valorMinimo = 0.2
+          const valorParcela = parcela.valor < valorMinimo ? valorMinimo : parcela.valor
+
+          console.log("[v0] Validação de campos PagSeguro:", {
+            taxId: taxIdValido.substring(0, 3) + "***",
+            email: emailValido,
+            cep: cepCompleto,
+            endereco: enderecoValido,
+            uf: ufNormalizada,
+            estado: nomeEstado,
+            valorParcela,
+            valorMinimo,
+          })
+
           const boletoPagSeguro = await pagseguro.criarBoleto({
             customer: {
               name: cliente.nome,
@@ -218,14 +271,14 @@ export async function POST(request: NextRequest) {
                 reference_id: numeroBoleto,
                 name: `Boleto ${numeroBoleto}`,
                 quantity: 1,
-                unit_amount: Math.round(parcela.valor * 100),
+                unit_amount: Math.round(valorParcela * 100),
               },
             ],
             shipping_address: {
-              street: cliente.endereco || "Rua Principal",
-              number: "1",
-              locality: cliente.bairro || "Centro",
-              city: cliente.cidade || "São Paulo",
+              street: enderecoValido,
+              number: numeroEndereco,
+              locality: bairroValido,
+              city: cidadeValida,
               region_code: ufNormalizada,
               country: "BRA",
               postal_code: cepCompleto,
@@ -235,7 +288,7 @@ export async function POST(request: NextRequest) {
                 reference_id: numeroBoleto,
                 description: `Boleto ${numeroBoleto}${observacoes ? ` - ${observacoes}` : ""}`,
                 amount: {
-                  value: Math.round(parcela.valor * 100),
+                  value: Math.round(valorParcela * 100),
                   currency: "BRL",
                 },
                 payment_method: {
@@ -249,11 +302,12 @@ export async function POST(request: NextRequest) {
                       tax_id: taxIdValido,
                       email: emailValido,
                       address: {
-                        street: cliente.endereco || "Rua Principal",
-                        number: "1",
+                        street: enderecoValido,
+                        number: numeroEndereco,
                         postal_code: cepCompleto,
-                        locality: cliente.bairro || "Centro",
-                        city: cliente.cidade || "São Paulo",
+                        locality: bairroValido,
+                        city: cidadeValida,
+                        region: nomeEstado,
                         region_code: ufNormalizada,
                         country: "Brasil",
                       },
@@ -294,6 +348,14 @@ export async function POST(request: NextRequest) {
           } else {
             console.error("[v0] Detalhes do erro:", JSON.stringify(error, null, 2))
           }
+          return NextResponse.json(
+            {
+              success: false,
+              message: "Erro ao criar boleto no PagSeguro. Verifique os dados do cliente e tente novamente.",
+              error: error instanceof Error ? error.message : "Erro desconhecido",
+            },
+            { status: 400 },
+          )
         }
       } else {
         console.log("[v0] PagSeguro não configurado, criando boleto apenas no sistema interno")

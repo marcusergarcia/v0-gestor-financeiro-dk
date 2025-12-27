@@ -23,10 +23,10 @@
 
 Execute o script SQL para criar as tabelas necessárias:
 
-```bash
+\`\`\`bash
 # No MySQL
 source scripts/update-boletos-pagseguro.sql
-```
+\`\`\`
 
 Ou copie e cole o conteúdo do arquivo `/scripts/update-boletos-pagseguro.sql` no seu cliente MySQL.
 
@@ -42,23 +42,23 @@ Ou copie e cole o conteúdo do arquivo `/scripts/update-boletos-pagseguro.sql` n
 
 Na seção **Vars** da barra lateral, adicione:
 
-```
+\`\`\`
 PAGSEGURO_TOKEN=seu_token_aqui
 PAGSEGURO_ENVIRONMENT=sandbox
-```
+\`\`\`
 
 Para produção, altere para:
-```
+\`\`\`
 PAGSEGURO_ENVIRONMENT=production
-```
+\`\`\`
 
 ### 4. Configurar Webhook no PagSeguro
 
 1. No painel do PagSeguro, vá em **Integrações** > **Notificações**
 2. Configure a URL de webhook:
-   ```
+   \`\`\`
    https://seu-dominio.vercel.app/api/pagseguro/webhook
-   ```
+   \`\`\`
 3. Marque todas as notificações relacionadas a:
    - Pagamentos (charges)
    - Boletos

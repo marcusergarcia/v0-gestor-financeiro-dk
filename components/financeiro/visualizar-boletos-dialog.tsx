@@ -50,6 +50,7 @@ interface VisualizarBoletosDialogProps {
 export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: VisualizarBoletosDialogProps) {
   const [boletos, setBoletos] = useState<Boleto[]>([])
   const [loading, setLoading] = useState(false)
+  const [printingAll, setPrintingAll] = useState(false)
 
   const extrairNumeroBase = (numero: string): string => {
     return numero.replace(/-\d+$/, "")
@@ -179,6 +180,63 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
     window.open(url, "_blank")
   }
 
+  const imprimirTodosBoletos = () => {
+    setPrintingAll(true)
+
+    const boletosComPDF = boletos.filter((b) => b.link_pdf || b.link_impressao)
+
+    if (boletosComPDF.length === 0) {
+      alert("Nenhum boleto disponível para impressão.")
+      setPrintingAll(false)
+      return
+    }
+
+    boletosComPDF.forEach((boleto, index) => {
+      setTimeout(() => {
+        const url = boleto.link_pdf || boleto.link_impressao
+        if (url) {
+          window.open(url, "_blank")
+        }
+      }, index * 500) // Delay de 500ms entre cada abertura
+    })
+
+    setTimeout(
+      () => {
+        setPrintingAll(false)
+      },
+      boletosComPDF.length * 500 + 1000,
+    )
+  }
+
+  const baixarTodosPDFs = async () => {
+    const boletosComPDF = boletos.filter((b) => b.link_pdf)
+
+    if (boletosComPDF.length === 0) {
+      alert("Nenhum PDF disponível para download.")
+      return
+    }
+
+    for (const boleto of boletosComPDF) {
+      try {
+        const response = await fetch(boleto.link_pdf!)
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `boleto-${boleto.numero}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+
+        // Delay entre downloads
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      } catch (error) {
+        console.error(`Erro ao baixar boleto ${boleto.numero}:`, error)
+      }
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto border-0 shadow-2xl">
@@ -257,6 +315,37 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                 </CardContent>
               </Card>
             </div>
+
+            {boletos.some((b) => b.link_pdf || b.link_impressao) && (
+              <div className="flex gap-3 justify-end bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+                <Button
+                  onClick={baixarTodosPDFs}
+                  disabled={!boletos.some((b) => b.link_pdf)}
+                  variant="outline"
+                  className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300 shadow-sm"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Baixar Todos PDFs
+                </Button>
+                <Button
+                  onClick={imprimirTodosBoletos}
+                  disabled={printingAll}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md"
+                >
+                  {printingAll ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Abrindo...
+                    </>
+                  ) : (
+                    <>
+                      <Printer className="h-4 w-4 mr-2" />
+                      Imprimir Todos
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
 
             <Card>
               <CardHeader>
