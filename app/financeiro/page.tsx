@@ -23,6 +23,7 @@ import {
   Filter,
   XCircle,
   AlertCircle,
+  Printer,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -56,6 +57,9 @@ interface Boleto {
   total_parcelas: number
   observacoes?: string
   created_at: string
+  // Adicionando campos para links de PDF/Impressão
+  link_pdf?: string
+  link_impressao?: string
 }
 
 interface Recibo {
@@ -165,6 +169,19 @@ export default function FinanceiroPage() {
   const handleVisualizarBoleto = (boleto: Boleto) => {
     setBoletoParaVisualizar(boleto.numero)
     setShowVisualizarBoletos(true)
+  }
+
+  const handleImprimirBoleto = async (boleto: Boleto) => {
+    if (boleto.link_pdf || boleto.link_impressao) {
+      const url = boleto.link_pdf || boleto.link_impressao
+      window.open(url, "_blank")
+    } else {
+      toast({
+        title: "PDF não disponível",
+        description: "Este boleto não possui PDF gerado no PagSeguro.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleEditarBoleto = (boleto: Boleto) => {
@@ -755,6 +772,16 @@ export default function FinanceiroPage() {
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
+                                {(boleto.link_pdf || boleto.link_impressao) && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleImprimirBoleto(boleto)}
+                                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                  >
+                                    <Printer className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="outline"
