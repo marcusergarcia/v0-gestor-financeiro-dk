@@ -41,6 +41,7 @@ import {
 import { NovoBoletoDialog } from "@/components/financeiro/novo-boleto-dialog"
 import { EditarBoletoDialog } from "@/components/financeiro/editar-boleto-dialog"
 import { VisualizarBoletosDialog } from "@/components/financeiro/visualizar-boletos-dialog"
+import Link from "next/link"
 
 interface Boleto {
   id: number
@@ -794,10 +795,12 @@ export default function FinanceiroPage() {
                 <h2 className="text-2xl font-bold text-gray-900">Recibos</h2>
                 <p className="text-gray-600">Gerencie todos os recibos emitidos</p>
               </div>
-              <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg h-9 lg:h-12 text-sm lg:text-base">
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Recibo
-              </Button>
+              <Link href="/financeiro/novo-recibo">
+                <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg h-9 lg:h-12 text-sm lg:text-base">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Recibo
+                </Button>
+              </Link>
             </div>
 
             {/* Recibos Stats */}
@@ -862,10 +865,12 @@ export default function FinanceiroPage() {
                       {searchRecibos ? "Tente ajustar os termos de busca" : "Comece criando seu primeiro recibo"}
                     </p>
                     {!searchRecibos && (
-                      <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white h-9 lg:h-12 text-sm lg:text-base">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Criar Primeiro Recibo
-                      </Button>
+                      <Link href="/financeiro/novo-recibo">
+                        <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white h-9 lg:h-12 text-sm lg:text-base">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Criar Primeiro Recibo
+                        </Button>
+                      </Link>
                     )}
                   </div>
                 ) : (

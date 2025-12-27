@@ -100,6 +100,17 @@ export async function POST(request: NextRequest) {
       return vencimento < hoje ? "vencido" : "pendente"
     }
 
+    const clientes = await query(`SELECT * FROM clientes WHERE id = ?`, [clienteId])
+
+    if (clientes.length === 0) {
+      return NextResponse.json({ success: false, message: "Cliente não encontrado" }, { status: 404 })
+    }
+
+    const cliente = clientes[0]
+
+    const pagseguroToken = process.env.PAGSEGURO_TOKEN
+    const pagseguroHabilitado = pagseguroToken && pagseguroToken !== "test_token_temporario"
+
     // Inserir cada parcela como um boleto separado
     for (let i = 0; i < parcelas.length; i++) {
       const parcela = parcelas[i]
@@ -109,6 +120,70 @@ export async function POST(request: NextRequest) {
       // Ajustar data de vencimento para dia útil
       const dataVencimentoAjustada = adjustToBusinessDay(parcela.dataVencimento)
       const status = calcularStatus(dataVencimentoAjustada)
+
+      let pagseguroData = null
+
+      if (pagseguroHabilitado) {
+        try {
+          const { getPagSeguroAPI } = await import("@/lib/pagseguro")
+          const pagseguro = getPagSeguroAPI()
+
+          const boletoPagSeguro = await pagseguro.criarBoleto({
+            customer: {
+              name: cliente.nome,
+              email: cliente.email || "sem-email@placeholder.com",
+              tax_id: cliente.cnpj || cliente.cpf || "00000000000",
+              phone: cliente.telefone || "11999999999",
+            },
+            billing_address: {
+              street: cliente.endereco || "Rua Principal",
+              number: "1",
+              locality: cliente.bairro || "Centro",
+              city: cliente.cidade || "São Paulo",
+              region_code: cliente.estado || "SP",
+              country: "Brasil",
+              postal_code: cliente.cep || "00000000",
+            },
+            amount: {
+              value: Math.round(parcela.valor * 100),
+              currency: "BRL",
+            },
+            reference_id: numeroBoleto,
+            description: `Boleto ${numeroBoleto}${observacoes ? ` - ${observacoes}` : ""}`,
+            due_date: dataVencimentoAjustada,
+            instruction_lines: {
+              line_1: observacoes?.substring(0, 100),
+            },
+            holder: {
+              name: cliente.nome,
+              tax_id: cliente.cnpj || cliente.cpf || "00000000000",
+              email: cliente.email || "sem-email@placeholder.com",
+              address: {
+                street: cliente.endereco || "Rua Principal",
+                number: "1",
+                locality: cliente.bairro || "Centro",
+                city: cliente.cidade || "São Paulo",
+                region_code: cliente.estado || "SP",
+                country: "Brasil",
+                postal_code: cliente.cep || "00000000",
+              },
+            },
+            multa: {
+              percentual: 2.0,
+            },
+            juros: {
+              percentual: 0.033,
+            },
+          })
+
+          pagseguroData = boletoPagSeguro
+          console.log("[Boleto PagSeguro] Criado:", boletoPagSeguro)
+        } catch (error) {
+          console.error("[Boleto PagSeguro] Erro ao criar:", error)
+        }
+      } else {
+        console.log("[Boleto] PagSeguro não configurado, criando boleto apenas no sistema interno")
+      }
 
       await query(
         `
@@ -122,9 +197,14 @@ export async function POST(request: NextRequest) {
           total_parcelas, 
           observacoes,
           forma_pagamento,
+          pagseguro_id,
+          linha_digitavel,
+          codigo_barras,
+          link_pdf,
+          link_impressao,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `,
         [
           numeroBoleto,
@@ -136,6 +216,11 @@ export async function POST(request: NextRequest) {
           parcelas.length,
           observacoes || null,
           formaPagamento || "boleto",
+          pagseguroData?.id || null,
+          pagseguroData?.payment_method?.boleto?.barcode || null,
+          pagseguroData?.payment_method?.boleto?.formatted_barcode || null,
+          pagseguroData?.links?.find((l: any) => l.rel === "PRINT")?.href || null,
+          pagseguroData?.links?.find((l: any) => l.rel === "PAY")?.href || null,
         ],
       )
     }
