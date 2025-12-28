@@ -1754,13 +1754,31 @@ async function sendMessage(to: string, message: string) {
   const PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID
   const ACCESS_TOKEN = process.env.WHATSAPP_ACCESS_TOKEN
 
+  console.log("[v0] 📤 Tentando enviar mensagem...")
+  console.log("[v0] 📱 Para:", to)
+  console.log("[v0] 💬 Mensagem:", message.substring(0, 100) + "...")
+  console.log("[v0] 🔑 PHONE_NUMBER_ID existe?", !!PHONE_NUMBER_ID)
+  console.log("[v0] 🔐 ACCESS_TOKEN existe?", !!ACCESS_TOKEN)
+  console.log("[v0] 🔐 ACCESS_TOKEN primeiros caracteres:", ACCESS_TOKEN?.substring(0, 20) + "...")
+
   if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
     console.error("[v0] ❌ Credenciais do WhatsApp não configuradas")
+    console.error("[v0] ❌ PHONE_NUMBER_ID:", PHONE_NUMBER_ID)
+    console.error("[v0] ❌ ACCESS_TOKEN:", ACCESS_TOKEN ? "Existe mas pode estar vazio" : "Não existe")
     return
   }
 
   try {
     const url = `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`
+    console.log("[v0] 🌐 URL da API:", url)
+
+    const payload = {
+      messaging_product: "whatsapp",
+      to: to,
+      type: "text",
+      text: { body: message },
+    }
+    console.log("[v0] 📦 Payload:", JSON.stringify(payload, null, 2))
 
     const response = await fetch(url, {
       method: "POST",
@@ -1768,25 +1786,30 @@ async function sendMessage(to: string, message: string) {
         Authorization: `Bearer ${ACCESS_TOKEN}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: to,
-        type: "text",
-        text: { body: message },
-      }),
+      body: JSON.stringify(payload),
     })
 
+    console.log("[v0] 📊 Status da resposta:", response.status)
     const result = await response.json()
+    console.log("[v0] 📋 Resposta completa:", JSON.stringify(result, null, 2))
 
     if (!response.ok) {
+      if (result.error?.code === 190) {
+        console.error("[v0] ❌ TOKEN EXPIRADO! O WHATSAPP_ACCESS_TOKEN precisa ser atualizado no Vercel.")
+        console.error("[v0] ❌ Acesse: Meta Developers > Configuração da API > Gerar novo token")
+      }
       console.error("[v0] ❌ Erro ao enviar mensagem:", result)
+      console.error("[v0] ❌ Código do erro:", result.error?.code)
+      console.error("[v0] ❌ Mensagem do erro:", result.error?.message)
     } else {
       console.log("[v0] ✅ Mensagem enviada com sucesso")
+      console.log("[v0] ✅ Message ID:", result.messages?.[0]?.id)
     }
 
     return result
   } catch (error) {
     console.error("[v0] ❌ Exceção ao enviar mensagem:", error)
+    console.error("[v0] ❌ Stack trace:", error instanceof Error ? error.stack : "N/A")
     throw error
   }
 }

@@ -19,12 +19,31 @@ export default function WhatsAppConfigPage() {
   const [testMessage, setTestMessage] = useState("Olá! Esta é uma mensagem de teste do sistema.")
   const [loading, setLoading] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<{
+    phoneNumberId: boolean
+    accessToken: boolean
+    verifyToken: boolean
+  } | null>(null)
+  const [checkingStatus, setCheckingStatus] = useState(false)
 
   useEffect(() => {
-    // Carregar configurações salvas
     const webhookUrl = `${window.location.origin}/api/whatsapp/webhook`
     setConfig((prev) => ({ ...prev, webhookUrl }))
+    checkConnectionStatus()
   }, [])
+
+  const checkConnectionStatus = async () => {
+    setCheckingStatus(true)
+    try {
+      const response = await fetch("/api/whatsapp/status")
+      const result = await response.json()
+      setConnectionStatus(result.config)
+    } catch (error) {
+      console.error("Erro ao verificar status:", error)
+    } finally {
+      setCheckingStatus(false)
+    }
+  }
 
   const handleTestMessage = async () => {
     if (!testPhone || !testMessage) {
@@ -72,7 +91,86 @@ export default function WhatsAppConfigPage() {
       </div>
 
       <div className="grid gap-6">
-        {/* Instruções */}
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Erro comum:</strong> Se você recebeu o erro "Object does not exist or missing permissions",
+            verifique:
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>
+                Use <code className="bg-muted px-1 rounded">WHATSAPP_PHONE_NUMBER_ID</code> (não o Business Account ID)
+              </li>
+              <li>
+                Token precisa ter permissões <code className="bg-muted px-1 rounded">whatsapp_business_management</code>{" "}
+                e <code className="bg-muted px-1 rounded">whatsapp_business_messaging</code>
+              </li>
+              <li>Crie um System User com token permanente no Meta Business Suite</li>
+            </ul>
+            <a href="/docs/RESOLVER_ERRO_WHATSAPP.md" className="text-blue-600 underline mt-2 inline-block">
+              Ver guia completo de resolução
+            </a>
+          </AlertDescription>
+        </Alert>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              Status da Integração
+              <Button variant="outline" size="sm" onClick={checkConnectionStatus} disabled={checkingStatus}>
+                {checkingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
+              </Button>
+            </CardTitle>
+            <CardDescription>Verificação das configurações do WhatsApp Business</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {connectionStatus ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                  <span className="font-medium">Phone Number ID</span>
+                  {connectionStatus.phoneNumberId ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-600" />
+                  )}
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                  <span className="font-medium">Access Token</span>
+                  {connectionStatus.accessToken ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-600" />
+                  )}
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                  <span className="font-medium">Verify Token</span>
+                  {connectionStatus.verifyToken ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-red-600" />
+                  )}
+                </div>
+
+                {connectionStatus.phoneNumberId && connectionStatus.accessToken && connectionStatus.verifyToken ? (
+                  <Alert>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertDescription>Todas as configurações estão corretas!</AlertDescription>
+                  </Alert>
+                ) : (
+                  <Alert variant="destructive">
+                    <XCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      Algumas configurações estão faltando. Adicione as variáveis de ambiente no Vercel.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">Verificando status...</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Como Configurar */}
         <Card>
           <CardHeader>
             <CardTitle>📋 Como Configurar</CardTitle>
@@ -80,24 +178,18 @@ export default function WhatsAppConfigPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <h3 className="font-semibold">1. Criar App no Meta for Developers</h3>
+              <h3 className="font-semibold">1. Obter Phone Number ID (Não o Business Account ID!)</h3>
               <p className="text-sm text-muted-foreground">
-                Acesse{" "}
-                <a
-                  href="https://developers.facebook.com"
-                  target="_blank"
-                  className="text-blue-600 underline"
-                  rel="noreferrer"
-                >
-                  developers.facebook.com
-                </a>{" "}
-                e crie um app do tipo "Business"
+                No Meta Developers, vá em <strong>WhatsApp → Introdução</strong> e copie o{" "}
+                <strong>Phone number ID</strong> (algo como 110200345501442)
               </p>
             </div>
             <div className="space-y-2">
-              <h3 className="font-semibold">2. Adicionar WhatsApp Product</h3>
+              <h3 className="font-semibold">2. Criar System User com Token Permanente</h3>
               <p className="text-sm text-muted-foreground">
-                No painel do app, adicione o produto "WhatsApp" e configure um número de telefone
+                No Meta Business Suite, crie um System User com permissões{" "}
+                <code className="bg-muted px-1 rounded text-xs">whatsapp_business_management</code> e{" "}
+                <code className="bg-muted px-1 rounded text-xs">whatsapp_business_messaging</code>
               </p>
             </div>
             <div className="space-y-2">
@@ -112,13 +204,19 @@ export default function WhatsAppConfigPage() {
               <p className="text-sm text-muted-foreground">No Vercel, adicione as seguintes variáveis de ambiente:</p>
               <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
                 <li>
-                  <code className="bg-muted px-1 rounded">WHATSAPP_PHONE_NUMBER_ID</code>
+                  <code className="bg-muted px-1 rounded">WHATSAPP_PHONE_NUMBER_ID</code> - ID do telefone (não da conta
+                  business)
                 </li>
                 <li>
-                  <code className="bg-muted px-1 rounded">WHATSAPP_ACCESS_TOKEN</code>
+                  <code className="bg-muted px-1 rounded">WHATSAPP_ACCESS_TOKEN</code> - Token do System User
+                  (permanente)
                 </li>
                 <li>
-                  <code className="bg-muted px-1 rounded">WHATSAPP_VERIFY_TOKEN</code>
+                  <code className="bg-muted px-1 rounded">WHATSAPP_VERIFY_TOKEN</code> - Qualquer string segura que você
+                  definir
+                </li>
+                <li>
+                  <code className="bg-muted px-1 rounded">WHATSAPP_BUSINESS_ACCOUNT_ID</code> - ID da conta business
                 </li>
               </ul>
             </div>
