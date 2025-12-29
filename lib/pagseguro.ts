@@ -1,3 +1,5 @@
+import { PagBankLogger } from "./pagbank-logger"
+
 interface PagSeguroConfig {
   token: string
   environment: "sandbox" | "production"
@@ -150,6 +152,23 @@ export class PagSeguroAPI {
       const responseData = await response.json()
 
       console.log("[PagSeguro API] Response:", { status: response.status, data: responseData })
+
+      const paymentType = endpoint.includes("/orders")
+        ? "BOLETO"
+        : endpoint.includes("/payouts")
+          ? "PAYOUT"
+          : endpoint.includes("/cashback")
+            ? "CASHBACK"
+            : "OTHER"
+
+      await PagBankLogger.log({
+        method,
+        endpoint,
+        request: data || {},
+        response: responseData,
+        status: response.status,
+        paymentType,
+      }).catch((err) => console.error("[PagSeguro] Erro ao registrar log:", err))
 
       if (!response.ok) {
         throw new Error(`PagSeguro API Error: ${response.status} - ${JSON.stringify(responseData)}`)
