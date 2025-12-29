@@ -1,8 +1,7 @@
-import { writeFile, readFile, mkdir } from "fs/promises"
-import { existsSync } from "fs"
-import path from "path"
+import { query } from "@/lib/db"
 
 interface PagBankLogEntry {
+  id?: number
   timestamp: string
   method: string
   endpoint: string
@@ -10,13 +9,12 @@ interface PagBankLogEntry {
   response: any
   status: number
   paymentType: string
+  success: boolean
 }
 
 export class PagBankLogger {
-  private static logFilePath = path.join(process.cwd(), "logs", "pagbank-integration.json")
-
-  static async log(entry: Omit<PagBankLogEntry, "timestamp">) {
-    const logEntry: PagBankLogEntry = {
+  static async log(entry: Omit<PagBankLogEntry, "timestamp" | "id">) {
+    const logEntry: Omit<PagBankLogEntry, "id"> = {
       timestamp: new Date().toISOString(),
       ...entry,
     }
@@ -28,24 +26,22 @@ export class PagBankLogger {
     })
 
     try {
-      const logsDir = path.join(process.cwd(), "logs")
-      if (!existsSync(logsDir)) {
-        await mkdir(logsDir, { recursive: true })
-      }
-
-      let logs: PagBankLogEntry[] = []
-      if (existsSync(this.logFilePath)) {
-        const content = await readFile(this.logFilePath, "utf-8")
-        logs = JSON.parse(content)
-      }
-
-      logs.push(logEntry)
-
-      if (logs.length > 100) {
-        logs = logs.slice(-100)
-      }
-
-      await writeFile(this.logFilePath, JSON.stringify(logs, null, 2))
+      await query(
+        `INSERT INTO pagbank_logs 
+        (timestamp, method, endpoint, request_data, response_data, status, payment_type, success) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          logEntry.timestamp,
+          logEntry.method,
+          logEntry.endpoint,
+          JSON.stringify(logEntry.request),
+          JSON.stringify(logEntry.response),
+          logEntry.status,
+          logEntry.paymentType,
+          logEntry.success,
+        ],
+      )
+      console.log("[PagBank Logger] Log salvo no banco com sucesso")
     } catch (error) {
       console.error("[PagBank Logger] Erro ao salvar log:", error)
     }
@@ -53,11 +49,27 @@ export class PagBankLogger {
 
   static async getLogs(): Promise<PagBankLogEntry[]> {
     try {
-      if (!existsSync(this.logFilePath)) {
-        return []
-      }
-      const content = await readFile(this.logFilePath, "utf-8")
-      return JSON.parse(content)
+      const logs = await query(
+        `SELECT 
+          id,
+          timestamp,
+          method,
+          endpoint,
+          request_data as request,
+          response_data as response,
+          status,
+          payment_type as paymentType,
+          success
+        FROM pagbank_logs 
+        ORDER BY timestamp DESC 
+        LIMIT 100`,
+      )
+
+      return logs.map((log: any) => ({
+        ...log,
+        request: JSON.parse(log.request),
+        response: JSON.parse(log.response),
+      }))
     } catch (error) {
       console.error("[PagBank Logger] Erro ao ler logs:", error)
       return []
@@ -76,6 +88,7 @@ export class PagBankLogger {
       output += `Data/Hora: ${log.timestamp}\n`
       output += `Método: ${log.method} ${log.endpoint}\n`
       output += `Status: ${log.status}\n`
+      output += `Sucesso: ${log.success ? "SIM" : "NÃO"}\n`
       output += `${"=".repeat(80)}\n\n`
 
       output += "REQUEST:\n"
@@ -96,7 +109,8 @@ export class PagBankLogger {
 
   static async clearLogs(): Promise<void> {
     try {
-      await writeFile(this.logFilePath, JSON.stringify([], null, 2))
+      await query(`DELETE FROM pagbank_logs`)
+      console.log("[PagBank Logger] Logs limpos com sucesso")
     } catch (error) {
       console.error("[PagBank Logger] Erro ao limpar logs:", error)
     }
@@ -117,5 +131,6 @@ export async function logPagBankTransaction(data: {
     response: data.response,
     status: data.success ? 200 : 400,
     paymentType: data.method,
+    success: data.success,
   })
 }
