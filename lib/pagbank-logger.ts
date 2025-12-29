@@ -102,3 +102,20 @@ export class PagBankLogger {
     }
   }
 }
+
+export async function logPagBankTransaction(data: {
+  method: string
+  endpoint: string
+  request: any
+  response: any
+  success: boolean
+}) {
+  await PagBankLogger.log({
+    method: data.method,
+    endpoint: data.endpoint,
+    request: data.request,
+    response: data.response,
+    status: data.success ? 200 : 400,
+    paymentType: data.method,
+  })
+}

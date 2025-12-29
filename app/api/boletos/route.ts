@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
+import { logPagBankTransaction } from "@/lib/pagbank-logger"
 
 function normalizarEstado(estado: string | null | undefined): string {
   if (!estado) return "SP" // Padrão SP se não fornecido
@@ -259,7 +260,7 @@ export async function POST(request: NextRequest) {
             valorMinimo,
           })
 
-          const boletoPagSeguro = await pagseguro.criarBoleto({
+          const boletoRequest = {
             customer: {
               name: cliente.nome,
               email: emailValido,
@@ -330,6 +331,16 @@ export async function POST(request: NextRequest) {
                 },
               },
             ],
+          }
+
+          const boletoPagSeguro = await pagseguro.criarBoleto(boletoRequest)
+
+          await logPagBankTransaction({
+            method: "BOLETO",
+            endpoint: "/charges",
+            request: boletoRequest,
+            response: boletoPagSeguro,
+            success: true,
           })
 
           pagseguroData = boletoPagSeguro
@@ -341,6 +352,18 @@ export async function POST(request: NextRequest) {
             links: boletoPagSeguro.charges?.[0]?.links?.length || 0,
           })
         } catch (error) {
+          await logPagBankTransaction({
+            method: "BOLETO",
+            endpoint: "/charges",
+            request: {
+              reference_id: numeroBoleto,
+              customer_name: cliente.nome,
+              amount: parcela.valor,
+            },
+            response: error instanceof Error ? { error: error.message } : { error: "Erro desconhecido" },
+            success: false,
+          })
+
           console.error("[v0] Erro ao criar boleto no PagSeguro:", error)
           if (error instanceof Error) {
             console.error("[v0] Mensagem de erro:", error.message)
