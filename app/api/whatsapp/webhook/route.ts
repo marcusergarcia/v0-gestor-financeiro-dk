@@ -68,13 +68,24 @@ export async function POST(request: NextRequest) {
 
 async function processUserMessage(from: string, messageBody: string) {
   try {
+    console.log("[v0] 📱 ===== PROCESSANDO MENSAGEM =====")
+    console.log("[v0] 📱 Número:", from)
+    console.log("[v0] 💬 Mensagem:", messageBody)
+
     // Buscar estado atual da conversa
     const state = await getConversationState(from)
+
+    if (state) {
+      console.log("[v0] 📊 Estado encontrado - Stage:", state.stage)
+      console.log("[v0] 📊 Cliente ID:", state.data?.clienteId)
+    } else {
+      console.log("[v0] 📊 Nenhum estado ativo - Nova conversa")
+    }
 
     const normalizedMessage = messageBody.toLowerCase().trim()
 
     if (normalizedMessage === "sair") {
-      console.log("[v0] 👋 Comando 'sair' detectado - finalizando conversa")
+      console.log("[v0] 👋 Comando 'sair' detectado - finalizando conversa para:", from)
       await clearConversationState(from)
       await sendMessage(
         from,
@@ -82,6 +93,7 @@ async function processUserMessage(from: string, messageBody: string) {
           "Obrigado por usar nosso Sistema de Ordens de Serviço.\n\n" +
           "Quando precisar, é só enviar uma mensagem que iniciaremos um novo atendimento! 😊",
       )
+      console.log("[v0] ✅ Conversa finalizada com sucesso para:", from)
       return
     }
 
@@ -649,8 +661,9 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
         from,
         `✅ Endereço confirmado!\n` +
           `📏 Distância: ${distanciaResult.distanciaKm} km\n\n` +
-          `Agora, qual é o *telefone* de contato?\n\n` +
-          `Exemplo: _(11) 99999-9999_\n\n` +
+          `O condomínio tem *telefone fixo*?\n\n` +
+          `Digite o número ou *pular* se não tiver.\n\n` +
+          `Exemplo: _(11) 3333-4444_\n\n` +
           `💡 _Digite 'menu' para voltar ao início_`,
       )
     } else {
@@ -660,8 +673,9 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
       await sendMessage(
         from,
         `✅ Endereço confirmado!\n\n` +
-          `Agora, qual é o *telefone* de contato?\n\n` +
-          `Exemplo: _(11) 99999-9999_\n\n` +
+          `O condomínio tem *telefone fixo*?\n\n` +
+          `Digite o número ou *pular* se não tiver.\n\n` +
+          `Exemplo: _(11) 3333-4444_\n\n` +
           `💡 _Digite 'menu' para voltar ao início_`,
       )
     }
@@ -688,10 +702,12 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
 
 async function handleCadastroTelefone(from: string, message: string, data: any) {
   const telefone = message.trim()
-  await updateConversationState(from, "cadastro_email", { ...data, telefone })
+  const telefoneFixo = telefone.toLowerCase() === "pular" ? "" : telefone
+
+  await updateConversationState(from, "cadastro_email", { ...data, telefone: telefoneFixo })
   await sendMessage(
     from,
-    `✅ Telefone registrado!\n\n` +
+    `✅ ${telefoneFixo ? "Telefone fixo registrado!" : "Sem telefone fixo."}\n\n` +
       `Agora, qual é o *email* para contato?\n\n` +
       `Exemplo: _contato@condominio.com.br_\n\n` +
       `💡 _Digite 'menu' para voltar ao início_`,

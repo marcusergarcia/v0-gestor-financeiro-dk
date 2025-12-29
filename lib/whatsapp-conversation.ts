@@ -64,17 +64,30 @@ export async function getConversationState(phoneNumber: string): Promise<Convers
     console.log("[v0] 🔍 Buscando estado da conversa para:", phoneNumber)
 
     const result = await query(
-      "SELECT phone_number, current_step, data FROM whatsapp_conversations WHERE phone_number = ? AND status = 'active'",
+      `SELECT phone_number, current_step, data, updated_at, last_activity, timeout_warning_sent
+       FROM whatsapp_conversations 
+       WHERE phone_number = ? 
+       AND status = 'active' 
+       AND updated_at > DATE_SUB(NOW(), INTERVAL 30 MINUTE)
+       LIMIT 1`,
       [phoneNumber],
     )
 
     if (!result || (result as any[]).length === 0) {
-      console.log("[v0] ℹ️ Nenhum estado encontrado, retornando null")
+      console.log("[v0] ℹ️ Nenhum estado ativo encontrado (ou expirado), retornando null")
+      await query(
+        `UPDATE whatsapp_conversations 
+         SET status = 'expired' 
+         WHERE phone_number = ? 
+         AND status = 'active' 
+         AND updated_at < DATE_SUB(NOW(), INTERVAL 30 MINUTE)`,
+        [phoneNumber],
+      )
       return null
     }
 
     const row = (result as any[])[0]
-    console.log("[v0] ✅ Estado encontrado:", row.current_step)
+    console.log("[v0] ✅ Estado encontrado:", row.current_step, "- Última atualização:", row.updated_at)
 
     return {
       phone_number: row.phone_number,
@@ -94,24 +107,22 @@ export async function updateConversationState(
 ): Promise<void> {
   try {
     console.log("[v0] 💾 Atualizando estado para:", phoneNumber, "->", stage)
+    console.log("[v0] 📦 Dados:", JSON.stringify(data))
 
-    // Primeiro, tentar atualizar
-    const updateResult = await query(
+    await query(
       `UPDATE whatsapp_conversations 
-       SET current_step = ?, data = ?, status = 'active', updated_at = NOW()
-       WHERE phone_number = ?`,
-      [stage, JSON.stringify(data), phoneNumber],
+       SET status = 'replaced', updated_at = NOW() 
+       WHERE phone_number = ? 
+       AND status = 'active'`,
+      [phoneNumber],
     )
 
-    // Se não atualizou nenhuma linha, inserir nova
-    if ((updateResult as any).affectedRows === 0) {
-      console.log("[v0] ➕ Criando novo registro de conversa")
-      await query(
-        `INSERT INTO whatsapp_conversations (phone_number, current_step, data, status, created_at, updated_at) 
-         VALUES (?, ?, ?, 'active', NOW(), NOW())`,
-        [phoneNumber, stage, JSON.stringify(data)],
-      )
-    }
+    console.log("[v0] ➕ Criando novo registro de conversa")
+    await query(
+      `INSERT INTO whatsapp_conversations (phone_number, current_step, data, status, last_activity, timeout_warning_sent, created_at, updated_at) 
+       VALUES (?, ?, ?, 'active', NOW(), FALSE, NOW(), NOW())`,
+      [phoneNumber, stage, JSON.stringify(data)],
+    )
 
     console.log("[v0] ✅ Estado atualizado com sucesso")
   } catch (error) {
@@ -124,11 +135,15 @@ export async function clearConversationState(phoneNumber: string): Promise<void>
   try {
     console.log("[v0] 🗑️ Limpando estado da conversa para:", phoneNumber)
 
-    await query("UPDATE whatsapp_conversations SET status = 'completed', updated_at = NOW() WHERE phone_number = ?", [
-      phoneNumber,
-    ])
+    await query(
+      `UPDATE whatsapp_conversations 
+       SET status = 'completed', updated_at = NOW() 
+       WHERE phone_number = ? 
+       AND status = 'active'`,
+      [phoneNumber],
+    )
 
-    console.log("[v0] ✅ Estado limpo com sucesso")
+    console.log("[v0] ✅ Estado limpo com sucesso - conversa finalizada")
   } catch (error) {
     console.error("[v0] ❌ Erro ao limpar estado da conversa:", error)
   }
@@ -138,10 +153,8 @@ export async function restartConversation(phoneNumber: string): Promise<void> {
   try {
     console.log("[v0] 🔄 Reiniciando conversa para:", phoneNumber)
 
-    // Limpar estado atual
     await clearConversationState(phoneNumber)
 
-    // Criar novo estado inicial
     await updateConversationState(phoneNumber, ConversationStage.TIPO_CLIENTE, {})
 
     console.log("[v0] ✅ Conversa reiniciada com sucesso")
@@ -155,11 +168,9 @@ export async function findClientByPhone(phoneNumber: string): Promise<any | null
   try {
     console.log("[v0] 🔍 Buscando cliente por telefone:", phoneNumber)
 
-    // Limpar número de telefone (remover caracteres especiais)
     const cleanPhone = phoneNumber.replace(/\D/g, "")
     console.log("[v0] 📱 Telefone limpo:", cleanPhone)
 
-    // Buscar por diferentes formatos de telefone
     const result = await query(
       `SELECT id, codigo, nome, telefone, email, endereco, cidade, estado 
        FROM clientes 
@@ -187,12 +198,10 @@ export async function findClientByCodigo(codigo: string): Promise<any | null> {
     console.log("[v0] 🔍 Buscando cliente por código:", codigo)
 
     const cleanCodigo = codigo.replace(/\D/g, "").substring(0, 6)
-    // Remover zeros à esquerda, mas manter pelo menos um dígito
     const normalizedCodigo = cleanCodigo.replace(/^0+/, "") || "0"
     console.log("[v0] 🔢 Código limpo:", cleanCodigo)
     console.log("[v0] 🔢 Código normalizado (sem zeros à esquerda):", normalizedCodigo)
 
-    // Buscar tanto pelo código com zeros quanto sem zeros
     const result = await query(
       `SELECT id, codigo, nome, cnpj, telefone, email, cidade, estado 
        FROM clientes 
@@ -255,7 +264,6 @@ export async function generateOrderNumber(): Promise<string> {
       day: "2-digit",
     })
 
-    // Parse da data no formato MM/DD/YYYY
     const [mes, dia, ano] = brasiliaDateString.split("/")
 
     const prefixoMes = `${ano}${mes}`
@@ -263,7 +271,6 @@ export async function generateOrderNumber(): Promise<string> {
 
     console.log("[v0] 📅 Prefixo do dia:", prefixoDia)
 
-    // Buscar última ordem do mês atual
     const result = await query(
       `SELECT numero 
        FROM ordens_servico 
@@ -279,7 +286,6 @@ export async function generateOrderNumber(): Promise<string> {
       const ultimoNumero = (result as any[])[0].numero
       console.log("[v0] 📋 Último número do mês:", ultimoNumero)
 
-      // Extrair os últimos 3 dígitos (sequencial)
       const ultimoSequencial = Number.parseInt(ultimoNumero.slice(-3))
       sequencial = ultimoSequencial + 1
 
@@ -289,7 +295,6 @@ export async function generateOrderNumber(): Promise<string> {
       console.log("[v0] ℹ️ Primeira ordem do mês")
     }
 
-    // Formatar sequencial com 3 dígitos (001, 002, etc.)
     const sequencialFormatado = String(sequencial).padStart(3, "0")
     const numeroOrdem = `${prefixoDia}${sequencialFormatado}`
 
@@ -297,7 +302,6 @@ export async function generateOrderNumber(): Promise<string> {
     return numeroOrdem
   } catch (error) {
     console.error("[v0] ❌ Erro ao gerar número de ordem:", error)
-    // Fallback: usar timestamp
     const fallback = Date.now().toString()
     console.log("[v0] ⚠️ Usando fallback:", fallback)
     return fallback
@@ -381,15 +385,11 @@ export async function createClient(data: {
   }
 }
 
-// Vamos apenas registrar no log por enquanto
 export async function saveAtendimentoRequest(phoneNumber: string, clienteId?: number): Promise<void> {
   try {
     console.log("[v0] 📞 Solicitação de atendimento registrada")
     console.log("[v0] 📱 Telefone:", phoneNumber)
     console.log("[v0] 👤 Cliente ID:", clienteId)
-
-    // TODO: Criar tabela whatsapp_atendimento se necessário
-    // Por enquanto, apenas logamos a solicitação
   } catch (error) {
     console.error("[v0] ❌ Erro ao salvar solicitação de atendimento:", error)
   }
@@ -454,11 +454,9 @@ export async function checkAgendamentoDisponivel(
     const params: any[] = []
 
     if (periodo === "integral") {
-      // Se quiser agendar integral, não pode ter nenhum agendamento neste dia
       whereClause = `WHERE data_agendamento = ? AND situacao IN ('agendada', 'em_andamento')`
       params.push(data)
     } else if (periodo === "manha" || periodo === "tarde") {
-      // Se quiser agendar manhã ou tarde, não pode ter integral nem o mesmo período
       whereClause = `WHERE data_agendamento = ? 
          AND (periodo_agendamento = ? OR periodo_agendamento = 'integral')
          AND situacao IN ('agendada', 'em_andamento')`
@@ -486,31 +484,27 @@ export function validateDate(dateStr: string): {
   error?: string
 } {
   try {
-    // Aceitar formato DD/MM/AAAA
     const parts = dateStr.split("/")
     if (parts.length !== 3) {
       return { valid: false, error: "Formato inválido. Use DD/MM/AAAA" }
     }
 
     const day = Number.parseInt(parts[0])
-    const month = Number.parseInt(parts[1]) - 1 // Mês começa em 0
+    const month = Number.parseInt(parts[1]) - 1
     const year = Number.parseInt(parts[2])
 
     const date = new Date(year, month, day)
 
-    // Verificar se a data é válida
     if (date.getDate() !== day || date.getMonth() !== month || date.getFullYear() !== year) {
       return { valid: false, error: "Data inválida" }
     }
 
-    // Verificar se não é no passado
     const hoje = new Date()
     hoje.setHours(0, 0, 0, 0)
     if (date < hoje) {
       return { valid: false, error: "Data não pode ser no passado" }
     }
 
-    // Verificar se é dia útil (seg-sex)
     const diaSemana = date.getDay()
     if (diaSemana === 0 || diaSemana === 6) {
       return { valid: false, error: "Data deve ser dia útil (segunda a sexta)" }
@@ -653,7 +647,6 @@ export async function getNextAvailablePeriod(): Promise<{
   try {
     console.log("[v0] 📅 Calculando próximo período disponível (apenas manhã e tarde)...")
 
-    // Obter hora atual de Brasília
     const agora = new Date()
     const brasiliaDateString = agora.toLocaleString("en-US", {
       timeZone: "America/Sao_Paulo",
@@ -672,7 +665,6 @@ export async function getNextAvailablePeriod(): Promise<{
     const horaAtual = Number.parseInt(hora)
     console.log("[v0] 🕐 Hora atual em Brasília:", horaAtual)
 
-    // Buscar feriados ativos
     const feriadosResult = await query("SELECT data FROM feriados WHERE ativo = 1")
     const feriadosSet = new Set(
       (feriadosResult as any[]).map((f: any) => {
@@ -681,7 +673,6 @@ export async function getNextAvailablePeriod(): Promise<{
       }),
     )
 
-    // Função para verificar se é dia útil
     const isDiaUtil = (date: Date): boolean => {
       const diaSemana = date.getDay()
       const isWeekend = diaSemana === 0 || diaSemana === 6
@@ -690,7 +681,6 @@ export async function getNextAvailablePeriod(): Promise<{
       return !isWeekend && !isFeriado
     }
 
-    // Função para obter próximo dia útil
     const getProximoDiaUtil = (startDate: Date): Date => {
       const nextDay = new Date(startDate)
       nextDay.setDate(nextDay.getDate() + 1)
@@ -701,7 +691,6 @@ export async function getNextAvailablePeriod(): Promise<{
     }
 
     const isPeriodoDisponivel = async (dataStr: string, periodo: string): Promise<boolean> => {
-      // Verificar se existe período integral neste dia (bloqueia tudo)
       const integralResult = await query(
         `SELECT COUNT(*) as count FROM ordens_servico 
          WHERE data_agendamento = ? 
@@ -716,36 +705,29 @@ export async function getNextAvailablePeriod(): Promise<{
         return false
       }
 
-      // Verificar se o período específico está disponível
       const { disponivel } = await checkAgendamentoDisponivel(dataStr, periodo)
       return disponivel
     }
 
-    // Data atual
     let dataVerificar = new Date(`${ano}-${mes}-${dia}T00:00:00`)
     let periodo: string
     let periodoLabel: string
 
-    // Determinar período baseado na hora atual
     if (horaAtual < 12) {
-      // Manhã atual - tentar tarde do mesmo dia
       periodo = "tarde"
       periodoLabel = "Tarde (13:00 - 17:00)"
       console.log("[v0] 🌅 Período atual: Manhã, tentando agendar para Tarde")
     } else {
-      // Tarde/Noite - tentar manhã do próximo dia útil
       dataVerificar = getProximoDiaUtil(dataVerificar)
       periodo = "manha"
       periodoLabel = "Manhã (09:00 - 12:00)"
       console.log("[v0] 🌆 Período atual: Tarde/Noite, tentando agendar para próxima Manhã")
     }
 
-    // Verificar disponibilidade e buscar próximo período disponível
     let tentativas = 0
-    const maxTentativas = 30 // Máximo 30 dias úteis no futuro
+    const maxTentativas = 30
 
     while (tentativas < maxTentativas) {
-      // Verificar se é dia útil
       if (!isDiaUtil(dataVerificar)) {
         console.log("[v0] ⚠️ Data não é dia útil, pulando para próximo dia útil")
         dataVerificar = getProximoDiaUtil(dataVerificar)
@@ -756,9 +738,7 @@ export async function getNextAvailablePeriod(): Promise<{
       const disponivel = await isPeriodoDisponivel(dataStr, periodo)
 
       if (disponivel) {
-        // Período disponível encontrado!
         const dataFormatada = `${dataVerificar.getDate().toString().padStart(2, "0")}/${(dataVerificar.getMonth() + 1).toString().padStart(2, "0")}/${dataVerificar.getFullYear()}`
-
         console.log("[v0] ✅ Período disponível encontrado:", dataFormatada, periodo)
 
         return {
@@ -769,13 +749,10 @@ export async function getNextAvailablePeriod(): Promise<{
         }
       }
 
-      // Período não disponível - tentar próximo período
       if (periodo === "manha") {
-        // Tentar tarde do mesmo dia
         periodo = "tarde"
         periodoLabel = "Tarde (13:00 - 17:00)"
       } else {
-        // Tentar manhã do próximo dia útil
         dataVerificar = getProximoDiaUtil(dataVerificar)
         periodo = "manha"
         periodoLabel = "Manhã (09:00 - 12:00)"
@@ -789,5 +766,74 @@ export async function getNextAvailablePeriod(): Promise<{
   } catch (error) {
     console.error("[v0] ❌ Erro ao calcular próximo período disponível:", error)
     return null
+  }
+}
+
+export async function checkInactiveConversations(): Promise<
+  Array<{ phone_number: string; minutes_inactive: number; warning_sent: boolean }>
+> {
+  try {
+    console.log("[v0] ⏰ Verificando conversas inativas...")
+
+    const result = await query(
+      `SELECT 
+        phone_number, 
+        TIMESTAMPDIFF(MINUTE, last_activity, NOW()) as minutes_inactive,
+        timeout_warning_sent
+       FROM whatsapp_conversations 
+       WHERE status = 'active' 
+       AND TIMESTAMPDIFF(MINUTE, last_activity, NOW()) >= 5
+       AND (
+         timeout_warning_sent = FALSE 
+         OR TIMESTAMPDIFF(MINUTE, last_activity, NOW()) >= 10
+       )`,
+      [],
+    )
+
+    const inactiveConversations = (result as any[]) || []
+    console.log("[v0] 📊 Conversas inativas encontradas:", inactiveConversations.length)
+
+    return inactiveConversations.map((row) => ({
+      phone_number: row.phone_number,
+      minutes_inactive: row.minutes_inactive,
+      warning_sent: Boolean(row.timeout_warning_sent),
+    }))
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao verificar conversas inativas:", error)
+    return []
+  }
+}
+
+export async function markTimeoutWarningSent(phoneNumber: string): Promise<void> {
+  try {
+    console.log("[v0] ✅ Marcando aviso de timeout como enviado para:", phoneNumber)
+
+    await query(
+      `UPDATE whatsapp_conversations 
+       SET timeout_warning_sent = TRUE 
+       WHERE phone_number = ? 
+       AND status = 'active'`,
+      [phoneNumber],
+    )
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao marcar aviso de timeout:", error)
+  }
+}
+
+export async function closeConversationByInactivity(phoneNumber: string): Promise<void> {
+  try {
+    console.log("[v0] ⏱️ Finalizando conversa por inatividade:", phoneNumber)
+
+    await query(
+      `UPDATE whatsapp_conversations 
+       SET status = 'timeout', updated_at = NOW() 
+       WHERE phone_number = ? 
+       AND status = 'active'`,
+      [phoneNumber],
+    )
+
+    console.log("[v0] ✅ Conversa finalizada por timeout")
+  } catch (error) {
+    console.error("[v0] ❌ Erro ao finalizar conversa por inatividade:", error)
   }
 }
