@@ -147,19 +147,19 @@ export class PagSeguroAPI {
       options.body = JSON.stringify(data)
     }
 
+    const paymentType = endpoint.includes("/orders")
+      ? "BOLETO"
+      : endpoint.includes("/payouts")
+        ? "PAYOUT"
+        : endpoint.includes("/cashback")
+          ? "CASHBACK"
+          : "OTHER"
+
     try {
       const response = await fetch(url, options)
       const responseData = await response.json()
 
       console.log("[PagSeguro API] Response:", { status: response.status, data: responseData })
-
-      const paymentType = endpoint.includes("/orders")
-        ? "BOLETO"
-        : endpoint.includes("/payouts")
-          ? "PAYOUT"
-          : endpoint.includes("/cashback")
-            ? "CASHBACK"
-            : "OTHER"
 
       await PagBankLogger.log({
         method,
@@ -177,6 +177,16 @@ export class PagSeguroAPI {
       return responseData as T
     } catch (error) {
       console.error("[PagSeguro API] Error:", error)
+
+      await PagBankLogger.log({
+        method,
+        endpoint,
+        request: data || {},
+        response: error instanceof Error ? { error: error.message } : { error: String(error) },
+        status: 500,
+        paymentType,
+      }).catch((err) => console.error("[PagSeguro] Erro ao registrar log de erro:", err))
+
       throw error
     }
   }
