@@ -16,6 +16,7 @@ import {
   findOrdemById,
   findOrdensBySituacao,
   getNextAvailablePeriod,
+  updateLastActivity, // Adicionando import da função updateLastActivity
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
 
@@ -52,14 +53,12 @@ export async function POST(request: NextRequest) {
 
     const from = messages.from
     const messageBody = messages.text?.body?.trim() || ""
-    const messageId = messages.id // Capturando o ID da mensagem
 
     console.log("[v0] 📱 Mensagem de:", from)
     console.log("[v0] 💬 Texto:", messageBody)
-    console.log("[v0] 🆔 Message ID:", messageId)
 
     // Processar mensagem baseado no estado da conversa
-    await processUserMessage(from, messageBody, messageId)
+    await processUserMessage(from, messageBody)
 
     return NextResponse.json({ status: "ok" })
   } catch (error) {
@@ -68,16 +67,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processUserMessage(
-  from: string,
-  messageBody: string,
-  messageId: string, // Adicionando messageId ao parâmetro
-): Promise<void> {
+async function processUserMessage(from: string, messageBody: string) {
   try {
     console.log("[v0] 📱 ===== PROCESSANDO MENSAGEM =====")
     console.log("[v0] 📱 Número:", from)
     console.log("[v0] 💬 Mensagem:", messageBody)
-    console.log("[v0] 🆔 Message ID:", messageId)
+
+    await updateLastActivity(from)
+    console.log("[v0] ⏰ Last activity atualizado para:", from)
 
     // Buscar estado atual da conversa
     const state = await getConversationState(from)
