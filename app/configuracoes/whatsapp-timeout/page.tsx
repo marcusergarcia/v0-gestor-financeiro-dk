@@ -4,11 +4,13 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, CheckCircle, XCircle, Clock } from "lucide-react"
+import { RefreshCw, CheckCircle, XCircle, Clock, Play } from "lucide-react"
 
 export default function WhatsAppTimeoutConfig() {
   const [loading, setLoading] = useState(false)
   const [testResult, setTestResult] = useState<any>(null)
+  const [checkingNow, setCheckingNow] = useState(false)
+  const [checkResult, setCheckResult] = useState<any>(null)
 
   const testTimeoutSystem = async () => {
     setLoading(true)
@@ -20,6 +22,19 @@ export default function WhatsAppTimeoutConfig() {
       console.error("Erro ao testar sistema:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const runTimeoutCheck = async () => {
+    setCheckingNow(true)
+    try {
+      const response = await fetch("/api/whatsapp/check-timeouts")
+      const data = await response.json()
+      setCheckResult(data)
+    } catch (error) {
+      console.error("Erro ao executar verificação:", error)
+    } finally {
+      setCheckingNow(false)
     }
   }
 
@@ -157,6 +172,61 @@ export default function WhatsAppTimeoutConfig() {
                   <p className="text-sm text-yellow-800 mt-2">
                     Consulte o guia em docs/ATIVAR_TIMEOUT_WHATSAPP.md para mais detalhes
                   </p>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Executar Verificação Agora</CardTitle>
+          <CardDescription>Executa manualmente a verificação de timeouts e envia avisos/finalizações</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={runTimeoutCheck} disabled={checkingNow} className="w-full" variant="secondary">
+            {checkingNow ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Verificando...
+              </>
+            ) : (
+              <>
+                <Play className="mr-2 h-4 w-4" />
+                Executar Verificação Agora
+              </>
+            )}
+          </Button>
+
+          {checkResult && (
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-green-50">
+                <span className="font-medium">Verificação Executada</span>
+                <Badge variant="default" className="gap-1">
+                  <CheckCircle className="h-3 w-3" />
+                  Sucesso
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-blue-700">{checkResult.results.warnings_sent}</p>
+                  <p className="text-sm text-blue-600">Avisos Enviados</p>
+                </div>
+                <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-orange-700">{checkResult.results.conversations_closed}</p>
+                  <p className="text-sm text-orange-600">Conversas Finalizadas</p>
+                </div>
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-red-700">{checkResult.results.errors}</p>
+                  <p className="text-sm text-red-600">Erros</p>
+                </div>
+              </div>
+
+              {checkResult.message && (
+                <div className="p-3 bg-muted rounded text-sm">
+                  <p>{checkResult.message}</p>
                 </div>
               )}
             </div>
