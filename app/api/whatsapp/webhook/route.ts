@@ -16,6 +16,7 @@ import {
   findOrdemById,
   findOrdensBySituacao,
   getNextAvailablePeriod, // Importando nova função de agendamento automático
+  checkAndSendInactivityWarning, // Importando nova função de aviso de inatividade
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
 
@@ -72,14 +73,26 @@ async function processUserMessage(from: string, messageBody: string) {
     console.log("[v0] 📱 Número:", from)
     console.log("[v0] 💬 Mensagem:", messageBody)
 
-    // Buscar estado atual da conversa
+    const needsWarning = await checkAndSendInactivityWarning(from)
+    if (needsWarning) {
+      await sendMessage(
+        from,
+        "⏰ *Você ainda está aí?*\n\n" +
+          "Percebi que você ficou inativo por alguns minutos.\n\n" +
+          "Se não responder em *5 minutos*, vou finalizar nosso atendimento automaticamente.\n\n" +
+          "💡 _Digite qualquer mensagem para continuar ou 'menu' para voltar ao início_",
+      )
+    }
+
+    // Buscar estado atual da conversa DESTE usuário específico
     const state = await getConversationState(from)
 
     if (state) {
       console.log("[v0] 📊 Estado encontrado - Stage:", state.stage)
       console.log("[v0] 📊 Cliente ID:", state.data?.clienteId)
+      console.log("[v0] 📊 Telefone do estado:", state.phone_number)
     } else {
-      console.log("[v0] 📊 Nenhum estado ativo - Nova conversa")
+      console.log("[v0] 📊 Nenhum estado ativo - Nova conversa para:", from)
     }
 
     const normalizedMessage = messageBody.toLowerCase().trim()
@@ -98,19 +111,17 @@ async function processUserMessage(from: string, messageBody: string) {
     }
 
     if (normalizedMessage === "menu") {
-      console.log("[v0] 🏠 Comando 'menu' detectado - voltando ao início")
+      console.log("[v0] 🏠 Comando 'menu' detectado - voltando ao início para:", from)
       if (state?.data?.clienteId) {
-        // Se já tem cliente identificado, vai direto pro menu principal
         await returnToMenu(from, state.data)
       } else {
-        // Se não tem cliente, vai para identificação
         await sendTipoClienteMenu(from)
       }
       return
     }
 
     if (!state) {
-      console.log("[v0] 👋 Nova conversa iniciada")
+      console.log("[v0] 👋 Nova conversa iniciada para:", from)
       await sendMessage(
         from,
         "👋 *Bem-vindo ao Sistema de Ordens de Serviço Automatizado!*\n\n" +
@@ -130,7 +141,7 @@ async function processUserMessage(from: string, messageBody: string) {
 
     const currentStage = state.stage
 
-    console.log("[v0] 📊 Estado atual:", currentStage)
+    console.log("[v0] 📊 Estado atual para", from, ":", currentStage)
     console.log("[v0] 📦 Dados salvos:", state?.data)
 
     const restartKeywords = [
