@@ -53,12 +53,14 @@ export async function POST(request: NextRequest) {
 
     const from = messages.from
     const messageBody = messages.text?.body?.trim() || ""
+    const messageId = messages.id // Capturando o ID da mensagem
 
     console.log("[v0] 📱 Mensagem de:", from)
     console.log("[v0] 💬 Texto:", messageBody)
+    console.log("[v0] 🆔 Message ID:", messageId)
 
     // Processar mensagem baseado no estado da conversa
-    await processUserMessage(from, messageBody)
+    await processUserMessage(from, messageBody, messageId)
 
     return NextResponse.json({ status: "ok" })
   } catch (error) {
@@ -67,13 +69,20 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processUserMessage(from: string, messageBody: string) {
+async function processUserMessage(
+  from: string,
+  messageBody: string,
+  messageId: string, // Adicionando messageId ao parâmetro
+): Promise<void> {
   try {
     console.log("[v0] 📱 ===== PROCESSANDO MENSAGEM =====")
     console.log("[v0] 📱 Número:", from)
     console.log("[v0] 💬 Mensagem:", messageBody)
+    console.log("[v0] 🆔 Message ID:", messageId)
 
-    await updateLastActivity(from)
+    updateLastActivity(from).catch((error) => {
+      console.error("[v0] Erro ao atualizar last_activity (não-crítico):", error)
+    })
     console.log("[v0] ⏰ Last activity atualizado para:", from)
 
     // Buscar estado atual da conversa
