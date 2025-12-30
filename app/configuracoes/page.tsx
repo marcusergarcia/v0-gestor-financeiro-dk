@@ -33,6 +33,7 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     loadLogoMenu()
+    console.log("[v0] WhatsApp tab component loaded")
   }, [])
 
   const loadLogoMenu = async () => {
