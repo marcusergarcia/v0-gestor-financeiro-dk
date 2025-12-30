@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CheckCircle2, FileText, Loader2 } from "lucide-react"
+import { CheckCircle2, FileText, Loader2, Receipt } from "lucide-react"
 import { ClienteCombobox, type Cliente } from "@/components/cliente-combobox"
 
 export default function TestPagBankBoletoPage() {
@@ -67,6 +67,28 @@ export default function TestPagBankBoletoPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const calcularParcelas = () => {
+    const numParcelas = Number.parseInt(formData.numeroParcelas) || 1
+    const valorTotal = Number.parseFloat(formData.valorTotal) || 0
+    const valorParcela = valorTotal / numParcelas
+    const dataBase = new Date(formData.primeiroVencimento)
+
+    const parcelas = []
+    for (let i = 0; i < numParcelas; i++) {
+      const dataVencimento = new Date(dataBase)
+      dataVencimento.setMonth(dataVencimento.getMonth() + i)
+
+      parcelas.push({
+        numero: i + 1,
+        valor: valorParcela,
+        vencimento: dataVencimento.toLocaleDateString("pt-BR"),
+        referencia: `${formData.numeroNota}-${String(i + 1).padStart(2, "0")}`,
+      })
+    }
+
+    return parcelas
   }
 
   return (
@@ -155,12 +177,52 @@ export default function TestPagBankBoletoPage() {
                 value={formData.numeroParcelas}
                 onChange={handleChange}
               />
-              <p className="text-xs text-muted-foreground">
-                {Number.parseInt(formData.numeroParcelas) > 1
-                  ? `${formData.numeroParcelas} parcelas de R$ ${(Number.parseFloat(formData.valorTotal) / Number.parseInt(formData.numeroParcelas)).toFixed(2)}`
-                  : "Boleto simples (à vista)"}
-              </p>
+              <div className="text-xs space-y-1">
+                {Number.parseInt(formData.numeroParcelas) > 1 ? (
+                  <>
+                    <p className="font-semibold text-primary">
+                      {formData.numeroParcelas} parcelas de R${" "}
+                      {(Number.parseFloat(formData.valorTotal) / Number.parseInt(formData.numeroParcelas)).toFixed(2)}
+                    </p>
+                    <p className="text-muted-foreground">Intervalo de 30 dias entre parcelas</p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">Boleto simples (à vista)</p>
+                )}
+              </div>
             </div>
+
+            {formData.numeroNota &&
+              formData.valorTotal &&
+              formData.primeiroVencimento &&
+              Number.parseInt(formData.numeroParcelas) > 1 && (
+                <Card className="bg-muted/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Receipt className="w-4 h-4" />
+                      Preview das Parcelas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="text-xs space-y-1">
+                      {calcularParcelas().map((parcela) => (
+                        <div
+                          key={parcela.numero}
+                          className="flex justify-between items-center py-1 border-b border-border/50 last:border-0"
+                        >
+                          <span className="font-mono">{parcela.referencia}</span>
+                          <span className="font-semibold">R$ {parcela.valor.toFixed(2)}</span>
+                          <span className="text-muted-foreground">{parcela.vencimento}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="pt-2 border-t border-border flex justify-between items-center font-semibold text-sm">
+                      <span>Total:</span>
+                      <span className="text-primary">R$ {Number.parseFloat(formData.valorTotal).toFixed(2)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
             <Button
               onClick={generateBoleto}
