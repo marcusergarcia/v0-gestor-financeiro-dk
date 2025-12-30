@@ -15,7 +15,8 @@ import {
   findOrdensAbertas,
   findOrdemById,
   findOrdensBySituacao,
-  getNextAvailablePeriod, // Importando nova função de agendamento automático
+  getNextAvailablePeriod,
+  updateLastActivity, // Adicionando import da função updateLastActivity
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
 
@@ -71,6 +72,9 @@ async function processUserMessage(from: string, messageBody: string) {
     console.log("[v0] 📱 ===== PROCESSANDO MENSAGEM =====")
     console.log("[v0] 📱 Número:", from)
     console.log("[v0] 💬 Mensagem:", messageBody)
+
+    await updateLastActivity(from)
+    console.log("[v0] ⏰ Last activity atualizado para:", from)
 
     // Buscar estado atual da conversa
     const state = await getConversationState(from)

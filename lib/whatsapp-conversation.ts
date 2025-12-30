@@ -837,3 +837,18 @@ export async function closeConversationByInactivity(phoneNumber: string): Promis
     console.error("[v0] ❌ Erro ao finalizar conversa por inatividade:", error)
   }
 }
+
+export async function updateLastActivity(phoneNumber: string): Promise<void> {
+  try {
+    await query(
+      `UPDATE whatsapp_conversations 
+       SET last_activity = NOW(), updated_at = NOW() 
+       WHERE phone_number = ? 
+       AND status = 'active'`,
+      [phoneNumber],
+    )
+  } catch (error) {
+    console.error("[v0] Erro ao atualizar last_activity:", error)
+    throw error
+  }
+}
