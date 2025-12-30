@@ -64,7 +64,7 @@ export async function getConversationState(phoneNumber: string): Promise<Convers
     console.log("[v0] 🔍 Buscando estado da conversa para:", phoneNumber)
 
     const result = await query(
-      `SELECT phone_number, current_step, data, updated_at, last_activity, timeout_warning_sent
+      `SELECT phone_number, current_step, data, updated_at 
        FROM whatsapp_conversations 
        WHERE phone_number = ? 
        AND status = 'active' 
@@ -119,8 +119,8 @@ export async function updateConversationState(
 
     console.log("[v0] ➕ Criando novo registro de conversa")
     await query(
-      `INSERT INTO whatsapp_conversations (phone_number, current_step, data, status, last_activity, timeout_warning_sent, created_at, updated_at) 
-       VALUES (?, ?, ?, 'active', NOW(), FALSE, NOW(), NOW())`,
+      `INSERT INTO whatsapp_conversations (phone_number, current_step, data, status, created_at, updated_at) 
+       VALUES (?, ?, ?, 'active', NOW(), NOW())`,
       [phoneNumber, stage, JSON.stringify(data)],
     )
 
@@ -766,74 +766,5 @@ export async function getNextAvailablePeriod(): Promise<{
   } catch (error) {
     console.error("[v0] ❌ Erro ao calcular próximo período disponível:", error)
     return null
-  }
-}
-
-export async function checkInactiveConversations(): Promise<
-  Array<{ phone_number: string; minutes_inactive: number; warning_sent: boolean }>
-> {
-  try {
-    console.log("[v0] ⏰ Verificando conversas inativas...")
-
-    const result = await query(
-      `SELECT 
-        phone_number, 
-        TIMESTAMPDIFF(MINUTE, last_activity, NOW()) as minutes_inactive,
-        timeout_warning_sent
-       FROM whatsapp_conversations 
-       WHERE status = 'active' 
-       AND TIMESTAMPDIFF(MINUTE, last_activity, NOW()) >= 5
-       AND (
-         timeout_warning_sent = FALSE 
-         OR TIMESTAMPDIFF(MINUTE, last_activity, NOW()) >= 10
-       )`,
-      [],
-    )
-
-    const inactiveConversations = (result as any[]) || []
-    console.log("[v0] 📊 Conversas inativas encontradas:", inactiveConversations.length)
-
-    return inactiveConversations.map((row) => ({
-      phone_number: row.phone_number,
-      minutes_inactive: row.minutes_inactive,
-      warning_sent: Boolean(row.timeout_warning_sent),
-    }))
-  } catch (error) {
-    console.error("[v0] ❌ Erro ao verificar conversas inativas:", error)
-    return []
-  }
-}
-
-export async function markTimeoutWarningSent(phoneNumber: string): Promise<void> {
-  try {
-    console.log("[v0] ✅ Marcando aviso de timeout como enviado para:", phoneNumber)
-
-    await query(
-      `UPDATE whatsapp_conversations 
-       SET timeout_warning_sent = TRUE 
-       WHERE phone_number = ? 
-       AND status = 'active'`,
-      [phoneNumber],
-    )
-  } catch (error) {
-    console.error("[v0] ❌ Erro ao marcar aviso de timeout:", error)
-  }
-}
-
-export async function closeConversationByInactivity(phoneNumber: string): Promise<void> {
-  try {
-    console.log("[v0] ⏱️ Finalizando conversa por inatividade:", phoneNumber)
-
-    await query(
-      `UPDATE whatsapp_conversations 
-       SET status = 'timeout', updated_at = NOW() 
-       WHERE phone_number = ? 
-       AND status = 'active'`,
-      [phoneNumber],
-    )
-
-    console.log("[v0] ✅ Conversa finalizada por timeout")
-  } catch (error) {
-    console.error("[v0] ❌ Erro ao finalizar conversa por inatividade:", error)
   }
 }
