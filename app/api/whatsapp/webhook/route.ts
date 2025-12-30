@@ -16,7 +16,6 @@ import {
   findOrdemById,
   findOrdensBySituacao,
   getNextAvailablePeriod,
-  updateLastActivity, // Adicionando import da função updateLastActivity
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
 
@@ -79,11 +78,6 @@ async function processUserMessage(
     console.log("[v0] 📱 Número:", from)
     console.log("[v0] 💬 Mensagem:", messageBody)
     console.log("[v0] 🆔 Message ID:", messageId)
-
-    updateLastActivity(from).catch((error) => {
-      console.error("[v0] Erro ao atualizar last_activity (não-crítico):", error)
-    })
-    console.log("[v0] ⏰ Last activity atualizado para:", from)
 
     // Buscar estado atual da conversa
     const state = await getConversationState(from)
