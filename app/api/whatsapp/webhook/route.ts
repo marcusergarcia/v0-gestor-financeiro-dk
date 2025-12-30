@@ -15,8 +15,7 @@ import {
   findOrdensAbertas,
   findOrdemById,
   findOrdensBySituacao,
-  getNextAvailablePeriod,
-  updateLastActivity, // Adicionando import da função updateLastActivity
+  getNextAvailablePeriod, // Importando nova função de agendamento automático
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
 
@@ -72,9 +71,6 @@ async function processUserMessage(from: string, messageBody: string) {
     console.log("[v0] 📱 ===== PROCESSANDO MENSAGEM =====")
     console.log("[v0] 📱 Número:", from)
     console.log("[v0] 💬 Mensagem:", messageBody)
-
-    await updateLastActivity(from)
-    console.log("[v0] ⏰ Last activity atualizado para:", from)
 
     // Buscar estado atual da conversa
     const state = await getConversationState(from)
@@ -665,9 +661,8 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
         from,
         `✅ Endereço confirmado!\n` +
           `📏 Distância: ${distanciaResult.distanciaKm} km\n\n` +
-          `O condomínio tem *telefone fixo*?\n\n` +
-          `Digite o número ou *pular* se não tiver.\n\n` +
-          `Exemplo: _(11) 3333-4444_\n\n` +
+          `Agora, qual é o *telefone* de contato?\n\n` +
+          `Exemplo: _(11) 99999-9999_\n\n` +
           `💡 _Digite 'menu' para voltar ao início_`,
       )
     } else {
@@ -677,9 +672,8 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
       await sendMessage(
         from,
         `✅ Endereço confirmado!\n\n` +
-          `O condomínio tem *telefone fixo*?\n\n` +
-          `Digite o número ou *pular* se não tiver.\n\n` +
-          `Exemplo: _(11) 3333-4444_\n\n` +
+          `Agora, qual é o *telefone* de contato?\n\n` +
+          `Exemplo: _(11) 99999-9999_\n\n` +
           `💡 _Digite 'menu' para voltar ao início_`,
       )
     }
@@ -706,12 +700,10 @@ async function handleCadastroConfirmarEndereco(from: string, message: string, da
 
 async function handleCadastroTelefone(from: string, message: string, data: any) {
   const telefone = message.trim()
-  const telefoneFixo = telefone.toLowerCase() === "pular" ? "" : telefone
-
-  await updateConversationState(from, "cadastro_email", { ...data, telefone: telefoneFixo })
+  await updateConversationState(from, "cadastro_email", { ...data, telefone })
   await sendMessage(
     from,
-    `✅ ${telefoneFixo ? "Telefone fixo registrado!" : "Sem telefone fixo."}\n\n` +
+    `✅ Telefone registrado!\n\n` +
       `Agora, qual é o *email* para contato?\n\n` +
       `Exemplo: _contato@condominio.com.br_\n\n` +
       `💡 _Digite 'menu' para voltar ao início_`,
