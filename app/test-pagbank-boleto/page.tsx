@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CheckCircle2, FileText, Loader2, Receipt } from "lucide-react"
+import { CheckCircle2, FileText, Loader2, Receipt, QrCode } from "lucide-react"
 import { ClienteCombobox, type Cliente } from "@/components/cliente-combobox"
 
 export default function TestPagBankBoletoPage() {
@@ -69,6 +69,35 @@ export default function TestPagBankBoletoPage() {
     }
   }
 
+  const generatePix = async () => {
+    if (!cliente || !formData.numeroNota || !formData.valorTotal) {
+      setResult({ error: "Preencha todos os campos obrigatórios" })
+      return
+    }
+
+    setLoading(true)
+    setResult(null)
+
+    try {
+      const response = await fetch("/api/test-pagbank-pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clienteId: cliente.id,
+          numeroNota: formData.numeroNota,
+          valorTotal: Number.parseFloat(formData.valorTotal),
+        }),
+      })
+
+      const data = await response.json()
+      setResult(data)
+    } catch (error) {
+      setResult({ error: "Erro ao gerar PIX simulado" })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const calcularParcelas = () => {
     const numParcelas = Number.parseInt(formData.numeroParcelas) || 1
     const valorTotal = Number.parseFloat(formData.valorTotal) || 0
@@ -94,16 +123,14 @@ export default function TestPagBankBoletoPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Simulador de Boletos PagBank</h1>
-        <p className="text-muted-foreground">
-          Gere logs de boletos (simples e parcelados) usando dados reais de clientes
-        </p>
+        <h1 className="text-3xl font-bold mb-2">Simulador de Pagamentos PagBank</h1>
+        <p className="text-muted-foreground">Gere logs de boletos e PIX usando dados reais de clientes</p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Dados do Boleto</CardTitle>
+            <CardTitle>Dados do Pagamento</CardTitle>
             <CardDescription>Selecione um cliente e preencha os dados para simular</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -224,25 +251,46 @@ export default function TestPagBankBoletoPage() {
                 </Card>
               )}
 
-            <Button
-              onClick={generateBoleto}
-              disabled={
-                loading || !cliente || !formData.numeroNota || !formData.valorTotal || !formData.primeiroVencimento
-              }
-              className="w-full"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Gerar Log de Boleto
-                </>
-              )}
-            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                onClick={generateBoleto}
+                disabled={
+                  loading || !cliente || !formData.numeroNota || !formData.valorTotal || !formData.primeiroVencimento
+                }
+                className="w-full"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Gerar Boleto
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={generatePix}
+                disabled={loading || !cliente || !formData.numeroNota || !formData.valorTotal}
+                variant="secondary"
+                className="w-full"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <QrCode className="w-4 h-4 mr-2" />
+                    Gerar PIX
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
