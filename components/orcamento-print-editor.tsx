@@ -460,8 +460,12 @@ export function OrcamentoPrintEditor({ orcamento, onClose }: OrcamentoPrintEdito
     const detalhesServico = (orcamento.detalhes_servico || "").replace(/\n/g, "<br>")
     conteudo = conteudo.replace(/\[DETALHES_SERVICO\]/g, detalhesServico)
 
-    const observacoes = (orcamento.observacoes || "").replace(/\n/g, "<br>")
-    conteudo = conteudo.replace(/\[OBSERVACOES\]/g, observacoes)
+    const observacoesRaw = orcamento.observacoes || ""
+    const observacoesHTML = observacoesRaw.replace(/\n/g, "<br>")
+    console.log("[v0] Observações do orçamento:", observacoesRaw)
+    console.log("[v0] Observações HTML:", observacoesHTML)
+    console.log("[v0] Termo contém [OBSERVACOES]:", termoOrcamento.conteudo.includes("[OBSERVACOES]"))
+    conteudo = conteudo.replace(/\[OBSERVACOES\]/g, observacoesHTML)
 
     // Valores
     const valorTotal = orcamento.valor_total || 0
