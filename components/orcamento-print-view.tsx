@@ -371,6 +371,15 @@ export function OrcamentoPrintView({
             </div>
           </div>
 
+          {orcamento.observacoes && (
+            <div style={{ marginBottom: "12px", marginTop: "8px" }}>
+              <h3 className="section-title">Observações</h3>
+              <div className="info-item" style={{ whiteSpace: "pre-wrap" }}>
+                {orcamento.observacoes}
+              </div>
+            </div>
+          )}
+
           {/* Conteúdo da primeira quebra */}
           {paginasPreview[0] && (
             <div className="conteudo-texto" dangerouslySetInnerHTML={{ __html: paginasPreview[0] }} />
