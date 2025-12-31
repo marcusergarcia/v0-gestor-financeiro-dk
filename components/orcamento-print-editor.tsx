@@ -460,6 +460,9 @@ export function OrcamentoPrintEditor({ orcamento, onClose }: OrcamentoPrintEdito
     const detalhesServico = (orcamento.detalhes_servico || "").replace(/\n/g, "<br>")
     conteudo = conteudo.replace(/\[DETALHES_SERVICO\]/g, detalhesServico)
 
+    const observacoes = (orcamento.observacoes || "").replace(/\n/g, "<br>")
+    conteudo = conteudo.replace(/\[OBSERVACOES\]/g, observacoes)
+
     // Valores
     const valorTotal = orcamento.valor_total || 0
     const valorFormatado = formatCurrency(valorTotal)
@@ -1827,6 +1830,8 @@ export function OrcamentoPrintEditor({ orcamento, onClose }: OrcamentoPrintEdito
                   {paginaAtual === 0 &&
                     (() => {
                       const clienteInfo = getClienteInfoForDisplay()
+                      // Declare observacoes here
+                      const observacoes = (orcamento.observacoes || "").replace(/\n/g, "<br>")
 
                       return (
                         <>
@@ -1929,6 +1934,20 @@ export function OrcamentoPrintEditor({ orcamento, onClose }: OrcamentoPrintEdito
                               )}
                             </div>
                           </div>
+                          {/* Adiciona a variável de observações aqui, se existir e for necessário exibi-la */}
+                          {orcamento.observacoes && (
+                            <div className="mt-6">
+                              <h3
+                                className="font-bold underline mb-3"
+                                style={{ fontSize: `${layoutConfig.sectionTitleFontSize}px` }}
+                              >
+                                Observações
+                              </h3>
+                              <div style={{ fontSize: `${layoutConfig.fontSize}px` }}>
+                                <div dangerouslySetInnerHTML={{ __html: observacoes }} />
+                              </div>
+                            </div>
+                          )}
                         </>
                       )
                     })()}

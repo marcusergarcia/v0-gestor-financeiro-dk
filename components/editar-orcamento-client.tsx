@@ -63,6 +63,7 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
   const [situacao, setSituacao] = useState(orcamento.situacao || "pendente")
   const [saving, setSaving] = useState(false)
   const [duplicating, setDuplicating] = useState(false) // State to control duplication
+  const [isLoading, setIsLoading] = useState(false) // Estado para controlar o carregamento geral
 
   const [produtoEditDialog, setProdutoEditDialog] = useState(false)
   const [produtoParaEditar, setProdutoParaEditar] = useState<any | null>(null)
@@ -520,36 +521,40 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
   }
 
   // Added function to duplicate the quote
-  const duplicarOrcamento = async () => {
-    try {
-      setDuplicating(true)
+  const handleDuplicar = async () => {
+    if (!confirm("Deseja duplicar este orçamento? Um novo orçamento será criado com um novo número.")) {
+      return
+    }
 
+    setIsLoading(true) // Use setIsLoading for the duplication process
+    try {
       const response = await fetch(`/api/orcamentos/${orcamento.numero}/duplicar`, {
         method: "POST",
       })
 
-      const result = await response.json()
-
-      if (result.success) {
-        toast({
-          title: "Orçamento duplicado",
-          description: `Novo orçamento criado: ${result.data.numero}`,
-        })
-
-        // Redirect to the new quote
-        router.push(`/orcamentos/${result.data.numero}/editar`)
-      } else {
-        throw new Error(result.message || "Erro ao duplicar orçamento")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Erro ao duplicar orçamento")
       }
-    } catch (error) {
-      console.error("Erro ao duplicar orçamento:", error)
+
+      const { novoNumero } = await response.json()
+
       toast({
-        title: "Erro",
-        description: "Não foi possível duplicar o orçamento",
+        title: "Orçamento duplicado com sucesso!",
+        description: `Novo orçamento #${novoNumero} criado.`,
+      })
+
+      router.push("/orcamentos") // Redirect to the list of quotes
+      router.refresh()
+    } catch (error) {
+      console.error("Erro ao duplicar:", error)
+      toast({
+        title: "Erro ao duplicar orçamento",
+        description: "Tente novamente mais tarde.",
         variant: "destructive",
       })
     } finally {
-      setDuplicating(false)
+      setIsLoading(false) // Use setIsLoading for the duplication process
     }
   }
 
@@ -735,16 +740,16 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
             {/* Changed button to use Copy icon and handle duplication */}
             <Button
               variant="outline"
-              onClick={duplicarOrcamento}
-              disabled={duplicating || saving}
+              onClick={handleDuplicar} // Use the new handleDuplicar function
+              disabled={isLoading || saving} // Use isLoading to disable during duplication
               className="bg-white/10 hover:bg-white/20 text-white border-white/30"
             >
               <Copy className="h-4 w-4 mr-2" />
-              {duplicating ? "Duplicando..." : "Duplicar"}
+              {isLoading ? "Duplicando..." : "Duplicar"} {/* Show loading state */}
             </Button>
             <Button
               onClick={salvarOrcamento}
-              disabled={saving || duplicating || !cliente || itens.length === 0 || !tipoServico.trim()}
+              disabled={saving || isLoading || !cliente || itens.length === 0 || !tipoServico.trim()} // Also disable if duplicating
               className="bg-white text-purple-600 hover:bg-purple-50"
             >
               <Save className="h-4 w-4 mr-2" />
