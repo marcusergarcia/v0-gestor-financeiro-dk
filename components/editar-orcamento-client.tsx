@@ -22,6 +22,7 @@ import {
   Building2,
   ArrowLeft,
   Printer,
+  Copy,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
@@ -61,6 +62,7 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
   const [desconto, setDesconto] = useState(orcamento.desconto || 0)
   const [situacao, setSituacao] = useState(orcamento.situacao || "pendente")
   const [saving, setSaving] = useState(false)
+  const [duplicating, setDuplicating] = useState(false) // State to control duplication
 
   const [produtoEditDialog, setProdutoEditDialog] = useState(false)
   const [produtoParaEditar, setProdutoParaEditar] = useState<any | null>(null)
@@ -443,7 +445,7 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
       return 0
     }
 
-    // Caso contrário, calcula normalmente com custo de deslocamento
+    // Caso contrário, calcula normally com custo de deslocamento
     return (
       calcularValorMaoObra() -
       calcularDescontoMdoValor() +
@@ -515,6 +517,40 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
 
     const fatorAjuste = subtotalMaterial / valorMaterialBruto
     return item.quantidade * (item.valor_unitario * fatorAjuste)
+  }
+
+  // Added function to duplicate the quote
+  const duplicarOrcamento = async () => {
+    try {
+      setDuplicating(true)
+
+      const response = await fetch(`/api/orcamentos/${orcamento.numero}/duplicar`, {
+        method: "POST",
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "Orçamento duplicado",
+          description: `Novo orçamento criado: ${result.data.numero}`,
+        })
+
+        // Redirect to the new quote
+        router.push(`/orcamentos/${result.data.numero}/editar`)
+      } else {
+        throw new Error(result.message || "Erro ao duplicar orçamento")
+      }
+    } catch (error) {
+      console.error("Erro ao duplicar orçamento:", error)
+      toast({
+        title: "Erro",
+        description: "Não foi possível duplicar o orçamento",
+        variant: "destructive",
+      })
+    } finally {
+      setDuplicating(false)
+    }
   }
 
   const salvarOrcamento = async () => {
@@ -696,9 +732,19 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </Button>
+            {/* Changed button to use Copy icon and handle duplication */}
+            <Button
+              variant="outline"
+              onClick={duplicarOrcamento}
+              disabled={duplicating || saving}
+              className="bg-white/10 hover:bg-white/20 text-white border-white/30"
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              {duplicating ? "Duplicando..." : "Duplicar"}
+            </Button>
             <Button
               onClick={salvarOrcamento}
-              disabled={saving || !cliente || itens.length === 0 || !tipoServico.trim()}
+              disabled={saving || duplicating || !cliente || itens.length === 0 || !tipoServico.trim()}
               className="bg-white text-purple-600 hover:bg-purple-50"
             >
               <Save className="h-4 w-4 mr-2" />
