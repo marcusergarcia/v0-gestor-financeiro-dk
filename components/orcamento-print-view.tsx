@@ -122,6 +122,9 @@ export function OrcamentoPrintView({
           .page:last-child {
             page-break-after: avoid;
           }
+          .force-page-break {
+            page-break-before: always;
+          }
         }
 
         @page {
@@ -371,6 +374,7 @@ export function OrcamentoPrintView({
             </div>
           </div>
 
+          {/* Observações */}
           {orcamento.observacoes && (
             <div style={{ marginBottom: "12px", marginTop: "8px" }}>
               <h3 className="section-title">Observações</h3>
@@ -382,7 +386,13 @@ export function OrcamentoPrintView({
 
           {/* Conteúdo da primeira quebra */}
           {paginasPreview[0] && (
-            <div className="conteudo-texto" dangerouslySetInnerHTML={{ __html: paginasPreview[0] }} />
+            <div className="conteudo-texto">
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: paginasPreview[0].split(/<h[23][^>]*>(?:Serviços|SERVIÇOS)/i)[0],
+                }}
+              />
+            </div>
           )}
         </div>
 
@@ -392,85 +402,81 @@ export function OrcamentoPrintView({
         )}
       </div>
 
-      {/* Páginas Intermediárias */}
-      {paginasPreview.slice(1, -1).map((paginaConteudo, index) => (
-        <div key={index + 1} className="page">
-          {/* Header */}
-          {(layoutConfig.showLogo || layoutConfig.showHeader) && (
-            <div className="page-header">
-              {layoutConfig.showLogo && (logoImpressao?.dados || timbradoConfig?.logo_url) && (
-                <img src={logoImpressao?.dados || timbradoConfig?.logo_url} alt="Logo da Empresa" />
-              )}
-              {layoutConfig.showHeader && timbradoConfig?.cabecalho && (
-                <div
-                  className="cabecalho-personalizado"
-                  dangerouslySetInnerHTML={{ __html: timbradoConfig.cabecalho }}
-                />
-              )}
-            </div>
-          )}
+      {/* Segunda Página */}
+      <div className="page force-page-break">
+        {/* Header */}
+        {(layoutConfig.showLogo || layoutConfig.showHeader) && (
+          <div className="page-header">
+            {layoutConfig.showLogo && (logoImpressao?.dados || timbradoConfig?.logo_url) && (
+              <img src={logoImpressao?.dados || timbradoConfig?.logo_url} alt="Logo da Empresa" />
+            )}
+            {layoutConfig.showHeader && timbradoConfig?.cabecalho && (
+              <div className="cabecalho-personalizado" dangerouslySetInnerHTML={{ __html: timbradoConfig.cabecalho }} />
+            )}
+          </div>
+        )}
 
-          {/* Conteúdo */}
-          <div className="page-content">
-            <div className="conteudo-texto" dangerouslySetInnerHTML={{ __html: paginaConteudo }} />
+        <div className="page-content">
+          <div className="conteudo-texto">
+            {paginasPreview[0] && (
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: (() => {
+                    const servicosMatch = paginasPreview[0].match(
+                      /<h[23][^>]*>(?:Serviços|SERVIÇOS)[\s\S]*?(?=<h[23][^>]*>(?:Condições|CONDIÇÕES)|$)/i,
+                    )
+                    return servicosMatch ? servicosMatch[0] : ""
+                  })(),
+                }}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        {layoutConfig.showFooter && timbradoConfig?.rodape && (
+          <div className="page-footer" dangerouslySetInnerHTML={{ __html: timbradoConfig.rodape }} />
+        )}
+      </div>
+
+      {/* Terceira Página */}
+      <div className="page force-page-break">
+        {/* Header */}
+        {(layoutConfig.showLogo || layoutConfig.showHeader) && (
+          <div className="page-header">
+            {layoutConfig.showLogo && (logoImpressao?.dados || timbradoConfig?.logo_url) && (
+              <img src={logoImpressao?.dados || timbradoConfig?.logo_url} alt="Logo da Empresa" />
+            )}
+            {layoutConfig.showHeader && timbradoConfig?.cabecalho && (
+              <div className="cabecalho-personalizado" dangerouslySetInnerHTML={{ __html: timbradoConfig.cabecalho }} />
+            )}
+          </div>
+        )}
+
+        <div className="page-content">
+          <div className="conteudo-texto">
+            {paginasPreview[0] && (
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: (() => {
+                    const condicoesMatch = paginasPreview[0].match(/<h[23][^>]*>(?:Condições|CONDIÇÕES)[\s\S]*/i)
+                    return condicoesMatch ? condicoesMatch[0] : ""
+                  })(),
+                }}
+              />
+            )}
           </div>
 
-          {/* Footer */}
-          {layoutConfig.showFooter && timbradoConfig?.rodape && (
-            <div className="page-footer" dangerouslySetInnerHTML={{ __html: timbradoConfig.rodape }} />
-          )}
+          <p className="data-local">
+            {timbradoConfig?.empresa_cidade || "Local"}, {dataParaExtenso(orcamento.data_orcamento)}
+          </p>
         </div>
-      ))}
 
-      {/* Última Página */}
-      {paginasPreview.length > 1 && (
-        <div className="page">
-          {/* Header */}
-          {(layoutConfig.showLogo || layoutConfig.showHeader) && (
-            <div className="page-header">
-              {layoutConfig.showLogo && (logoImpressao?.dados || timbradoConfig?.logo_url) && (
-                <img src={logoImpressao?.dados || timbradoConfig?.logo_url} alt="Logo da Empresa" />
-              )}
-              {layoutConfig.showHeader && timbradoConfig?.cabecalho && (
-                <div
-                  className="cabecalho-personalizado"
-                  dangerouslySetInnerHTML={{ __html: timbradoConfig.cabecalho }}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Conteúdo */}
-          <div className="page-content">
-            <div
-              className="conteudo-texto"
-              dangerouslySetInnerHTML={{ __html: paginasPreview[paginasPreview.length - 1] }}
-            />
-
-            {/* Data no final da última página - ÚNICA OCORRÊNCIA */}
-            <p className="data-local">
-              {timbradoConfig?.empresa_cidade || "Local"}, {dataParaExtenso(orcamento.data_orcamento)}
-            </p>
-          </div>
-
-          {/* Footer */}
-          {layoutConfig.showFooter && timbradoConfig?.rodape && (
-            <div className="page-footer" dangerouslySetInnerHTML={{ __html: timbradoConfig.rodape }} />
-          )}
-        </div>
-      )}
-
-      {/* Se houver apenas 1 página, adicionar data inline */}
-      {paginasPreview.length === 1 && (
-        <style>{`
-          .page:first-child .page-content::after {
-            content: "${timbradoConfig?.empresa_cidade || "Local"}, ${dataParaExtenso(orcamento.data_orcamento)}";
-            display: block;
-            margin-top: ${layoutConfig.contentMarginBottom}mm;
-            font-size: 12px;
-          }
-        `}</style>
-      )}
+        {/* Footer */}
+        {layoutConfig.showFooter && timbradoConfig?.rodape && (
+          <div className="page-footer" dangerouslySetInnerHTML={{ __html: timbradoConfig.rodape }} />
+        )}
+      </div>
     </div>
   )
 }
