@@ -333,7 +333,7 @@ export async function findClientsByName(nome: string): Promise<any[]> {
 
     // Busca todos os clientes ativos
     const result = await query(
-      `SELECT id, codigo, nome, cnpj, telefone, email, endereco, numero, bairro, cidade, estado 
+      `SELECT id, codigo, nome, cnpj, telefone, email, endereco, bairro, cidade, estado, cep 
        FROM clientes 
        WHERE (status IS NULL OR status != 'inativo')
        ORDER BY nome`,
@@ -358,17 +358,12 @@ export async function findClientsByName(nome: string): Promise<any[]> {
       return todasPalavrasEncontradas
     })
 
-    console.log("[v0] ✅ Clientes encontrados:", clientesFiltrados.length)
+    console.log(`[v0] ✅ Encontrados ${clientesFiltrados.length} clientes`)
 
-    return clientesFiltrados.slice(0, 10).map((cliente) => ({
-      ...cliente,
-      endereco: cliente.endereco
-        ? `${cliente.endereco}${cliente.numero ? ", " + cliente.numero : ""}${cliente.bairro ? " - " + cliente.bairro : ""}`
-        : "Endereço não cadastrado",
-    }))
+    return clientesFiltrados
   } catch (error) {
     console.error("[v0] ❌ Erro ao buscar clientes por nome:", error)
-    return []
+    throw error
   }
 }
 

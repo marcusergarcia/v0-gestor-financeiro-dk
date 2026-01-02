@@ -116,7 +116,14 @@ async function processUserMessage(from: string, messageBody: string) {
       if (state?.data?.clienteId) {
         await returnToMenu(from, state.data)
       } else {
-        await sendTipoClienteMenu(from)
+        await updateConversationState(from, "buscar_cliente_por_nome", {})
+        await sendMessage(
+          from,
+          "🏢 *Digite o nome do condomínio*\n\n" +
+            "Pode ser o nome completo ou parte dele.\n" +
+            "Exemplo: _Villaggio_, _Torino_, etc.\n\n" +
+            "💡 _Digite 'menu' para voltar ao início_",
+        )
       }
       return
     }
@@ -134,9 +141,15 @@ async function processUserMessage(from: string, messageBody: string) {
           "💡 *Dica:* Digite *menu* a qualquer momento para voltar ao início.\n\n" +
           "Vamos começar! 🚀",
       )
-      // Pequeno delay para dar tempo de ler a mensagem de boas-vindas
       await new Promise((resolve) => setTimeout(resolve, 1000))
-      await sendTipoClienteMenu(from)
+      await updateConversationState(from, "buscar_cliente_por_nome", {})
+      await sendMessage(
+        from,
+        "🏢 *Digite o nome do condomínio*\n\n" +
+          "Pode ser o nome completo ou parte dele.\n" +
+          "Exemplo: _Villaggio_, _Torino_, etc.\n\n" +
+          "💡 _Digite 'menu' para voltar ao início_",
+      )
       return
     }
 
@@ -162,14 +175,13 @@ async function processUserMessage(from: string, messageBody: string) {
     if (shouldRestart) {
       console.log("[v0] 🔄 Solicitação de reiniciar conversa detectada")
       await restartConversation(from)
+      await updateConversationState(from, "buscar_cliente_por_nome", {})
       await sendMessage(
         from,
         "🔄 *Conversa reiniciada!*\n\n" +
-          "Vamos começar do início. 👋\n\n" +
-          "Você é nosso cliente ou é o primeiro contato?\n\n" +
-          "*1* - Já sou cliente\n" +
-          "*2* - Primeiro contato\n\n" +
-          "_Digite o número da opção desejada_\n\n" +
+          "🏢 *Digite o nome do condomínio*\n\n" +
+          "Pode ser o nome completo ou parte dele.\n" +
+          "Exemplo: _Villaggio_, _Torino_, etc.\n\n" +
           "💡 _Digite 'menu' para voltar ao início_",
       )
       return
@@ -1913,13 +1925,12 @@ async function returnToMenu(from: string, data: any) {
 
 async function sendTipoClienteMenu(from: string) {
   await clearConversationState(from)
-  await updateConversationState(from, "tipo_cliente", {})
+  await updateConversationState(from, "buscar_cliente_por_nome", {})
   await sendMessage(
     from,
-    "Para começarmos, preciso saber:\n\n" +
-      "*1* - Já sou cliente\n" +
-      "*2* - Primeiro contato\n\n" +
-      "_Digite o número da opção desejada_\n\n" +
+    "🏢 *Digite o nome do condomínio*\n\n" +
+      "Pode ser o nome completo ou parte dele.\n" +
+      "Exemplo: _Villaggio_, _Torino_, etc.\n\n" +
       "💡 _Digite 'menu' para voltar ao início_",
   )
 }
