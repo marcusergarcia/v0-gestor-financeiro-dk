@@ -366,6 +366,14 @@ async function processUserMessage(from: string, messageBody: string) {
       case "selecionar_tipo_atendimento":
         await handleSelecionarTipoAtendimento(from, messageBody, state?.data || {})
         break
+
+      case "consultar_os_unica":
+        await handleConsultarOsUnica(from, messageBody, state?.data || {})
+        break
+
+      case "selecionar_os_consulta":
+        await handleSelecionarOsConsulta(from, messageBody, state?.data || {})
+        break
       // </CHANGE>
 
       default:
@@ -609,7 +617,6 @@ async function handleConfirmarCliente(from: string, messageBody: string, data: a
         ordensAbertas: ordensAbertas,
       })
 
-      // Mapear situação
       const statusMap: Record<string, string> = {
         aberta: "🔴 Aberta",
         agendada: "📅 Agendada",
@@ -646,8 +653,10 @@ async function handleConfirmarCliente(from: string, messageBody: string, data: a
       })
 
       mensagem += `O que deseja fazer?\n\n`
-      mensagem += `Digite o *número* da ordem se for o mesmo problema\n`
-      mensagem += `*OU* digite *NOVA* para criar uma nova ordem\n\n`
+      mensagem += `*1* - Consultar detalhes ${ordensAbertas.length > 1 ? "das ordens" : "da ordem"}\n`
+      mensagem += `*2* - Criar Nova Ordem\n`
+      mensagem += `*3* - Sair\n\n`
+      mensagem += `_Digite o número da opção desejada_\n\n`
       mensagem += `💡 _Digite 'menu' para voltar ao início_`
 
       await sendMessage(from, mensagem)
@@ -2267,10 +2276,71 @@ async function handleCriarOSContatoTelefone(from: string, message: string, data:
 }
 
 async function handleVerificarOsAberta(from: string, messageBody: string, data: any) {
-  const input = messageBody.trim().toUpperCase()
+  const input = messageBody.trim()
 
-  if (input === "NOVA") {
-    // Usuário quer criar nova ordem - ir para tipo de atendimento
+  if (input === "1") {
+    // Consultar detalhes
+    const ordensAbertas = data.ordensAbertas || []
+
+    if (ordensAbertas.length === 1) {
+      // Se tem apenas 1 ordem, mostrar direto os detalhes
+      const ordem = ordensAbertas[0]
+
+      const statusMap: Record<string, string> = {
+        aberta: "🔴 Aberta",
+        agendada: "📅 Agendada",
+        em_andamento: "🟡 Em Andamento",
+      }
+
+      const tipoMap: Record<string, string> = {
+        manutencao: "Manutenção",
+        orcamento: "Orçamento",
+        vistoria_contrato: "Vistoria",
+      }
+
+      let mensagem = `📋 *Detalhes da Ordem de Serviço #${ordem.numero}*\n\n`
+      mensagem += `${statusMap[ordem.situacao] || ordem.situacao}\n\n`
+      mensagem += `📅 *Data de Abertura:* ${new Date(ordem.data_abertura).toLocaleDateString("pt-BR")}\n`
+      mensagem += `🔧 *Tipo:* ${tipoMap[ordem.tipo_servico] || ordem.tipo_servico}\n`
+
+      if (ordem.data_agendamento) {
+        const dataAgendamento = new Date(ordem.data_agendamento).toLocaleDateString("pt-BR")
+        mensagem += `📆 *Agendamento:* ${dataAgendamento}\n`
+      }
+
+      if (ordem.descricao) {
+        mensagem += `\n📝 *Descrição:*\n${ordem.descricao}\n`
+      }
+
+      mensagem += `\n\nDeseja criar uma *nova ordem*?\n\n`
+      mensagem += `*1* - Sim, criar nova ordem\n`
+      mensagem += `*2* - Não, sair\n\n`
+      mensagem += `💡 _Digite 'menu' para voltar ao início_`
+
+      await updateConversationState(from, "consultar_os_unica", {
+        ...data,
+        ordemConsultada: ordem,
+      })
+
+      await sendMessage(from, mensagem)
+    } else {
+      // Se tem múltiplas ordens, pedir para selecionar qual quer ver
+      let mensagem = `📋 *Selecione qual ordem deseja consultar:*\n\n`
+
+      ordensAbertas.forEach((ordem: any, index: number) => {
+        const numero = index + 1
+        const dataFormatada = new Date(ordem.data_abertura).toLocaleDateString("pt-BR")
+        mensagem += `*${numero}* - OS #${ordem.numero} (${dataFormatada})\n`
+      })
+
+      mensagem += `\n_Digite o número da ordem que deseja consultar_\n\n`
+      mensagem += `💡 _Digite 'menu' para voltar ao início_`
+
+      await updateConversationState(from, "selecionar_os_consulta", data)
+      await sendMessage(from, mensagem)
+    }
+  } else if (input === "2") {
+    // Criar Nova Ordem
     console.log("[v0] ✅ Criando nova ordem de serviço")
     await updateConversationState(from, "selecionar_tipo_atendimento", {
       clienteId: data.clienteId,
@@ -2287,79 +2357,146 @@ async function handleVerificarOsAberta(from: string, messageBody: string, data: 
         `_Digite o número da opção desejada_\n\n` +
         `💡 _Digite 'menu' para voltar ao início_`,
     )
-  } else {
-    // Tentar converter para número para selecionar uma ordem
-    const numeroSelecionado = Number.parseInt(input)
-
-    if (isNaN(numeroSelecionado) || numeroSelecionado < 1 || numeroSelecionado > (data.ordensAbertas?.length || 0)) {
-      await sendMessage(
-        from,
-        "❌ Opção inválida.\n\n" +
-          `Digite o *número* da ordem (1 a ${data.ordensAbertas?.length || 0})\n` +
-          `*OU* digite *NOVA* para criar nova ordem\n\n` +
-          "💡 _Digite 'menu' para voltar ao início_",
-      )
-      return
-    }
-
-    // Usuário selecionou uma ordem existente
-    const ordemSelecionada = data.ordensAbertas[numeroSelecionado - 1]
-
-    // Mostrar detalhes da ordem e confirmar
-    const statusMap: Record<string, string> = {
-      aberta: "🔴 Aberta",
-      agendada: "📅 Agendada",
-      em_andamento: "🟡 Em Andamento",
-    }
-
-    const tipoMap: Record<string, string> = {
-      manutencao: "Manutenção",
-      orcamento: "Orçamento",
-      vistoria_contrato: "Vistoria",
-    }
-
-    let mensagem = `📋 *Ordem de Serviço #${ordemSelecionada.numero}*\n\n`
-    mensagem += `${statusMap[ordemSelecionada.situacao] || ordemSelecionada.situacao}\n\n`
-    mensagem += `📅 *Data:* ${new Date(ordemSelecionada.data_abertura).toLocaleDateString("pt-BR")}\n`
-    mensagem += `🔧 *Tipo:* ${tipoMap[ordemSelecionada.tipo_servico] || ordemSelecionada.tipo_servico}\n\n`
-
-    if (ordemSelecionada.data_agendamento) {
-      const dataAgendamento = new Date(ordemSelecionada.data_agendamento).toLocaleDateString("pt-BR")
-      mensagem += `📆 *Agendamento:* ${dataAgendamento}\n\n`
-    }
-
-    mensagem += `📝 *Descrição:*\n${ordemSelecionada.descricao || "Sem descrição"}\n\n`
-    mensagem += `✅ Esta ordem foi selecionada. Nossa equipe já está ciente do problema.\n\n`
-    mensagem += `Deseja adicionar mais informações ou fazer algo mais?\n\n`
-    mensagem += `*NOVA* - Criar nova ordem\n`
-    mensagem += `*MENU* - Voltar ao menu principal`
-
-    await sendMessage(from, mensagem)
-
-    // Finalizar conversa (ordem já existe, não precisa criar nova)
-    await updateConversationState(from, "inicio", {})
-  }
-}
-
-async function handleSelecionarTipoAtendimento(from: string, messageBody: string, data: any) {
-  const option = messageBody.trim()
-
-  let tipoServico: string
-  let tipoTexto: string
-
-  if (option === "1") {
-    tipoServico = "manutencao"
-    tipoTexto = "Manutenção"
-  } else if (option === "2") {
-    tipoServico = "orcamento"
-    tipoTexto = "Orçamento"
-  } else if (option === "3") {
-    tipoServico = "vistoria_contrato"
-    tipoTexto = "Vistoria para Contrato"
+  } else if (input === "3") {
+    // Sair
+    console.log("[v0] ✅ Usuário optou por sair")
+    await updateConversationState(from, "finalizada", {})
+    await sendMessage(
+      from,
+      `✅ *Atendimento encerrado!*\n\n` +
+        `Se precisar de algo, é só me chamar novamente! 😊\n\n` +
+        `💡 _Digite qualquer mensagem para iniciar um novo atendimento_`,
+    )
   } else {
     await sendMessage(
       from,
-      "❌ Opção inválida. Digite:\n\n" +
+      "❌ Opção inválida.\n\n" +
+        `Por favor, escolha uma das opções:\n\n` +
+        `*1* - Consultar detalhes\n` +
+        `*2* - Criar Nova Ordem\n` +
+        `*3* - Sair\n\n` +
+        "💡 _Digite 'menu' para voltar ao início_",
+    )
+  }
+}
+
+async function handleConsultarOsUnica(from: string, messageBody: string, data: any) {
+  const option = messageBody.trim()
+
+  if (option === "1") {
+    // Criar nova ordem
+    await updateConversationState(from, "selecionar_tipo_atendimento", {
+      clienteId: data.clienteId,
+      clienteNome: data.clienteNome,
+    })
+
+    await sendMessage(
+      from,
+      `📝 *Criar Nova Ordem de Serviço*\n\n` +
+        `Qual tipo de atendimento você precisa?\n\n` +
+        `*1* - Manutenção\n` +
+        `*2* - Orçamento\n` +
+        `*3* - Vistoria para Contrato\n\n` +
+        `_Digite o número da opção desejada_\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
+    )
+  } else if (option === "2") {
+    // Sair
+    await updateConversationState(from, "finalizada", {})
+    await sendMessage(
+      from,
+      `✅ *Atendimento encerrado!*\n\n` +
+        `Se precisar de algo, é só me chamar novamente! 😊\n\n` +
+        `💡 _Digite qualquer mensagem para iniciar um novo atendimento_`,
+    )
+  } else {
+    await sendMessage(
+      from,
+      "❌ Opção inválida.\n\n" +
+        `*1* - Sim, criar nova ordem\n` +
+        `*2* - Não, sair\n\n` +
+        "💡 _Digite 'menu' para voltar ao início_",
+    )
+  }
+}
+
+async function handleSelecionarOsConsulta(from: string, messageBody: string, data: any) {
+  const input = messageBody.trim()
+  const numeroSelecionado = Number.parseInt(input)
+  const ordensAbertas = data.ordensAbertas || []
+
+  if (isNaN(numeroSelecionado) || numeroSelecionado < 1 || numeroSelecionado > ordensAbertas.length) {
+    await sendMessage(
+      from,
+      `❌ Opção inválida.\n\n` +
+        `Digite um número entre 1 e ${ordensAbertas.length}\n\n` +
+        "💡 _Digite 'menu' para voltar ao início_",
+    )
+    return
+  }
+
+  // Mostrar detalhes da ordem selecionada
+  const ordem = ordensAbertas[numeroSelecionado - 1]
+
+  const statusMap: Record<string, string> = {
+    aberta: "🔴 Aberta",
+    agendada: "📅 Agendada",
+    em_andamento: "🟡 Em Andamento",
+  }
+
+  const tipoMap: Record<string, string> = {
+    manutencao: "Manutenção",
+    orcamento: "Orçamento",
+    vistoria_contrato: "Vistoria",
+  }
+
+  let mensagem = `📋 *Detalhes da Ordem de Serviço #${ordem.numero}*\n\n`
+  mensagem += `${statusMap[ordem.situacao] || ordem.situacao}\n\n`
+  mensagem += `📅 *Data de Abertura:* ${new Date(ordem.data_abertura).toLocaleDateString("pt-BR")}\n`
+  mensagem += `🔧 *Tipo:* ${tipoMap[ordem.tipo_servico] || ordem.tipo_servico}\n`
+
+  if (ordem.data_agendamento) {
+    const dataAgendamento = new Date(ordem.data_agendamento).toLocaleDateString("pt-BR")
+    mensagem += `📆 *Agendamento:* ${dataAgendamento}\n`
+  }
+
+  if (ordem.descricao) {
+    mensagem += `\n📝 *Descrição:*\n${ordem.descricao}\n`
+  }
+
+  mensagem += `\n\nDeseja criar uma *nova ordem*?\n\n`
+  mensagem += `*1* - Sim, criar nova ordem\n`
+  mensagem += `*2* - Não, sair\n\n`
+  mensagem += `💡 _Digite 'menu' para voltar ao início_`
+
+  await updateConversationState(from, "consultar_os_unica", {
+    ...data,
+    ordemConsultada: ordem,
+  })
+
+  await sendMessage(from, mensagem)
+}
+
+async function handleSelecionarTipoAtendimento(from: string, messageBody: string, data: any) {
+  const opcao = messageBody.trim()
+
+  let tipoServico: string
+  let tipoServicoLabel: string
+
+  if (opcao === "1") {
+    tipoServico = "manutencao"
+    tipoServicoLabel = "Manutenção"
+  } else if (opcao === "2") {
+    tipoServico = "orcamento"
+    tipoServicoLabel = "Orçamento"
+  } else if (opcao === "3") {
+    tipoServico = "vistoria_contrato"
+    tipoServicoLabel = "Vistoria para Contrato"
+  } else {
+    await sendMessage(
+      from,
+      "❌ Opção inválida.\n\n" +
+        "Digite:\n" +
         "*1* - Manutenção\n" +
         "*2* - Orçamento\n" +
         "*3* - Vistoria para Contrato\n\n" +
@@ -2368,21 +2505,20 @@ async function handleSelecionarTipoAtendimento(from: string, messageBody: string
     return
   }
 
-  console.log("[v0] ✅ Tipo de serviço selecionado:", tipoServico)
-
-  // Ir direto para tipo de atendimento (presencial/remoto)
-  await updateConversationState(from, "criar_os_tipo_atendimento", {
+  // Após selecionar o tipo, pedir o nome do solicitante
+  await updateConversationState(from, "criar_os_solicitante", {
     ...data,
-    tipoServico: tipoServico,
+    tipoServico,
+    tipoServicoLabel,
   })
 
   await sendMessage(
     from,
-    `✅ *${tipoTexto}* selecionado\n\n` +
-      `Qual será o tipo de atendimento?\n\n` +
-      `*1* - Presencial\n` +
-      `*2* - Remoto\n\n` +
-      `_Digite o número da opção desejada_\n\n` +
+    `✅ *Tipo de serviço: ${tipoServicoLabel}*\n\n` +
+      `Agora, qual é o *seu nome*?\n` +
+      `(Pessoa que está solicitando o serviço)\n\n` +
+      `Exemplo: _Maria Santos_\n\n` +
       `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
+// </CHANGE>
