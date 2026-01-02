@@ -17,6 +17,7 @@ import {
   findOrdensBySituacao,
   getNextAvailablePeriod, // Importando nova função de agendamento automático
   checkAndSendInactivityWarning, // Importando nova função de aviso de inatividade
+  findClientsByName, // Importando nova função de busca por nome
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
 
@@ -206,6 +207,8 @@ async function processUserMessage(from: string, messageBody: string) {
         await handleTipoCliente(from, messageBody, state?.data || {})
         break
 
+      // </CHANGE> Removido case "selecionar_cliente_por_nome" desnecessário que causava erro
+
       case "codigo_cliente":
         await handleCodigoCliente(from, messageBody, state?.data || {})
         break
@@ -332,6 +335,17 @@ async function processUserMessage(from: string, messageBody: string) {
         await handleCriarOSContatoTelefone(from, messageBody, state?.data || {})
         break
 
+      // Novos casos para lidar com a busca por nome
+      case "buscar_cliente_por_nome":
+        await handleBuscarClientePorNome(from, messageBody, state?.data || {})
+        break
+      case "confirmar_cliente":
+        await handleConfirmarCliente(from, messageBody, state?.data || {})
+        break
+      case "buscar_cliente_por_cnpj":
+        await handleCodigoCliente(from, messageBody, state?.data || {}) // Reutiliza handleCodigoCliente para buscar por CNPJ
+        break
+
       default:
         await sendTipoClienteMenu(from)
     }
@@ -346,14 +360,13 @@ async function handleTipoCliente(from: string, message: string, data: any) {
   const opcao = message.trim()
 
   if (opcao === "1") {
-    // Cliente existente - pedir código CNPJ
     await updateConversationState(from, "codigo_cliente", { ...data, tipo: "existente" })
     await sendMessage(
       from,
       "✅ *Cliente Existente*\n\n" +
-        "Para te identificar, digite os *6 primeiros dígitos do CNPJ* do seu condomínio.\n\n" +
-        "📋 Formato: *12.345.6*XX/XXXX-XX\n\n" +
-        "Exemplo: _123456_\n\n" +
+        "Como você prefere se identificar?\n\n" +
+        "*1* - Pelo nome do condomínio\n" +
+        "*2* - Pelos 6 primeiros dígitos do CNPJ\n\n" +
         "💡 _Digite 'menu' para voltar ao início_",
     )
   } else if (opcao === "2") {
@@ -379,7 +392,37 @@ async function handleTipoCliente(from: string, message: string, data: any) {
 }
 
 async function handleCodigoCliente(from: string, message: string, data: any) {
-  const codigo = message.trim().replace(/\D/g, "").substring(0, 6)
+  const opcao = message.trim()
+
+  if (opcao === "1" || opcao === "2") {
+    if (opcao === "1") {
+      // Buscar por nome
+      await updateConversationState(from, "buscar_cliente_por_nome", { ...data })
+      await sendMessage(
+        from,
+        "🔍 *Busca por Nome*\n\n" +
+          "Digite o *nome do condomínio* ou parte dele.\n\n" +
+          "Exemplo: _Villa Carrão_\n\n" +
+          "💡 _Digite 'menu' para voltar ao início_",
+      )
+      return
+    } else {
+      // Buscar por CNPJ - pedir os 6 dígitos
+      await updateConversationState(from, "buscar_cliente_por_cnpj", { ...data })
+      await sendMessage(
+        from,
+        "🔍 *Busca por CNPJ*\n\n" +
+          "Digite os *6 primeiros dígitos do CNPJ* do seu condomínio.\n\n" +
+          "📋 Formato: _12.345.6_XX/XXXX-XX\n\n" +
+          "Exemplo: _123456_\n\n" +
+          "💡 _Digite 'menu' para voltar ao início_",
+      )
+      return
+    }
+  }
+
+  // Se chegou aqui, é um código CNPJ digitado
+  const codigo = message.replace(/\D/g, "").substring(0, 6)
 
   if (!codigo || codigo.length < 6) {
     await sendMessage(
@@ -454,6 +497,114 @@ async function handleNomeCliente(from: string, message: string, data: any) {
       `Exemplo: _12.345.678/0001-90_\n\n` +
       `💡 _Digite 'menu' para voltar ao início_`,
   )
+}
+
+async function handleBuscarClientePorNome(from: string, message: string, data: any) {
+  const nome = message.trim()
+
+  if (!nome || nome.length < 3) {
+    await sendMessage(
+      from,
+      "❌ Por favor, digite pelo menos 3 caracteres do nome.\n\n" + "💡 _Digite 'menu' para voltar ao início_",
+    )
+    return
+  }
+
+  console.log("[v0] 🔍 Buscando clientes por nome:", nome)
+  const clientes = await findClientsByName(nome)
+
+  if (clientes.length === 0) {
+    await updateConversationState(from, "cliente_nao_encontrado", {
+      ...data,
+      nomeBuscado: nome,
+    })
+    await sendMessage(
+      from,
+      `❌ *Nenhum cliente encontrado*\n\n` +
+        `Não encontrei nenhum condomínio com o nome *${nome}*.\n\n` +
+        `Deseja fazer um novo cadastro?\n\n` +
+        `*1* - Sim, cadastrar\n` +
+        `*2* - Não, tentar outra busca\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
+    )
+  } else if (clientes.length === 1) {
+    // Apenas um cliente encontrado - mostrar para confirmação
+    const cliente = clientes[0]
+    await updateConversationState(from, "confirmar_cliente", {
+      ...data,
+      clienteEncontrado: cliente,
+    })
+    await sendMessage(
+      from,
+      `✅ *Cliente encontrado!*\n\n` +
+        `*${cliente.nome}*\n` +
+        `📍 Endereço: ${cliente.endereco || "Não informado"}\n` +
+        `🏙️ Cidade: ${cliente.cidade || "Não informado"} - ${cliente.estado || ""}\n` +
+        `📞 Telefone: ${cliente.telefone || "Não informado"}\n\n` +
+        `É este condomínio?\n\n` +
+        `*1* - Sim, continuar\n` +
+        `*2* - Não, buscar novamente\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
+    )
+  } else {
+    // Múltiplos clientes encontrados - listar com endereços
+    await updateConversationState(from, "selecionar_cliente", {
+      ...data,
+      clientesEncontrados: clientes,
+    })
+
+    let mensagem = `🔍 *Encontrei ${clientes.length} condomínios:*\n\n`
+    clientes.forEach((cliente, index) => {
+      mensagem += `*${index + 1}* - ${cliente.nome}\n`
+      mensagem += `   📍 ${cliente.endereco || "Sem endereço"}\n`
+      mensagem += `   🏙️ ${cliente.cidade || ""}${cliente.cidade && cliente.estado ? " - " : ""}${cliente.estado || ""}\n\n`
+    })
+    mensagem += `Digite o *número* do seu condomínio:\n\n`
+    mensagem += `💡 _Digite 'menu' para voltar ao início_`
+
+    await sendMessage(from, mensagem)
+  }
+}
+
+async function handleConfirmarCliente(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  if (opcao === "1") {
+    const cliente = data.clienteEncontrado
+    await updateConversationState(from, "menu", {
+      ...data,
+      clienteId: cliente.id,
+      clienteNome: cliente.nome,
+    })
+    await sendMessage(
+      from,
+      `✅ *Cliente identificado!*\n\n` +
+        `*${cliente.nome}*\n` +
+        `Código: ${cliente.codigo}\n\n` +
+        `Agora escolha uma opção:\n\n` +
+        `*1* - Criar ordem de serviço\n` +
+        `*2* - Consultar ordem aberta\n` +
+        `*3* - Consultar ordem finalizada\n` +
+        `*4* - Consultar ordem agendada\n` +
+        `*5* - Sair\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
+    )
+  } else if (opcao === "2") {
+    await updateConversationState(from, "buscar_cliente_por_nome", { ...data })
+    await sendMessage(
+      from,
+      "🔍 Ok! Digite o nome do condomínio novamente:\n\n" + "💡 _Digite 'menu' para voltar ao início_",
+    )
+  } else {
+    await sendMessage(
+      from,
+      "❌ Opção inválida.\n\n" +
+        "Digite:\n" +
+        "*1* - Sim, continuar\n" +
+        "*2* - Não, buscar novamente\n\n" +
+        "💡 _Digite 'menu' para voltar ao início_",
+    )
+  }
 }
 
 async function handleCadastroCNPJ(from: string, message: string, data: any) {
@@ -810,7 +961,7 @@ async function handleCadastroSolicitanteTelefone(from: string, message: string, 
       `*Endereço:* ${data.endereco}\n` +
       `*Bairro:* ${data.bairro}\n` +
       `*Cidade:* ${data.cidade} - ${data.estado}\n` +
-      `*Telefone Principal:* ${data.telefone}\n` +
+      `*Telefone:* ${data.telefone}\n` +
       `*Email:* ${data.email}\n` +
       `*Síndico:* ${data.sindico}\n` +
       `*Pessoa de Contato:* ${data.solicitanteNome}\n` +
@@ -1864,13 +2015,10 @@ async function handleConsultarPorSituacao(from: string, data: any, situacao: str
     await sendMessage(
       from,
       `ℹ️ *Nenhuma ordem ${situacaoLabel[situacao].toLowerCase()} encontrada*\n\n` +
-        `Não há ordens de serviço ${situacaoLabel[situacao].toLowerCase()} para *${data.clienteNome}*.\n\n` +
-        `Deseja fazer mais alguma coisa?\n\n` +
+        `Não há ordens de serviço ${situacaoLabel[situacao].toLowerCase()} para este cliente.\n\n` +
+        `Deseja criar uma nova ordem?\n\n` +
         `*1* - Criar ordem de serviço\n` +
-        `*2* - Consultar ordem aberta\n` +
-        `*3* - Consultar ordem finalizada\n` +
-        `*4* - Consultar ordem agendada\n` +
-        `*5* - Sair\n\n` +
+        `*2* - Voltar ao menu\n\n` +
         `💡 _Digite 'menu' para voltar ao início_`,
     )
     return
@@ -1891,7 +2039,7 @@ async function handleConsultarPorSituacao(from: string, data: any, situacao: str
   }
 
   // Montar lista de ordens
-  let mensagem = `${situacaoEmoji[situacao]} *Ordens ${situacaoLabel[situacao]} - ${data.clienteNome}*\n\n`
+  let mensagem = `📋 *Ordens de Serviço ${situacaoLabel[situacao]}*\n\n`
 
   ordens.forEach((ordem, index) => {
     const numero = index + 1
@@ -1902,6 +2050,7 @@ async function handleConsultarPorSituacao(from: string, data: any, situacao: str
         : ordem.descricao_defeito || "Sem descrição"
 
     mensagem += `*${numero}* - OS #${ordem.numero}\n`
+    mensagem += `${situacaoEmoji[ordem.situacao] || ordem.situacao}\n`
     mensagem += `📅 ${dataFormatada}\n`
     mensagem += `🔧 ${tipoMap[ordem.tipo_servico] || ordem.tipo_servico}\n`
 
@@ -1920,22 +2069,22 @@ async function handleConsultarPorSituacao(from: string, data: any, situacao: str
   await updateConversationState(from, "consultar_os_selecionar", {
     ...data,
     ordensEncontradas: ordens,
-    situacaoConsulta: situacao,
+    clienteConsulta: { id: data.clienteId, nome: data.clienteNome },
   })
 
   await sendMessage(from, mensagem)
 }
 
-// Nova função para lidar com a confirmação do agendamento
+// Função para confirmar agendamento automático
 async function handleConfirmarAgendamento(from: string, message: string, data: any) {
   const opcao = message.trim()
 
   if (opcao === "1") {
-    // Confirmar agendamento sugerido - agora pedir nome do contato
-    await updateConversationState(from, "criar_os_contato_nome", data)
+    // Confirmar agendamento
+    await updateConversationState(from, "criar_os_contato_nome", data) // Transiciona para solicitar nome do contato
     await sendMessage(
       from,
-      `✅ *Agendamento Confirmado*\n\n` +
+      `✅ *Agendamento confirmado!*\n\n` +
         `📅 Data: ${data.dataAgendamentoFormatada}\n` +
         `🕐 Período: ${data.periodoAgendamentoLabel}\n\n` +
         `Agora, qual é o *seu nome*?\n` +
@@ -1944,7 +2093,7 @@ async function handleConfirmarAgendamento(from: string, message: string, data: a
         `💡 _Digite 'menu' para voltar ao início_`,
     )
   } else if (opcao === "2") {
-    // Usuário quer escolher outra data manualmente
+    // Escolher outra data
     await updateConversationState(from, "criar_os_data_agendamento", {
       ...data,
       dataAgendamento: undefined,
@@ -1954,7 +2103,7 @@ async function handleConfirmarAgendamento(from: string, message: string, data: a
     })
     await sendMessage(
       from,
-      `📅 *Escolher Outra Data*\n\n` +
+      "📅 *Escolher Nova Data*\n\n" +
         "Digite a data desejada para o atendimento:\n\n" +
         "📋 Formato: DD/MM/AAAA\n" +
         "Exemplo: _15/01/2025_\n\n" +
@@ -1964,19 +2113,20 @@ async function handleConfirmarAgendamento(from: string, message: string, data: a
   } else {
     await sendMessage(
       from,
-      "❌ Opção inválida.\n\n" +
-        "Digite:\n" +
-        "*1* - Sim, confirmar\n" +
-        "*2* - Não, escolher outra data\n\n" +
-        "💡 _Digite 'menu' para voltar ao início_",
+      `❌ Opção inválida.\n\n` +
+        `Digite:\n` +
+        `*1* - Sim, confirmar agendamento\n` +
+        `*2* - Não, escolher outra data\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
     )
   }
 }
 
+// Função para capturar o nome do contato para a OS
 async function handleCriarOSContatoNome(from: string, message: string, data: any) {
-  const contatoNome = message.trim().toUpperCase()
+  const nomeContato = message.trim()
 
-  if (!contatoNome || contatoNome.length < 3) {
+  if (!nomeContato || nomeContato.length < 3) {
     await sendMessage(
       from,
       "❌ Por favor, digite um nome válido com pelo menos 3 caracteres.\n\n" +
@@ -1985,57 +2135,50 @@ async function handleCriarOSContatoNome(from: string, message: string, data: any
     return
   }
 
-  // Atualizar campo contato na tabela clientes
-  try {
-    console.log("[v0] 📝 Atualizando campo contato do cliente ID:", data.clienteId)
-    await query("UPDATE clientes SET contato = ? WHERE id = ?", [contatoNome, data.clienteId])
-    console.log("[v0] ✅ Campo contato atualizado com sucesso")
-  } catch (error) {
-    console.error("[v0] ❌ Erro ao atualizar contato:", error)
-  }
-
   await updateConversationState(from, "criar_os_contato_telefone", {
     ...data,
-    contatoNome,
+    nomeContatoOS: nomeContato,
   })
-
   await sendMessage(
     from,
-    `✅ Nome registrado: *${contatoNome}*\n\n` +
-      `Agora, qual é o *seu telefone*?\n\n` +
+    `✅ Nome registrado: *${nomeContato}*\n\n` +
+      `Agora, qual é o *telefone de contato*?\n\n` +
       `Exemplo: _(11) 99999-9999_\n\n` +
       `💡 _Digite 'menu' para voltar ao início_`,
   )
 }
 
+// Função para capturar o telefone de contato para a OS
 async function handleCriarOSContatoTelefone(from: string, message: string, data: any) {
-  const contatoTelefone = message.trim()
+  const telefoneContato = message.trim()
 
-  if (!contatoTelefone) {
+  if (!telefoneContato) {
     await sendMessage(from, "❌ Por favor, digite um telefone válido.\n\n" + "💡 _Digite 'menu' para voltar ao início_")
     return
   }
 
-  // Atualizar campo telefone na tabela clientes
-  try {
-    console.log("[v0] 📝 Atualizando campo telefone do cliente ID:", data.clienteId)
-    await query("UPDATE clientes SET telefone = ? WHERE id = ?", [contatoTelefone, data.clienteId])
-    console.log("[v0] ✅ Campo telefone atualizado com sucesso")
-  } catch (error) {
-    console.error("[v0] ❌ Erro ao atualizar telefone:", error)
-  }
-
   await updateConversationState(from, "create_order_desc", {
     ...data,
-    contatoTelefone,
-    solicitanteOS: data.contatoNome, // Usar o nome do contato como solicitante
+    telefoneContatoOS: telefoneContato,
   })
 
-  await sendMessage(
-    from,
-    `✅ Telefone registrado: *${contatoTelefone}*\n\n` +
-      `Agora, descreva o problema ou serviço necessário:\n\n` +
-      `Exemplo: _Verificar câmeras do hall do bloco A_\n\n` +
-      `💡 _Digite 'menu' para voltar ao início_`,
-  )
+  const tipoAtendimento = data.tipoAtendimento || "hoje"
+
+  if (tipoAtendimento === "agendado") {
+    await sendMessage(
+      from,
+      `✅ Telefone registrado: *${telefoneContato}*\n\n` +
+        `Agora, descreva o problema ou serviço necessário:\n\n` +
+        `Exemplo: _Verificar câmeras do hall do bloco A_\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
+    )
+  } else {
+    await sendMessage(
+      from,
+      `✅ Telefone registrado: *${telefoneContato}*\n\n` +
+        `Agora, descreva o problema ou serviço necessário:\n\n` +
+        `Exemplo: _Verificar câmeras do hall do bloco A_\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
+    )
+  }
 }
