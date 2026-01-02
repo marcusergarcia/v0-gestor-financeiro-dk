@@ -56,9 +56,6 @@ export default function OrdemServicoPage() {
     const hoje = new Date()
     hoje.setHours(0, 0, 0, 0)
 
-    console.log("[v0] Filtro de período:", periodoFilter)
-    console.log("[v0] Data de hoje:", hoje)
-
     return ordens.filter((os) => {
       if (!os.data_atual) return false
 
@@ -71,71 +68,59 @@ export default function OrdemServicoPage() {
 
         dataOS.setHours(0, 0, 0, 0)
 
-        console.log("[v0] Data da OS:", dataOS, "| String original:", os.data_atual)
-
         switch (periodoFilter) {
           case "mes-anterior": {
             const mesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)
             const fimMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth(), 0)
-            const resultado = dataOS >= mesAnterior && dataOS <= fimMesAnterior
-            console.log("[v0] Mês anterior - Range:", mesAnterior, "até", fimMesAnterior, "| Resultado:", resultado)
-            return resultado
+            return dataOS >= mesAnterior && dataOS <= fimMesAnterior
           }
           case "mes-atual": {
             const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
             const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
-            const resultado = dataOS >= inicioMes && dataOS <= fimMes
-            console.log("[v0] Mês atual - Range:", inicioMes, "até", fimMes, "| Resultado:", resultado)
-            return resultado
+            return dataOS >= inicioMes && dataOS <= fimMes
           }
           case "mes-posterior": {
             const mesPosterior = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1)
             const fimMesPosterior = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0)
-            const resultado = dataOS >= mesPosterior && dataOS <= fimMesPosterior
-            console.log("[v0] Mês posterior - Range:", mesPosterior, "até", fimMesPosterior, "| Resultado:", resultado)
-            return resultado
+            return dataOS >= mesPosterior && dataOS <= fimMesPosterior
           }
           case "trimestre": {
             const mesAtual = hoje.getMonth()
             const trimestreAtual = Math.floor(mesAtual / 3)
-            const inicioTrimestre = new Date(hoje.getFullYear(), trimestreAtual * 3, 1)
-            const fimTrimestre = new Date(hoje.getFullYear(), (trimestreAtual + 1) * 3, 0)
-            const resultado = dataOS >= inicioTrimestre && dataOS <= fimTrimestre
-            console.log(
-              "[v0] Trimestre - Atual:",
-              trimestreAtual,
-              "| Range:",
-              inicioTrimestre,
-              "até",
-              fimTrimestre,
-              "| Resultado:",
-              resultado,
-            )
-            return resultado
+            const trimestreAnterior = trimestreAtual - 1
+            let anoTrimestre = hoje.getFullYear()
+            let trimestreCalculo = trimestreAnterior
+
+            if (trimestreAnterior < 0) {
+              anoTrimestre = hoje.getFullYear() - 1
+              trimestreCalculo = 3
+            }
+
+            const inicioTrimestre = new Date(anoTrimestre, trimestreCalculo * 3, 1)
+            const fimTrimestre = new Date(anoTrimestre, (trimestreCalculo + 1) * 3, 0)
+            return dataOS >= inicioTrimestre && dataOS <= fimTrimestre
           }
           case "semestre": {
             const mesAtual = hoje.getMonth()
-            const semestreAtual = mesAtual < 6 ? 0 : 1
-            const inicioSemestre = new Date(hoje.getFullYear(), semestreAtual * 6, 1)
-            const fimSemestre = new Date(hoje.getFullYear(), (semestreAtual + 1) * 6, 0)
-            const resultado = dataOS >= inicioSemestre && dataOS <= fimSemestre
-            console.log(
-              "[v0] Semestre - Atual:",
-              semestreAtual,
-              "| Range:",
-              inicioSemestre,
-              "até",
-              fimSemestre,
-              "| Resultado:",
-              resultado,
-            )
-            return resultado
+            const semestreAtual = Math.floor(mesAtual / 6)
+            const semestreAnterior = semestreAtual - 1
+            let anoSemestre = hoje.getFullYear()
+            let semestreCalculo = semestreAnterior
+
+            if (semestreAnterior < 0) {
+              anoSemestre = hoje.getFullYear() - 1
+              semestreCalculo = 1
+            }
+
+            const inicioSemestre = new Date(anoSemestre, semestreCalculo * 6, 1)
+            const fimSemestre = new Date(anoSemestre, (semestreCalculo + 1) * 6, 0)
+            return dataOS >= inicioSemestre && dataOS <= fimSemestre
           }
           default:
             return true
         }
       } catch (error) {
-        console.error("[v0] Erro ao processar data:", error)
+        console.error("[v0] Erro ao filtrar por período:", error)
         return false
       }
     })
