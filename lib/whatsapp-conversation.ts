@@ -599,12 +599,12 @@ export async function findOrdensAbertas(clienteId: number): Promise<any[]> {
 
     const result = await query(
       `SELECT 
-        id, numero, data_atual, tipo_servico, descricao_defeito, 
+        id, numero, data_atual as data_abertura, tipo_servico, descricao_defeito, 
         situacao, data_agendamento, periodo_agendamento, created_at
        FROM ordens_servico 
        WHERE cliente_id = ? 
        AND situacao IN ('aberta', 'agendada', 'em_andamento')
-       ORDER BY created_at DESC
+       ORDER BY data_atual DESC
        LIMIT 10`,
       [clienteId],
     )
@@ -865,15 +865,15 @@ export async function checkAndFinalizeExpiredSessions(): Promise<number> {
 export async function findOpenServiceOrders(clienteId: number): Promise<any[]> {
   try {
     const result = await query(
-      `SELECT numero, descricao, data_abertura, situacao, prioridade
-       FROM ordem_servico
+      `SELECT numero, descricao_defeito as descricao, data_atual as data_abertura, situacao, tipo_servico, data_agendamento, periodo_agendamento
+       FROM ordens_servico
        WHERE cliente_id = ? 
-       AND situacao IN ('aberta', 'em_andamento', 'aguardando')
-       ORDER BY data_abertura DESC
+       AND situacao IN ('aberta', 'agendada', 'em_andamento')
+       ORDER BY data_atual DESC
        LIMIT 5`,
       [clienteId],
     )
-    return result.rows
+    return result as any[]
   } catch (error) {
     console.error("Erro ao buscar ordens abertas:", error)
     return []
