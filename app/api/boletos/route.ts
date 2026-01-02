@@ -275,6 +275,15 @@ export async function POST(request: NextRequest) {
                 unit_amount: Math.round(valorParcela * 100),
               },
             ],
+            shipping_address: {
+              street: enderecoValido,
+              number: numeroEndereco,
+              locality: bairroValido,
+              city: cidadeValida,
+              region_code: ufNormalizada,
+              country: "BRA",
+              postal_code: cepCompleto,
+            },
             charges: [
               {
                 reference_id: numeroBoleto,
@@ -301,7 +310,7 @@ export async function POST(request: NextRequest) {
                         city: cidadeValida,
                         region: nomeEstado,
                         region_code: ufNormalizada,
-                        country: "BRA",
+                        country: "Brasil",
                       },
                     },
                     instruction_lines: {
