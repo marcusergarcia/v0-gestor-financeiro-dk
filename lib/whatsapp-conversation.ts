@@ -6,6 +6,9 @@ export enum ConversationStage {
   NOME_CLIENTE = "nome_cliente",
   SELECIONAR_CLIENTE = "selecionar_cliente",
   CLIENTE_NAO_ENCONTRADO = "cliente_nao_encontrado",
+  CONFIRMAR_CLIENTE = "confirmar_cliente",
+  VERIFICAR_OS_ABERTA = "verificar_os_aberta",
+  SELECIONAR_TIPO_ATENDIMENTO = "selecionar_tipo_atendimento",
   CADASTRO_CNPJ = "cadastro_cnpj",
   CADASTRO_CEP = "cadastro_cep",
   CADASTRO_NUMERO = "cadastro_numero",
@@ -21,7 +24,7 @@ export enum ConversationStage {
   MENU = "menu",
   CRIAR_OS_TIPO_SERVICO = "criar_os_tipo_servico",
   CRIAR_OS_TIPO_ATENDIMENTO = "criar_os_tipo_atendimento",
-  CRIAR_OS_CONFIRMAR_AGENDAMENTO = "criar_os_confirmar_agendamento", // Novo estágio para confirmação de agendamento automático
+  CRIAR_OS_CONFIRMAR_AGENDAMENTO = "criar_os_confirmar_agendamento",
   CRIAR_OS_DATA_AGENDAMENTO = "criar_os_data_agendamento",
   CRIAR_OS_PERIODO_AGENDAMENTO = "criar_os_periodo_agendamento",
   CRIAR_OS_SOLICITANTE = "criar_os_solicitante",
@@ -59,8 +62,8 @@ export interface ConversationState {
   }
 }
 
-const TIMEOUT_WARNING_MINUTES = 5 // Aviso após 5 minutos
-const TIMEOUT_FINAL_MINUTES = 10 // Finalização após 10 minutos
+const TIMEOUT_WARNING_MINUTES = 5
+const TIMEOUT_FINAL_MINUTES = 10
 
 export async function getConversationState(phoneNumber: string): Promise<ConversationState | null> {
   try {
@@ -182,7 +185,7 @@ export async function findClientByPhone(phoneNumber: string): Promise<any | null
        FROM clientes 
        WHERE REPLACE(REPLACE(REPLACE(REPLACE(telefone, '-', ''), ' ', ''), '(', ''), ')', '') LIKE ?
        LIMIT 1`,
-      [`%${cleanPhone.slice(-9)}%`], // Últimos 9 dígitos (número sem DDD)
+      [`%${cleanPhone.slice(-9)}%`],
     )
 
     if (!result || (result as any[]).length === 0) {
@@ -318,12 +321,11 @@ export async function findClientsByName(nome: string): Promise<any[]> {
   try {
     console.log("[v0] 🔍 Buscando clientes por nome:", nome)
 
-    // Normaliza o texto de busca removendo acentos, til, ç
     const normalizar = (texto: string) => {
       return texto
         .toLowerCase()
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/[\u0300-\u036f]/g, "")
         .replace(/ç/g, "c")
         .replace(/ñ/g, "n")
     }
@@ -331,7 +333,6 @@ export async function findClientsByName(nome: string): Promise<any[]> {
     const nomeBusca = normalizar(nome)
     console.log("[v0] 🔍 Termo normalizado:", nomeBusca)
 
-    // Busca todos os clientes ativos
     const result = await query(
       `SELECT id, codigo, nome, cnpj, telefone, email, endereco, bairro, cidade, estado, cep 
        FROM clientes 
@@ -342,16 +343,13 @@ export async function findClientsByName(nome: string): Promise<any[]> {
 
     const todosClientes = (result as any[]) || []
 
-    // Filtra no código para busca flexível
     const clientesFiltrados = todosClientes.filter((cliente) => {
       const nomeCliente = normalizar(cliente.nome || "")
 
-      // Verifica se o termo de busca está contido no nome
       if (nomeCliente.includes(nomeBusca)) {
         return true
       }
 
-      // Verifica se todas as palavras do termo de busca estão no nome
       const palavrasBusca = nomeBusca.split(/\s+/)
       const todasPalavrasEncontradas = palavrasBusca.every((palavra) => nomeCliente.includes(palavra))
 
@@ -823,7 +821,6 @@ export async function checkAndSendInactivityWarning(phoneNumber: string): Promis
     if (result && (result as any[]).length > 0) {
       const row = (result as any[])[0]
 
-      // Marcar que o aviso foi enviado
       await query(
         `UPDATE whatsapp_conversations 
          SET timeout_warning_sent = 1, updated_at = NOW() 
@@ -862,5 +859,23 @@ export async function checkAndFinalizeExpiredSessions(): Promise<number> {
   } catch (error) {
     console.error("[v0] ❌ Erro ao finalizar sessões expiradas:", error)
     return 0
+  }
+}
+
+export async function findOpenServiceOrders(clienteId: number): Promise<any[]> {
+  try {
+    const result = await query(
+      `SELECT numero, descricao, data_abertura, situacao, prioridade
+       FROM ordem_servico
+       WHERE cliente_id = ? 
+       AND situacao IN ('aberta', 'em_andamento', 'aguardando')
+       ORDER BY data_abertura DESC
+       LIMIT 5`,
+      [clienteId],
+    )
+    return result.rows
+  } catch (error) {
+    console.error("Erro ao buscar ordens abertas:", error)
+    return []
   }
 }

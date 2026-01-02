@@ -18,6 +18,7 @@ import {
   getNextAvailablePeriod, // Importando nova função de agendamento automático
   checkAndSendInactivityWarning, // Importando nova função de aviso de inatividade
   findClientsByName, // Importando nova função de busca por nome
+  findOpenServiceOrders, // Importando nova função para buscar OS abertas
 } from "@/lib/whatsapp-conversation"
 import { query } from "@/lib/db"
 
@@ -358,6 +359,15 @@ async function processUserMessage(from: string, messageBody: string) {
         await handleCodigoCliente(from, messageBody, state?.data || {}) // Reutiliza handleCodigoCliente para buscar por CNPJ
         break
 
+      case "verificar_os_aberta":
+        await handleVerificarOsAberta(from, messageBody, state?.data || {})
+        break
+
+      case "selecionar_tipo_atendimento":
+        await handleSelecionarTipoAtendimento(from, messageBody, state?.data || {})
+        break
+      // </CHANGE>
+
       default:
         await sendTipoClienteMenu(from)
     }
@@ -583,24 +593,53 @@ async function handleConfirmarCliente(from: string, message: string, data: any) 
 
   if (opcao === "1") {
     const cliente = data.clienteEncontrado
-    await updateConversationState(from, "menu", {
-      ...data,
-      clienteId: cliente.id,
-      clienteNome: cliente.nome,
-    })
-    await sendMessage(
-      from,
-      `✅ *Cliente identificado!*\n\n` +
-        `*${cliente.nome}*\n` +
-        `Código: ${cliente.codigo}\n\n` +
-        `Agora escolha uma opção:\n\n` +
-        `*1* - Criar ordem de serviço\n` +
-        `*2* - Consultar ordem aberta\n` +
-        `*3* - Consultar ordem finalizada\n` +
-        `*4* - Consultar ordem agendada\n` +
-        `*5* - Sair\n\n` +
-        `💡 _Digite 'menu' para voltar ao início_`,
-    )
+
+    // Buscar ordens de serviço abertas
+    const ordensAbertas = await findOpenServiceOrders(cliente.id)
+
+    if (ordensAbertas.length > 0) {
+      // Tem ordem aberta - mostrar e perguntar
+      let mensagem = `✅ *Cliente identificado!*\n\n*${cliente.nome}*\nCódigo: ${cliente.codigo}\n\n`
+      mensagem += `⚠️ Encontrei ${ordensAbertas.length} ordem(ns) de serviço aberta(s):\n\n`
+
+      ordensAbertas.forEach((os, index) => {
+        mensagem += `*${index + 1}.* OS #${os.numero}\n`
+        mensagem += `   ${os.descricao}\n`
+        mensagem += `   Situação: ${os.situacao}\n`
+        mensagem += `   Aberta em: ${new Date(os.data_abertura).toLocaleDateString("pt-BR")}\n\n`
+      })
+
+      mensagem += `*Escolha uma opção:*\n\n`
+      mensagem += `Digite o número da OS se for o mesmo problema\n`
+      mensagem += `Ou digite *NOVA* para abrir uma nova ordem\n\n`
+      mensagem += `💡 _Digite 'menu' para voltar ao início_`
+
+      await updateConversationState(from, "verificar_os_aberta", {
+        ...data,
+        clienteId: cliente.id,
+        clienteNome: cliente.nome,
+        ordensAbertas,
+      })
+      await sendMessage(from, mensagem)
+    } else {
+      // Não tem ordem aberta - mostrar opções de tipo de atendimento
+      await updateConversationState(from, "selecionar_tipo_atendimento", {
+        ...data,
+        clienteId: cliente.id,
+        clienteNome: cliente.nome,
+      })
+      await sendMessage(
+        from,
+        `✅ *Cliente identificado!*\n\n` +
+          `*${cliente.nome}*\n` +
+          `Código: ${cliente.codigo}\n\n` +
+          `*Escolha o tipo de atendimento:*\n\n` +
+          `*1* - Manutenção\n` +
+          `*2* - Orçamento\n` +
+          `*3* - Vistoria para contrato\n\n` +
+          `💡 _Digite 'menu' para voltar ao início_`,
+      )
+    }
   } else if (opcao === "2") {
     await updateConversationState(from, "buscar_cliente_por_nome", { ...data })
     await sendMessage(
@@ -2189,6 +2228,100 @@ async function handleCriarOSContatoTelefone(from: string, message: string, data:
       `✅ Telefone registrado: *${telefoneContato}*\n\n` +
         `Agora, descreva o problema ou serviço necessário:\n\n` +
         `Exemplo: _Verificar câmeras do hall do bloco A_\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
+    )
+  }
+}
+
+async function handleVerificarOsAberta(from: string, message: string, data: any) {
+  const input = message.trim().toUpperCase()
+
+  if (input === "NOVA") {
+    // Criar nova ordem - mostrar opções de tipo de atendimento
+    await updateConversationState(from, "selecionar_tipo_atendimento", data)
+    await sendMessage(
+      from,
+      `*Escolha o tipo de atendimento:*\n\n` +
+        `*1* - Manutenção\n` +
+        `*2* - Orçamento\n` +
+        `*3* - Vistoria para contrato\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
+    )
+  } else if (/^\d+$/.test(input)) {
+    const index = Number.parseInt(input) - 1
+    if (index >= 0 && index < data.ordensAbertas.length) {
+      const osEscolhida = data.ordensAbertas[index]
+      await sendMessage(
+        from,
+        `📋 *Ordem de Serviço #${osEscolhida.numero}*\n\n` +
+          `Descrição: ${osEscolhida.descricao}\n` +
+          `Situação: ${osEscolhida.situacao}\n` +
+          `Aberta em: ${new Date(osEscolhida.data_abertura).toLocaleDateString("pt-BR")}\n\n` +
+          `Vou adicionar um comentário nesta ordem informando que você entrou em contato.\n\n` +
+          `✅ Registrado! Nossa equipe já está ciente e em breve entrará em contato.\n\n` +
+          `💡 _Digite 'menu' para voltar ao início ou 'sair' para encerrar_`,
+      )
+      await clearConversationState(from)
+    } else {
+      await sendMessage(
+        from,
+        `❌ Número inválido.\n\n` +
+          `Digite o número da OS (1 a ${data.ordensAbertas.length}) ou *NOVA* para abrir uma nova ordem.\n\n` +
+          `💡 _Digite 'menu' para voltar ao início_`,
+      )
+    }
+  } else {
+    await sendMessage(
+      from,
+      `❌ Opção inválida.\n\n` +
+        `Digite o número da OS ou *NOVA* para abrir uma nova ordem.\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
+    )
+  }
+}
+
+async function handleSelecionarTipoAtendimento(from: string, message: string, data: any) {
+  const opcao = message.trim()
+
+  if (opcao === "1") {
+    await updateConversationState(from, "menu", data)
+    await sendMessage(
+      from,
+      `📝 *Manutenção selecionada*\n\n` +
+        `Agora escolha uma opção:\n\n` +
+        `*1* - Criar ordem de serviço\n` +
+        `*2* - Consultar ordem aberta\n` +
+        `*3* - Consultar ordem finalizada\n` +
+        `*4* - Consultar ordem agendada\n` +
+        `*5* - Sair\n\n` +
+        `💡 _Digite 'menu' para voltar ao início_`,
+    )
+  } else if (opcao === "2") {
+    await sendMessage(
+      from,
+      `💰 *Orçamento selecionado*\n\n` +
+        `Nossa equipe entrará em contato para fazer uma avaliação e preparar um orçamento personalizado.\n\n` +
+        `✅ Solicitação registrada!\n\n` +
+        `💡 _Digite 'menu' para voltar ao início ou 'sair' para encerrar_`,
+    )
+    await clearConversationState(from)
+  } else if (opcao === "3") {
+    await sendMessage(
+      from,
+      `🔍 *Vistoria para contrato selecionada*\n\n` +
+        `Nossa equipe entrará em contato para agendar a vistoria técnica.\n\n` +
+        `✅ Solicitação registrada!\n\n` +
+        `💡 _Digite 'menu' para voltar ao início ou 'sair' para encerrar_`,
+    )
+    await clearConversationState(from)
+  } else {
+    await sendMessage(
+      from,
+      `❌ Opção inválida.\n\n` +
+        `Digite:\n` +
+        `*1* - Manutenção\n` +
+        `*2* - Orçamento\n` +
+        `*3* - Vistoria para contrato\n\n` +
         `💡 _Digite 'menu' para voltar ao início_`,
     )
   }
