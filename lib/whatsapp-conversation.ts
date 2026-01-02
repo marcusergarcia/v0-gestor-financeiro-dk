@@ -318,20 +318,49 @@ export async function findClientsByName(nome: string): Promise<any[]> {
   try {
     console.log("[v0] 🔍 Buscando clientes por nome:", nome)
 
+    // Normaliza o texto de busca removendo acentos, til, ç
+    const normalizar = (texto: string) => {
+      return texto
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .replace(/ç/g, "c")
+        .replace(/ñ/g, "n")
+    }
+
+    const nomeBusca = normalizar(nome)
+    console.log("[v0] 🔍 Termo normalizado:", nomeBusca)
+
+    // Busca todos os clientes ativos
     const result = await query(
       `SELECT id, codigo, nome, cnpj, telefone, email, endereco, numero, bairro, cidade, estado 
        FROM clientes 
-       WHERE nome LIKE ? 
-       AND (status IS NULL OR status != 'inativo')
-       ORDER BY nome
-       LIMIT 10`,
-      [`%${nome}%`],
+       WHERE (status IS NULL OR status != 'inativo')
+       ORDER BY nome`,
+      [],
     )
 
-    const clientes = (result as any[]) || []
-    console.log("[v0] ✅ Clientes encontrados:", clientes.length)
+    const todosClientes = (result as any[]) || []
 
-    return clientes.map((cliente) => ({
+    // Filtra no código para busca flexível
+    const clientesFiltrados = todosClientes.filter((cliente) => {
+      const nomeCliente = normalizar(cliente.nome || "")
+
+      // Verifica se o termo de busca está contido no nome
+      if (nomeCliente.includes(nomeBusca)) {
+        return true
+      }
+
+      // Verifica se todas as palavras do termo de busca estão no nome
+      const palavrasBusca = nomeBusca.split(/\s+/)
+      const todasPalavrasEncontradas = palavrasBusca.every((palavra) => nomeCliente.includes(palavra))
+
+      return todasPalavrasEncontradas
+    })
+
+    console.log("[v0] ✅ Clientes encontrados:", clientesFiltrados.length)
+
+    return clientesFiltrados.slice(0, 10).map((cliente) => ({
       ...cliente,
       endereco: cliente.endereco
         ? `${cliente.endereco}${cliente.numero ? ", " + cliente.numero : ""}${cliente.bairro ? " - " + cliente.bairro : ""}`
