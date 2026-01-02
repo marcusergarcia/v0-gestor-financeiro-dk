@@ -33,9 +33,11 @@ export default function OrdemServicoPage() {
   const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([])
   const [logoMenu, setLogoMenu] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState("")
+
   const [situacaoFilter, setSituacaoFilter] = useState("todas")
-  const [periodoFilter, setPeriodoFilter] = useState("mes-atual")
   const [tipoServicoFilter, setTipoServicoFilter] = useState("todos")
+  const [periodoFilter, setPeriodoFilter] = useState("todos")
+
   const [stats, setStats] = useState({
     total: 0,
     abertas: 0,
@@ -45,6 +47,7 @@ export default function OrdemServicoPage() {
     preventivas: 0,
     manutencoes: 0,
   })
+
   const router = useRouter()
 
   const filterByPeriod = (ordens: OrdemServico[]) => {
@@ -54,16 +57,14 @@ export default function OrdemServicoPage() {
     hoje.setHours(0, 0, 0, 0)
 
     return ordens.filter((os) => {
-      if (!os.data_atual) {
-        return false
-      }
+      if (!os.data_atual) return false
 
       try {
-        const dataOS = new Date(os.data_atual)
+        const dataString = os.data_atual.split("T")[0]
+        const [ano, mes, dia] = dataString.split("-").map(Number)
+        const dataOS = new Date(ano, mes - 1, dia)
 
-        if (isNaN(dataOS.getTime())) {
-          return false
-        }
+        if (isNaN(dataOS.getTime())) return false
 
         dataOS.setHours(0, 0, 0, 0)
 
@@ -85,14 +86,14 @@ export default function OrdemServicoPage() {
           }
           case "trimestre": {
             const mesAtual = hoje.getMonth()
-            const trimestreAtual = Math.floor(mesAtual / 3) // 0-3 = Q1, 4-6 = Q2, 7-9 = Q3, 10-12 = Q4
+            const trimestreAtual = Math.floor(mesAtual / 3)
             const inicioTrimestre = new Date(hoje.getFullYear(), trimestreAtual * 3, 1)
             const fimTrimestre = new Date(hoje.getFullYear(), (trimestreAtual + 1) * 3, 0)
             return dataOS >= inicioTrimestre && dataOS <= fimTrimestre
           }
           case "semestre": {
             const mesAtual = hoje.getMonth()
-            const semestreAtual = mesAtual < 6 ? 0 : 1 // 0 = 1º semestre (jan-jun), 1 = 2º semestre (jul-dez)
+            const semestreAtual = mesAtual < 6 ? 0 : 1
             const inicioSemestre = new Date(hoje.getFullYear(), semestreAtual * 6, 1)
             const fimSemestre = new Date(hoje.getFullYear(), (semestreAtual + 1) * 6, 0)
             return dataOS >= inicioSemestre && dataOS <= fimSemestre
@@ -109,7 +110,6 @@ export default function OrdemServicoPage() {
   const ordensFiltered = useMemo(() => {
     let filtered = ordensServico
 
-    // Apply search filter
     if (searchInput.trim()) {
       const searchLower = searchInput.toLowerCase()
       filtered = filtered.filter((os) => {
@@ -122,22 +122,22 @@ export default function OrdemServicoPage() {
       })
     }
 
-    // Apply tipo de serviço filter
+    if (situacaoFilter !== "todas") {
+      filtered = filtered.filter((os) => os.situacao === situacaoFilter)
+    }
+
     if (tipoServicoFilter !== "todos") {
       filtered = filtered.filter((os) => os.tipo_servico === tipoServicoFilter)
     }
 
-    // Apply período filter
-    if (periodoFilter !== "todos") {
-      filtered = filterByPeriod(filtered)
-    }
+    filtered = filterByPeriod(filtered)
 
     return filtered
-  }, [ordensServico, searchInput, tipoServicoFilter, periodoFilter])
+  }, [ordensServico, searchInput, situacaoFilter, tipoServicoFilter, periodoFilter])
 
   useEffect(() => {
     carregarDados()
-  }, [situacaoFilter])
+  }, [])
 
   const carregarDados = async () => {
     try {
@@ -154,8 +154,7 @@ export default function OrdemServicoPage() {
       }
 
       const params = new URLSearchParams()
-      if (situacaoFilter && situacaoFilter !== "todas") params.append("situacao", situacaoFilter)
-      params.append("limit", "50")
+      params.append("limit", "1000")
 
       const response = await fetch(`/api/ordens-servico?${params}`)
       const data = await response.json()
@@ -163,20 +162,15 @@ export default function OrdemServicoPage() {
       if (data.success) {
         setOrdensServico(data.data)
 
-        const statsResponse = await fetch("/api/ordens-servico?limit=1000")
-        const statsData = await statsResponse.json()
+        const total = data.data.length
+        const abertas = data.data.filter((os: OrdemServico) => os.situacao === "aberta").length
+        const agendadas = data.data.filter((os: OrdemServico) => os.situacao === "agendada").length
+        const em_andamento = data.data.filter((os: OrdemServico) => os.situacao === "em_andamento").length
+        const concluidas = data.data.filter((os: OrdemServico) => os.situacao === "concluida").length
+        const preventivas = data.data.filter((os: OrdemServico) => os.tipo_servico === "preventiva").length
+        const manutencoes = data.data.filter((os: OrdemServico) => os.tipo_servico === "manutencao").length
 
-        if (statsData.success) {
-          const total = statsData.data.length
-          const abertas = statsData.data.filter((os: OrdemServico) => os.situacao === "aberta").length
-          const agendadas = statsData.data.filter((os: OrdemServico) => os.situacao === "agendada").length
-          const em_andamento = statsData.data.filter((os: OrdemServico) => os.situacao === "em_andamento").length
-          const concluidas = statsData.data.filter((os: OrdemServico) => os.situacao === "concluida").length
-          const preventivas = statsData.data.filter((os: OrdemServico) => os.tipo_servico === "preventiva").length
-          const manutencoes = statsData.data.filter((os: OrdemServico) => os.tipo_servico === "manutencao").length
-
-          setStats({ total, abertas, agendadas, em_andamento, concluidas, preventivas, manutencoes })
-        }
+        setStats({ total, abertas, agendadas, em_andamento, concluidas, preventivas, manutencoes })
       }
     } catch (error) {
       console.error("Erro ao carregar dados:", error)
@@ -212,7 +206,6 @@ export default function OrdemServicoPage() {
 
   const handleTipoServicoCardClick = (tipo: string) => {
     setTipoServicoFilter(tipo)
-    setSituacaoFilter("todas") // Reset situação filter quando filtrar por tipo
   }
 
   const getStatusBadge = (situacao: string) => {
@@ -477,6 +470,21 @@ export default function OrdemServicoPage() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+              <Select value={situacaoFilter} onValueChange={setSituacaoFilter}>
+                <SelectTrigger className="w-full md:w-48 text-sm">
+                  <SelectValue placeholder="Situação" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas situações</SelectItem>
+                  <SelectItem value="aberta">Aberta</SelectItem>
+                  <SelectItem value="agendada">Agendada</SelectItem>
+                  <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                  <SelectItem value="concluida">Concluída</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-2">
               <Wrench className="h-4 w-4 text-gray-400 flex-shrink-0" />
