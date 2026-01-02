@@ -84,13 +84,17 @@ export default function OrdemServicoPage() {
             return dataOS >= mesPosterior && dataOS <= fimMesPosterior
           }
           case "trimestre": {
-            const inicioTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1)
-            const fimTrimestre = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
+            const mesAtual = hoje.getMonth()
+            const trimestreAtual = Math.floor(mesAtual / 3) // 0-3 = Q1, 4-6 = Q2, 7-9 = Q3, 10-12 = Q4
+            const inicioTrimestre = new Date(hoje.getFullYear(), trimestreAtual * 3, 1)
+            const fimTrimestre = new Date(hoje.getFullYear(), (trimestreAtual + 1) * 3, 0)
             return dataOS >= inicioTrimestre && dataOS <= fimTrimestre
           }
           case "semestre": {
-            const inicioSemestre = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1)
-            const fimSemestre = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)
+            const mesAtual = hoje.getMonth()
+            const semestreAtual = mesAtual < 6 ? 0 : 1 // 0 = 1º semestre (jan-jun), 1 = 2º semestre (jul-dez)
+            const inicioSemestre = new Date(hoje.getFullYear(), semestreAtual * 6, 1)
+            const fimSemestre = new Date(hoje.getFullYear(), (semestreAtual + 1) * 6, 0)
             return dataOS >= inicioSemestre && dataOS <= fimSemestre
           }
           default:
