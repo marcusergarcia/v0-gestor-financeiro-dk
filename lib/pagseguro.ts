@@ -193,25 +193,27 @@ export class PagSeguroAPI {
 
   // BOLETOS
   async criarBoleto(data: BoletoData) {
+    const phoneNumber = data.customer.phone.replace(/\D/g, "")
+    const validPhone = phoneNumber.length >= 10 ? phoneNumber : null
+
     const payload = {
       reference_id: data.charges[0].reference_id,
       customer: {
         name: data.customer.name,
         email: data.customer.email,
         tax_id: data.customer.tax_id,
-        phones: [
-          {
-            country: "55",
-            area: data.customer.phone.substring(0, 2),
-            number: data.customer.phone.substring(2),
-            type: "MOBILE",
-          },
-        ],
+        ...(validPhone && {
+          phones: [
+            {
+              country: "55",
+              area: validPhone.substring(0, 2),
+              number: validPhone.substring(2),
+              type: "MOBILE",
+            },
+          ],
+        }),
       },
       items: data.items,
-      shipping: {
-        address: data.shipping_address,
-      },
       charges: data.charges,
     }
 

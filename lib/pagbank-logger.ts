@@ -31,14 +31,14 @@ export class PagBankLogger {
         (timestamp, method, endpoint, request_data, response_data, status, payment_type, success) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          logEntry.timestamp,
-          logEntry.method,
-          logEntry.endpoint,
-          JSON.stringify(logEntry.request),
-          JSON.stringify(logEntry.response),
-          logEntry.status,
-          logEntry.paymentType,
-          logEntry.success,
+          logEntry.timestamp ?? null,
+          logEntry.method ?? null,
+          logEntry.endpoint ?? null,
+          logEntry.request ? JSON.stringify(logEntry.request) : null,
+          logEntry.response ? JSON.stringify(logEntry.response) : null,
+          logEntry.status ?? null,
+          logEntry.paymentType ?? null,
+          logEntry.success ?? false,
         ],
       )
       console.log("[PagBank Logger] Log salvo no banco com sucesso")
@@ -234,15 +234,16 @@ export async function logPagBankTransaction(data: {
   endpoint: string
   request: any
   response: any
+  status?: number
   success: boolean
 }) {
   await PagBankLogger.log({
-    method: data.method,
-    endpoint: data.endpoint,
-    request: data.request,
-    response: data.response,
-    status: data.success ? 200 : 400,
-    paymentType: data.method,
-    success: data.success,
+    method: data.method ?? "UNKNOWN",
+    endpoint: data.endpoint ?? "",
+    request: data.request ?? {},
+    response: data.response ?? {},
+    status: data.status ?? (data.success ? 200 : 400),
+    paymentType: data.method ?? "UNKNOWN",
+    success: data.success ?? false,
   })
 }
