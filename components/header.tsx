@@ -116,7 +116,7 @@ export function Header() {
       if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
         const [year, month, day] = dateString.split("-")
         // Cria data local sem conversão UTC
-        return new Date(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day))
+        return new Date(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day), 0, 0, 0, 0)
       }
 
       // Se a data já vem no formato ISO com timezone
@@ -174,11 +174,22 @@ export function Header() {
               return false
             }
 
-            const vencimento = parseDate(boleto.data_vencimento)
-            if (!vencimento) return false
+            if (boleto.data_vencimento && boleto.data_vencimento.match(/^\d{4}-\d{2}-\d{2}$/)) {
+              const [year, month, day] = boleto.data_vencimento.split("-")
+              const vencimento = new Date(
+                Number.parseInt(year),
+                Number.parseInt(month) - 1,
+                Number.parseInt(day),
+                0,
+                0,
+                0,
+                0,
+              )
+              // Boleto vencido = vencimento é ANTES de hoje (não inclui hoje)
+              return vencimento < hoje
+            }
 
-            vencimento.setHours(0, 0, 0, 0)
-            return vencimento < hoje
+            return false
           })
 
           setBoletosVencidos(vencidos)
