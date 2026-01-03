@@ -22,17 +22,20 @@ import {
   Calendar,
   User,
   FileText,
+  CalendarRange,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { OrdemServico } from "@/types/ordem-servico"
+import { LotePreventivasDialog } from "@/components/ordem-servico/lote-preventivas-dialog"
 
 export default function OrdemServicoPage() {
   const [loading, setLoading] = useState(true)
   const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([])
   const [logoMenu, setLogoMenu] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState("")
+  const [loteDialogOpen, setLoteDialogOpen] = useState(false)
 
   const [situacaoFilter, setSituacaoFilter] = useState("todas")
   const [tipoServicoFilter, setTipoServicoFilter] = useState("todos")
@@ -471,12 +474,22 @@ export default function OrdemServicoPage() {
                 </CardDescription>
               </div>
             </div>
-            <Link href="/ordem-servico/nova">
-              <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30" size="sm">
-                <Plus className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">Nova OS</span>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setLoteDialogOpen(true)}
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                size="sm"
+              >
+                <CalendarRange className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Preventivas em Lote</span>
               </Button>
-            </Link>
+              <Link href="/ordem-servico/nova">
+                <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30" size="sm">
+                  <Plus className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Nova OS</span>
+                </Button>
+              </Link>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-4 md:p-6">
@@ -679,6 +692,8 @@ export default function OrdemServicoPage() {
           </div>
         </CardContent>
       </Card>
+
+      <LotePreventivasDialog open={loteDialogOpen} onOpenChange={setLoteDialogOpen} onSuccess={carregarDados} />
     </div>
   )
 }
