@@ -197,12 +197,37 @@ export function Header() {
   }
 
   const formatDate = (dateString: string) => {
-    const date = parseDate(dateString)
-    if (!date) return dateString
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-    })
+    try {
+      // Se a data vem no formato YYYY-MM-DD (formato do banco)
+      if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const [year, month, day] = dateString.split("-")
+        return `${day}/${month}`
+      }
+
+      // Se a data vem no formato ISO com timezone
+      if (dateString.includes("T")) {
+        const date = new Date(dateString)
+        const day = date.getDate().toString().padStart(2, "0")
+        const month = (date.getMonth() + 1).toString().padStart(2, "0")
+        return `${day}/${month}`
+      }
+
+      // Se a data já vem no formato DD/MM/YYYY
+      if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+        const [day, month] = dateString.split("/")
+        return `${day}/${month}`
+      }
+
+      // Fallback: tentar usar parseDate
+      const date = parseDate(dateString)
+      if (!date) return dateString
+      const day = date.getDate().toString().padStart(2, "0")
+      const month = (date.getMonth() + 1).toString().padStart(2, "0")
+      return `${day}/${month}`
+    } catch (error) {
+      console.error("Erro ao formatar data:", dateString, error)
+      return dateString
+    }
   }
 
   const getInitials = (nome: string) => {
