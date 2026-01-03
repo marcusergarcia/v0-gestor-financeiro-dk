@@ -165,13 +165,30 @@ export function Header() {
       if (boletosResponse.ok) {
         const boletosResult = await boletosResponse.json()
 
+        console.log("[v0] Resposta da API de boletos:", {
+          success: boletosResult.success,
+          totalBoletos: boletosResult.data?.length || 0,
+          primeirosBoletos: boletosResult.data?.slice(0, 3).map((b: any) => ({
+            numero: b.numero,
+            status: b.status,
+            data_vencimento: b.data_vencimento,
+          })),
+        })
+
         if (boletosResult.success && Array.isArray(boletosResult.data)) {
           const hoje = new Date()
           hoje.setHours(0, 0, 0, 0)
 
           const vencidos = boletosResult.data.filter((boleto: any) => {
+            console.log("[v0] Processando boleto:", {
+              numero: boleto.numero,
+              status: boleto.status,
+              data_vencimento: boleto.data_vencimento,
+            })
+
             // Se o status já é "vencido", deve aparecer na notificação
             if (boleto.status === "vencido") {
+              console.log("[v0] Boleto vencido encontrado:", boleto.numero)
               return true
             }
 
@@ -189,13 +206,21 @@ export function Header() {
                   0,
                 )
                 // Boleto vencido = vencimento é ANTES de hoje (não inclui hoje)
-                return vencimento < hoje
+                const estaVencido = vencimento < hoje
+                console.log("[v0] Boleto pendente - Comparação:", {
+                  numero: boleto.numero,
+                  vencimento: vencimento.toISOString(),
+                  hoje: hoje.toISOString(),
+                  estaVencido,
+                })
+                return estaVencido
               }
             }
 
             return false
           })
 
+          console.log("[v0] Total de boletos vencidos filtrados:", vencidos.length)
           setBoletosVencidos(vencidos)
         }
       }
