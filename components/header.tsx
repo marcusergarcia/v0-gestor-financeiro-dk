@@ -198,35 +198,24 @@ export function Header() {
 
   const formatDate = (dateString: string) => {
     try {
-      // Se a data vem no formato YYYY-MM-DD (formato do banco)
-      if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        const [year, month, day] = dateString.split("-")
-        return `${day}/${month}`
+      // Para formato YYYY-MM-DD (do banco) ou qualquer variação com hífen
+      if (dateString.includes("-")) {
+        const parts = dateString.split("T")[0].split("-") // Remove hora se existir
+        if (parts.length === 3) {
+          const [year, month, day] = parts
+          return `${day}/${month}`
+        }
       }
 
-      // Se a data vem no formato ISO com timezone
-      if (dateString.includes("T")) {
-        const date = new Date(dateString)
-        const day = String(date.getDate()).padStart(2, "0")
-        const month = String(date.getMonth() + 1).padStart(2, "0")
-        return `${day}/${month}`
-      }
-
-      // Se a data já vem no formato DD/MM/YYYY
-      if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+      // Para formato DD/MM/YYYY
+      if (dateString.includes("/")) {
         const [day, month] = dateString.split("/")
-        return `${day}/${month}`
-      }
-
-      // Fallback: usar split manual
-      const [year, month, day] = dateString.split("-")
-      if (day && month) {
         return `${day}/${month}`
       }
 
       return dateString
     } catch (error) {
-      console.error("Erro ao formatar data:", dateString, error)
+      console.error("[v0] Erro ao formatar data:", dateString, error)
       return dateString
     }
   }
