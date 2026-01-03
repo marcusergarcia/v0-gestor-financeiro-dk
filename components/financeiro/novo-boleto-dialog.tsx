@@ -329,8 +329,8 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
   return (
     <>
       <Dialog open={open && !previewOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-3xl border-0 shadow-2xl p-0">
-          <DialogHeader className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 rounded-t-lg">
+        <DialogContent className="max-w-3xl border-0 shadow-2xl p-0 overflow-hidden">
+          <DialogHeader className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6">
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <div className="p-2 bg-white/20 rounded-lg">
                 <Plus className="h-5 w-5" />
@@ -342,193 +342,199 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
             </DialogDescription>
           </DialogHeader>
 
-          <div className="p-6 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="cliente" className="text-sm font-semibold text-gray-700">
-                Cliente *
-              </Label>
-              <ClienteCombobox
-                value={cliente}
-                onValueChange={handleClienteChange}
-                placeholder="Selecione um cliente..."
-              />
-              <div className="flex items-center gap-4 flex-wrap">
-                {cliente && (
-                  <div className="text-sm text-gray-600">
-                    Selecionado: <span className="font-medium">{cliente.nome}</span>
-                  </div>
-                )}
-                {contratoInfo?.tem_contrato && contratoInfo?.dia_contrato && (
-                  <div className="flex items-center gap-1 text-sm text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded-md">
-                    <Calendar className="h-4 w-4" />
-                    Dia do Contrato: {contratoInfo.dia_contrato}
-                  </div>
-                )}
-                {contratoInfo?.tem_contrato === false && (
-                  <div className="text-sm text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded-md">
-                    Cliente sem contrato ativo
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white">
+            <div className="p-6 space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="numero-nota" className="text-sm font-semibold text-gray-700">
-                  Número da Nota *
+                <Label htmlFor="cliente" className="text-sm font-semibold text-gray-700">
+                  Cliente *
                 </Label>
-                <Input
-                  id="numero-nota"
-                  value={numeroNota}
-                  onChange={(e) => handleNumeroNotaChange(e.target.value)}
-                  placeholder="Digite o número da nota"
-                  className={`border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 ${
-                    numeroNotaError ? "border-red-500 focus:border-red-500" : ""
-                  }`}
+                <ClienteCombobox
+                  value={cliente}
+                  onValueChange={handleClienteChange}
+                  placeholder="Selecione um cliente..."
                 />
-                {numeroNotaError && <p className="text-sm text-red-500 mt-1">{numeroNotaError}</p>}
+                <div className="flex items-center gap-4 flex-wrap">
+                  {cliente && (
+                    <div className="text-sm text-gray-600">
+                      Selecionado: <span className="font-medium">{cliente.nome}</span>
+                    </div>
+                  )}
+                  {contratoInfo?.tem_contrato && contratoInfo?.dia_contrato && (
+                    <div className="flex items-center gap-1 text-sm text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded-md">
+                      <Calendar className="h-4 w-4" />
+                      Dia do Contrato: {contratoInfo.dia_contrato}
+                    </div>
+                  )}
+                  {contratoInfo?.tem_contrato === false && (
+                    <div className="text-sm text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded-md">
+                      Cliente sem contrato ativo
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="data-nota" className="text-sm font-semibold text-gray-700">
-                  Data da Nota *
-                </Label>
-                <Input
-                  id="data-nota"
-                  type="date"
-                  value={dataNota}
-                  onChange={(e) => setDataNota(e.target.value)}
-                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="numero-nota" className="text-sm font-semibold text-gray-700">
+                    Número da Nota *
+                  </Label>
+                  <Input
+                    id="numero-nota"
+                    value={numeroNota}
+                    onChange={(e) => handleNumeroNotaChange(e.target.value)}
+                    placeholder="Digite o número da nota"
+                    className={`border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 ${
+                      numeroNotaError ? "border-red-500 focus:border-red-500" : ""
+                    }`}
+                  />
+                  {numeroNotaError && <p className="text-sm text-red-500 mt-1">{numeroNotaError}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="data-nota" className="text-sm font-semibold text-gray-700">
+                    Data da Nota *
+                  </Label>
+                  <Input
+                    id="data-nota"
+                    type="date"
+                    value={dataNota}
+                    onChange={(e) => setDataNota(e.target.value)}
+                    className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="valor-total" className="text-sm font-semibold text-gray-700">
+                    Valor Total *
+                  </Label>
+                  <Input
+                    id="valor-total"
+                    type="number"
+                    step="0.01"
+                    value={valorTotal}
+                    onChange={(e) => setValorTotal(e.target.value)}
+                    placeholder="0,00"
+                    className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="primeiro-vencimento" className="text-sm font-semibold text-gray-700">
+                    Primeiro Vencimento *
+                  </Label>
+                  <Input
+                    id="primeiro-vencimento"
+                    type="date"
+                    value={primeiroVencimento}
+                    onChange={(e) => setPrimeiroVencimento(e.target.value)}
+                    className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="numero-parcelas" className="text-sm font-semibold text-gray-700">
+                    Número de Parcelas
+                  </Label>
+                  <Input
+                    id="numero-parcelas"
+                    type="number"
+                    min="1"
+                    value={numeroParcelas}
+                    onChange={(e) => setNumeroParcelas(e.target.value)}
+                    className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="intervalo" className="text-sm font-semibold text-gray-700">
+                    Intervalo (dias)
+                  </Label>
+                  <Input
+                    id="intervalo"
+                    type="number"
+                    min="1"
+                    value={intervalo}
+                    onChange={(e) => setIntervalo(e.target.value)}
+                    className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="forma-pagamento" className="text-sm font-semibold text-gray-700">
+                    Forma de Pagamento
+                  </Label>
+                  <Select value={formaPagamento} onValueChange={setFormaPagamento}>
+                    <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="boleto">Boleto</SelectItem>
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="transferencia">Transferência</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="valor-total" className="text-sm font-semibold text-gray-700">
-                  Valor Total *
-                </Label>
-                <Input
-                  id="valor-total"
-                  type="number"
-                  step="0.01"
-                  value={valorTotal}
-                  onChange={(e) => setValorTotal(e.target.value)}
-                  placeholder="0,00"
-                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="primeiro-vencimento" className="text-sm font-semibold text-gray-700">
-                  Primeiro Vencimento *
-                </Label>
-                <Input
-                  id="primeiro-vencimento"
-                  type="date"
-                  value={primeiroVencimento}
-                  onChange={(e) => setPrimeiroVencimento(e.target.value)}
-                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="numero-parcelas" className="text-sm font-semibold text-gray-700">
-                  Número de Parcelas
-                </Label>
-                <Input
-                  id="numero-parcelas"
-                  type="number"
-                  min="1"
-                  value={numeroParcelas}
-                  onChange={(e) => setNumeroParcelas(e.target.value)}
-                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="intervalo" className="text-sm font-semibold text-gray-700">
-                  Intervalo (dias)
-                </Label>
-                <Input
-                  id="intervalo"
-                  type="number"
-                  min="1"
-                  value={intervalo}
-                  onChange={(e) => setIntervalo(e.target.value)}
-                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="forma-pagamento" className="text-sm font-semibold text-gray-700">
-                  Forma de Pagamento
-                </Label>
-                <Select value={formaPagamento} onValueChange={setFormaPagamento}>
-                  <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="boleto">Boleto</SelectItem>
-                    <SelectItem value="pix">PIX</SelectItem>
-                    <SelectItem value="transferencia">Transferência</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {numeroNota.trim() && (
-              <div className="space-y-2">
-                <Label htmlFor="descricao-produto" className="text-sm font-semibold text-gray-700">
-                  Descrição do Produto/Serviço (PagBank)
-                </Label>
-                <Input
-                  id="descricao-produto"
-                  value={gerarDescricao()}
-                  readOnly
-                  disabled
-                  className="border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed"
-                />
-                <p className="text-xs text-gray-500">Esta descrição será enviada automaticamente ao PagBank</p>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="observacoes" className="text-sm font-semibold text-gray-700">
-                Observações
-              </Label>
-              <Textarea
-                id="observacoes"
-                value={observacoes}
-                onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Observações adicionais..."
-                rows={3}
-                className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 p-6 pt-0">
-            <Button variant="outline" onClick={handleClose} className="border-gray-200 hover:bg-gray-50 bg-transparent">
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleVisualizarParcelas}
-              disabled={
-                loading || !cliente || !valorTotal || !primeiroVencimento || !numeroNota.trim() || !!numeroNotaError
-              }
-              className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Carregando...
-                </>
-              ) : (
-                <>
-                  <Calculator className="h-4 w-4 mr-2" />
-                  Visualizar Parcelas
-                </>
+              {numeroNota.trim() && (
+                <div className="space-y-2">
+                  <Label htmlFor="descricao-produto" className="text-sm font-semibold text-gray-700">
+                    Descrição do Produto/Serviço (PagBank)
+                  </Label>
+                  <Input
+                    id="descricao-produto"
+                    value={gerarDescricao()}
+                    readOnly
+                    disabled
+                    className="border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed"
+                  />
+                  <p className="text-xs text-gray-500">Esta descrição será enviada automaticamente ao PagBank</p>
+                </div>
               )}
-            </Button>
+
+              <div className="space-y-2">
+                <Label htmlFor="observacoes" className="text-sm font-semibold text-gray-700">
+                  Observações
+                </Label>
+                <Textarea
+                  id="observacoes"
+                  value={observacoes}
+                  onChange={(e) => setObservacoes(e.target.value)}
+                  placeholder="Observações adicionais..."
+                  rows={3}
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 p-6 pt-0">
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                className="border-gray-200 hover:bg-gray-50 bg-transparent"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleVisualizarParcelas}
+                disabled={
+                  loading || !cliente || !valorTotal || !primeiroVencimento || !numeroNota.trim() || !!numeroNotaError
+                }
+                className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Carregando...
+                  </>
+                ) : (
+                  <>
+                    <Calculator className="h-4 w-4 mr-2" />
+                    Visualizar Parcelas
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
