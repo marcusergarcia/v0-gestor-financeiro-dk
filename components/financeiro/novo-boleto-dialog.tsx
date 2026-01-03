@@ -18,15 +18,19 @@ interface ParcelaPreview {
   valor: number
   vencimento: string
   status: string
+  descricao?: string
+  multa_percentual?: number
+  juros_mes_percentual?: number
 }
 
 interface NovoBoletoDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  notaFiscal?: any
   onSuccess: () => void
 }
 
-export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDialogProps) {
+export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: NovoBoletoDialogProps) {
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [contratoInfo, setContratoInfo] = useState<{ dia_contrato?: number; tem_contrato?: boolean } | null>(null)
   const [numeroNota, setNumeroNota] = useState("")
@@ -38,6 +42,8 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
   const [intervalo, setIntervalo] = useState("30")
   const [formaPagamento, setFormaPagamento] = useState("boleto")
   const [observacoes, setObservacoes] = useState("")
+  const [multaPercentual, setMultaPercentual] = useState("2.00")
+  const [jurosMesPercentual, setJurosMesPercentual] = useState("1.00")
   const [loading, setLoading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [parcelas, setParcelas] = useState<ParcelaPreview[]>([])
@@ -169,7 +175,7 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
     return datas
   }
 
-  const handleVisualizarParcelas = async () => {
+  const gerarPreview = () => {
     if (!cliente || !valorTotal || !primeiroVencimento || !numeroNota.trim()) {
       toast({
         title: "Erro",
@@ -190,57 +196,63 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
 
     setLoading(true)
 
-    try {
-      const valor = Number.parseFloat(valorTotal.replace(",", "."))
-      const numParcelas = Number.parseInt(numeroParcelas)
-      const intervaloDias = Number.parseInt(intervalo)
+    const valor = Number.parseFloat(valorTotal.replace(",", "."))
+    const numParcelas = Number.parseInt(numeroParcelas)
+    const intervaloDias = Number.parseInt(intervalo)
 
-      if (isNaN(valor) || valor <= 0) {
-        toast({
-          title: "Erro",
-          description: "Valor deve ser um número positivo",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const existe = await verificarNumeroExistente(numeroNota.trim())
-      if (existe) {
-        setNumeroNotaError("Este número já existe. Escolha outro número.")
-        toast({
-          title: "Erro",
-          description: "Este número já existe. Escolha outro número.",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const datasVencimento = calcularDatasVencimento(primeiroVencimento, intervaloDias, numParcelas)
-
-      const valorParcela = valor / numParcelas
-      const valorUltimaParcela = valor - valorParcela * (numParcelas - 1)
-
-      const parcelasPreview: ParcelaPreview[] = datasVencimento.map((data: string, index: number) => ({
-        parcela: index + 1,
-        numero_boleto: numParcelas > 1 ? `${numeroNota}-${String(index + 1).padStart(2, "0")}` : numeroNota,
-        valor: index === numParcelas - 1 ? valorUltimaParcela : valorParcela,
-        vencimento: data,
-        status: calcularStatus(data),
-      }))
-
-      console.log("Parcelas geradas:", parcelasPreview)
-      setParcelas(parcelasPreview)
-      setPreviewOpen(true)
-    } catch (error) {
-      console.error("Erro ao gerar preview:", error)
+    if (isNaN(valor) || valor <= 0) {
       toast({
         title: "Erro",
-        description: "Erro ao gerar preview das parcelas",
+        description: "Valor deve ser um número positivo",
         variant: "destructive",
       })
-    } finally {
       setLoading(false)
+      return
     }
+
+    verificarNumeroExistente(numeroNota.trim())
+      .then((existe) => {
+        if (existe) {
+          setNumeroNotaError("Este número já existe. Escolha outro número.")
+          toast({
+            title: "Erro",
+            description: "Este número já existe. Escolha outro número.",
+            variant: "destructive",
+          })
+          setLoading(false)
+          return
+        }
+
+        const datasVencimento = calcularDatasVencimento(primeiroVencimento, intervaloDias, numParcelas)
+
+        const valorParcela = valor / numParcelas
+        const valorUltimaParcela = valor - valorParcela * (numParcelas - 1)
+
+        const parcelasPreview: ParcelaPreview[] = datasVencimento.map((data: string, index: number) => ({
+          parcela: index + 1,
+          numero_boleto: numParcelas > 1 ? `${numeroNota}-${String(index + 1).padStart(2, "0")}` : numeroNota,
+          valor: index === numParcelas - 1 ? valorUltimaParcela : valorParcela,
+          vencimento: data,
+          status: calcularStatus(data),
+          descricao: gerarDescricao(),
+          multa_percentual: Number.parseFloat(multaPercentual),
+          juros_mes_percentual: Number.parseFloat(jurosMesPercentual),
+        }))
+
+        console.log("Parcelas geradas:", parcelasPreview)
+        setParcelas(parcelasPreview)
+        setPreviewOpen(true)
+        setLoading(false)
+      })
+      .catch((error) => {
+        console.error("Erro ao gerar preview:", error)
+        toast({
+          title: "Erro",
+          description: "Erro ao gerar preview das parcelas",
+          variant: "destructive",
+        })
+        setLoading(false)
+      })
   }
 
   const handleEmitirBoletos = async () => {
@@ -258,21 +270,20 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
 
       const response = await fetch("/api/boletos", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clienteId: cliente.id,
-          numeroNota,
-          dataNota,
-          descricaoProduto: gerarDescricao(),
-          valorTotal: Number.parseFloat(valorTotal.replace(",", ".")),
+          nota_fiscal_id: notaFiscal?.id,
+          cliente_id: cliente?.id,
+          numero_nota: numeroNota,
+          data_nota: dataNota,
+          valor_total: Number.parseFloat(valorTotal.replace(",", ".")) || 0,
+          primeiro_vencimento: primeiroVencimento,
+          numero_parcelas: Number.parseInt(numeroParcelas),
+          intervalo: Number.parseInt(intervalo),
+          forma_pagamento: formaPagamento,
           observacoes,
-          parcelas: parcelas.map((p) => ({
-            parcela: p.parcela,
-            valor: p.valor,
-            dataVencimento: p.vencimento,
-          })),
+          multa_percentual: Number.parseFloat(multaPercentual),
+          juros_mes_percentual: Number.parseFloat(jurosMesPercentual),
         }),
       })
 
@@ -318,6 +329,8 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
     setFormaPagamento("boleto")
     setObservacoes("")
     setParcelas([])
+    setMultaPercentual("2.00")
+    setJurosMesPercentual("1.00")
   }
 
   const handleClose = () => {
@@ -327,217 +340,249 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
   }
 
   return (
-    <>
-      <Dialog open={open && !previewOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-3xl max-h-[90vh] border-0 shadow-2xl p-0 overflow-hidden flex flex-col">
-          <DialogHeader className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 flex-shrink-0">
-            <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <Plus className="h-5 w-5" />
-              </div>
-              Novo Boleto
-            </DialogTitle>
-            <DialogDescription className="text-green-100">
-              Preencha as informações para gerar o(s) boleto(s)
-            </DialogDescription>
-          </DialogHeader>
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden border-0 shadow-2xl">
+        <DialogHeader className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 flex-shrink-0">
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Plus className="h-5 w-5" />
+            </div>
+            Novo Boleto
+          </DialogTitle>
+          <DialogDescription className="text-green-100">
+            Preencha as informações para gerar o(s) boleto(s)
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="bg-white overflow-y-auto flex-1">
-            <div className="p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto bg-white">
+          <div className="p-6 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cliente" className="text-sm font-semibold text-gray-700">
+                Cliente *
+              </Label>
+              <ClienteCombobox
+                value={cliente}
+                onValueChange={handleClienteChange}
+                placeholder="Selecione um cliente..."
+              />
+              <div className="flex items-center gap-4 flex-wrap">
+                {cliente && (
+                  <div className="text-sm text-gray-600">
+                    Selecionado: <span className="font-medium">{cliente.nome}</span>
+                  </div>
+                )}
+                {contratoInfo?.tem_contrato && contratoInfo?.dia_contrato && (
+                  <div className="flex items-center gap-1 text-sm text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded-md">
+                    <Calendar className="h-4 w-4" />
+                    Dia do Contrato: {contratoInfo.dia_contrato}
+                  </div>
+                )}
+                {contratoInfo?.tem_contrato === false && (
+                  <div className="text-sm text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded-md">
+                    Cliente sem contrato ativo
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="cliente" className="text-sm font-semibold text-gray-700">
-                  Cliente *
+                <Label htmlFor="numero-nota" className="text-sm font-semibold text-gray-700">
+                  Número da Nota *
                 </Label>
-                <ClienteCombobox
-                  value={cliente}
-                  onValueChange={handleClienteChange}
-                  placeholder="Selecione um cliente..."
+                <Input
+                  id="numero-nota"
+                  value={numeroNota}
+                  onChange={(e) => handleNumeroNotaChange(e.target.value)}
+                  placeholder="Digite o número da nota"
+                  className={`border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 ${
+                    numeroNotaError ? "border-red-500 focus:border-red-500" : ""
+                  }`}
                 />
-                <div className="flex items-center gap-4 flex-wrap">
-                  {cliente && (
-                    <div className="text-sm text-gray-600">
-                      Selecionado: <span className="font-medium">{cliente.nome}</span>
-                    </div>
-                  )}
-                  {contratoInfo?.tem_contrato && contratoInfo?.dia_contrato && (
-                    <div className="flex items-center gap-1 text-sm text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded-md">
-                      <Calendar className="h-4 w-4" />
-                      Dia do Contrato: {contratoInfo.dia_contrato}
-                    </div>
-                  )}
-                  {contratoInfo?.tem_contrato === false && (
-                    <div className="text-sm text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded-md">
-                      Cliente sem contrato ativo
-                    </div>
-                  )}
-                </div>
+                {numeroNotaError && <p className="text-sm text-red-500 mt-1">{numeroNotaError}</p>}
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="numero-nota" className="text-sm font-semibold text-gray-700">
-                    Número da Nota *
-                  </Label>
-                  <Input
-                    id="numero-nota"
-                    value={numeroNota}
-                    onChange={(e) => handleNumeroNotaChange(e.target.value)}
-                    placeholder="Digite o número da nota"
-                    className={`border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 ${
-                      numeroNotaError ? "border-red-500 focus:border-red-500" : ""
-                    }`}
-                  />
-                  {numeroNotaError && <p className="text-sm text-red-500 mt-1">{numeroNotaError}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="data-nota" className="text-sm font-semibold text-gray-700">
-                    Data da Nota *
-                  </Label>
-                  <Input
-                    id="data-nota"
-                    type="date"
-                    value={dataNota}
-                    onChange={(e) => setDataNota(e.target.value)}
-                    className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="valor-total" className="text-sm font-semibold text-gray-700">
-                    Valor Total *
-                  </Label>
-                  <Input
-                    id="valor-total"
-                    type="number"
-                    step="0.01"
-                    value={valorTotal}
-                    onChange={(e) => setValorTotal(e.target.value)}
-                    placeholder="0,00"
-                    className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="primeiro-vencimento" className="text-sm font-semibold text-gray-700">
-                    Primeiro Vencimento *
-                  </Label>
-                  <Input
-                    id="primeiro-vencimento"
-                    type="date"
-                    value={primeiroVencimento}
-                    onChange={(e) => setPrimeiroVencimento(e.target.value)}
-                    className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="numero-parcelas" className="text-sm font-semibold text-gray-700">
-                    Número de Parcelas
-                  </Label>
-                  <Input
-                    id="numero-parcelas"
-                    type="number"
-                    min="1"
-                    value={numeroParcelas}
-                    onChange={(e) => setNumeroParcelas(e.target.value)}
-                    className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="intervalo" className="text-sm font-semibold text-gray-700">
-                    Intervalo (dias)
-                  </Label>
-                  <Input
-                    id="intervalo"
-                    type="number"
-                    min="1"
-                    value={intervalo}
-                    onChange={(e) => setIntervalo(e.target.value)}
-                    className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="forma-pagamento" className="text-sm font-semibold text-gray-700">
-                    Forma de Pagamento
-                  </Label>
-                  <Select value={formaPagamento} onValueChange={setFormaPagamento}>
-                    <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="boleto">Boleto</SelectItem>
-                      <SelectItem value="pix">PIX</SelectItem>
-                      <SelectItem value="transferencia">Transferência</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {numeroNota.trim() && (
-                <div className="space-y-2">
-                  <Label htmlFor="descricao-produto" className="text-sm font-semibold text-gray-700">
-                    Descrição do Produto/Serviço (PagBank)
-                  </Label>
-                  <Input
-                    id="descricao-produto"
-                    value={gerarDescricao()}
-                    readOnly
-                    disabled
-                    className="border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed"
-                  />
-                  <p className="text-xs text-gray-500">Esta descrição será enviada automaticamente ao PagBank</p>
-                </div>
-              )}
 
               <div className="space-y-2">
-                <Label htmlFor="observacoes" className="text-sm font-semibold text-gray-700">
-                  Observações
+                <Label htmlFor="data-nota" className="text-sm font-semibold text-gray-700">
+                  Data da Nota *
                 </Label>
-                <Textarea
-                  id="observacoes"
-                  value={observacoes}
-                  onChange={(e) => setObservacoes(e.target.value)}
-                  placeholder="Observações adicionais..."
-                  rows={3}
+                <Input
+                  id="data-nota"
+                  type="date"
+                  value={dataNota}
+                  onChange={(e) => setDataNota(e.target.value)}
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="valor-total" className="text-sm font-semibold text-gray-700">
+                  Valor Total *
+                </Label>
+                <Input
+                  id="valor-total"
+                  type="number"
+                  step="0.01"
+                  value={valorTotal}
+                  onChange={(e) => setValorTotal(e.target.value)}
+                  placeholder="0,00"
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="primeiro-vencimento" className="text-sm font-semibold text-gray-700">
+                  Primeiro Vencimento *
+                </Label>
+                <Input
+                  id="primeiro-vencimento"
+                  type="date"
+                  value={primeiroVencimento}
+                  onChange={(e) => setPrimeiroVencimento(e.target.value)}
                   className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 p-6 pt-0 border-t border-gray-100 bg-white">
-              <Button
-                variant="outline"
-                onClick={handleClose}
-                className="border-gray-200 hover:bg-gray-50 bg-transparent"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleVisualizarParcelas}
-                disabled={
-                  loading || !cliente || !valorTotal || !primeiroVencimento || !numeroNota.trim() || !!numeroNotaError
-                }
-                className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Carregando...
-                  </>
-                ) : (
-                  <>
-                    <Calculator className="h-4 w-4 mr-2" />
-                    Visualizar Parcelas
-                  </>
-                )}
-              </Button>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="numero-parcelas" className="text-sm font-semibold text-gray-700">
+                  Número de Parcelas
+                </Label>
+                <Input
+                  id="numero-parcelas"
+                  type="number"
+                  min="1"
+                  value={numeroParcelas}
+                  onChange={(e) => setNumeroParcelas(e.target.value)}
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="intervalo" className="text-sm font-semibold text-gray-700">
+                  Intervalo (dias)
+                </Label>
+                <Input
+                  id="intervalo"
+                  type="number"
+                  min="1"
+                  value={intervalo}
+                  onChange={(e) => setIntervalo(e.target.value)}
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="multa-percentual" className="text-sm font-semibold text-gray-700">
+                  Multa por Atraso (%)
+                </Label>
+                <Input
+                  id="multa-percentual"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={multaPercentual}
+                  onChange={(e) => setMultaPercentual(e.target.value)}
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  placeholder="2.00"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="juros-mes" className="text-sm font-semibold text-gray-700">
+                  Juros ao Mês (%)
+                </Label>
+                <Input
+                  id="juros-mes"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={jurosMesPercentual}
+                  onChange={(e) => setJurosMesPercentual(e.target.value)}
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  placeholder="1.00"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="forma-pagamento" className="text-sm font-semibold text-gray-700">
+                Forma de Pagamento
+              </Label>
+              <Select value={formaPagamento} onValueChange={setFormaPagamento}>
+                <SelectTrigger className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="boleto">Boleto</SelectItem>
+                  <SelectItem value="pix">PIX</SelectItem>
+                  <SelectItem value="transferencia">Transferência</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {numeroNota.trim() && (
+              <div className="space-y-2">
+                <Label htmlFor="descricao-produto" className="text-sm font-semibold text-gray-700">
+                  Descrição do Produto/Serviço (PagBank)
+                </Label>
+                <Input
+                  id="descricao-produto"
+                  value={gerarDescricao()}
+                  readOnly
+                  disabled
+                  className="border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500">Esta descrição será enviada automaticamente ao PagBank</p>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="observacoes" className="text-sm font-semibold text-gray-700">
+                Observações
+              </Label>
+              <Textarea
+                id="observacoes"
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                placeholder="Observações adicionais..."
+                rows={3}
+                className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+              />
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+
+        <div className="flex justify-end gap-3 p-6 pt-0 border-t border-gray-100 bg-white">
+          <Button variant="outline" onClick={handleClose} className="border-gray-200 hover:bg-gray-50 bg-transparent">
+            Cancelar
+          </Button>
+          <Button
+            onClick={gerarPreview}
+            disabled={
+              loading || !cliente || !valorTotal || !primeiroVencimento || !numeroNota.trim() || !!numeroNotaError
+            }
+            className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Carregando...
+              </>
+            ) : (
+              <>
+                <Calculator className="h-4 w-4 mr-2" />
+                Visualizar Parcelas
+              </>
+            )}
+          </Button>
+        </div>
+      </DialogContent>
 
       <PreviewParcelasDialog
         open={previewOpen}
@@ -547,11 +592,13 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
         numeroNota={numeroNota}
         valorTotal={Number.parseFloat(valorTotal.replace(",", ".")) || 0}
         formaPagamento={formaPagamento}
+        multaPercentual={Number.parseFloat(multaPercentual)}
+        jurosMesPercentual={Number.parseFloat(jurosMesPercentual)}
         onEmitir={handleEmitirBoletos}
         onVoltar={() => setPreviewOpen(false)}
         loading={loading}
       />
-    </>
+    </Dialog>
   )
 }
 

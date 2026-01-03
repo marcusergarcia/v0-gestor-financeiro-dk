@@ -128,8 +128,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { clienteId, numeroNota, dataNota, descricaoProduto, valorTotal, observacoes, parcelas, formaPagamento } =
-      await request.json()
+    const {
+      clienteId,
+      numeroNota,
+      dataNota,
+      descricaoProduto,
+      valorTotal,
+      observacoes,
+      parcelas,
+      formaPagamento,
+      multa_percentual,
+      juros_mes_percentual,
+    } = await request.json()
 
     console.log("[v0] Dados recebidos para criar boleto:", {
       clienteId,
@@ -138,6 +148,8 @@ export async function POST(request: NextRequest) {
       descricaoProduto,
       valorTotal,
       parcelas: parcelas.length,
+      multa_percentual,
+      juros_mes_percentual,
     })
 
     if (!clienteId || !numeroNota || !valorTotal || !parcelas || parcelas.length === 0) {
@@ -268,6 +280,16 @@ export async function POST(request: NextRequest) {
               ? descricaoProduto?.replace(/Parcelas 1\/\d+/, `Parcelas ${parcela.parcela}/${parcelas.length}`)
               : descricaoProduto
 
+          const multaPercentual = multa_percentual || 2.0
+          const jurosMesPercentual = juros_mes_percentual || 1.0
+
+          // Converter percentuais para valores absolutos (PagBank usa valores em centavos)
+          // Multa: percentual do valor da parcela
+          const multaValor = Math.round(((valorParcela * multaPercentual) / 100) * 100)
+          // Juros: percentual mensal convertido para diário (aproximado)
+          const jurosDiarioPercentual = jurosMesPercentual / 30
+          const jurosValor = Math.round(((valorParcela * jurosDiarioPercentual) / 100) * 100)
+
           const boletoRequest = {
             customer: {
               name: cliente.nome,
@@ -330,11 +352,11 @@ export async function POST(request: NextRequest) {
                 payment_instructions: {
                   fine: {
                     date: dataMultaJurosStr,
-                    value: 200,
+                    value: multaValor,
                   },
                   interest: {
                     date: dataMultaJurosStr,
-                    value: 33,
+                    value: jurosValor,
                   },
                 },
               },
@@ -430,9 +452,11 @@ export async function POST(request: NextRequest) {
           link_impressao,
           data_nota,
           descricao_produto,
+          multa_percentual,
+          juros_mes_percentual,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `,
         [
           numeroBoleto,
@@ -451,6 +475,8 @@ export async function POST(request: NextRequest) {
           linkPNG || null,
           dataNota || null,
           descricaoProduto || null,
+          multa_percentual || 2.0,
+          juros_mes_percentual || 1.0,
         ],
       )
 

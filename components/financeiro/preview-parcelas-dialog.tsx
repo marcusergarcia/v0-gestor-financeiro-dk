@@ -14,6 +14,9 @@ interface ParcelaPreview {
   valor: number
   vencimento: string
   status: string
+  descricao?: string
+  multa_percentual?: number
+  juros_mes_percentual?: number
 }
 
 interface PreviewParcelasDialogProps {
@@ -24,6 +27,8 @@ interface PreviewParcelasDialogProps {
   numeroNota: string
   valorTotal: number
   formaPagamento: string
+  multaPercentual: number
+  jurosMesPercentual: number
   onEmitir: () => void
   onVoltar: () => void
   loading: boolean
@@ -37,6 +42,8 @@ export function PreviewParcelasDialog({
   numeroNota,
   valorTotal,
   formaPagamento,
+  multaPercentual,
+  jurosMesPercentual,
   onEmitir,
   onVoltar,
   loading,
@@ -118,6 +125,14 @@ export function PreviewParcelasDialog({
                   <span>Total de Parcelas:</span>
                   <span className="font-medium">{parcelas.length}</span>
                 </div>
+                <div className="flex justify-between text-sm">
+                  <span>Multa por Atraso:</span>
+                  <span className="font-medium">{multaPercentual.toFixed(2)}%</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Juros ao Mês:</span>
+                  <span className="font-medium">{jurosMesPercentual.toFixed(2)}%</span>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -137,8 +152,11 @@ export function PreviewParcelasDialog({
                     <TableRow className="bg-gray-50">
                       <TableHead className="font-semibold w-20 text-xs">Parcela</TableHead>
                       <TableHead className="font-semibold w-44 text-xs">Número do Boleto</TableHead>
+                      <TableHead className="font-semibold text-xs">Descrição</TableHead>
                       <TableHead className="font-semibold w-32 text-xs">Valor</TableHead>
                       <TableHead className="font-semibold w-28 text-xs">Vencimento</TableHead>
+                      <TableHead className="font-semibold w-20 text-xs text-center">Multa</TableHead>
+                      <TableHead className="font-semibold w-20 text-xs text-center">Juros</TableHead>
                       <TableHead className="font-semibold w-24 text-xs">Situação</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -151,10 +169,17 @@ export function PreviewParcelasDialog({
                           </Badge>
                         </TableCell>
                         <TableCell className="font-mono text-xs py-2">{parcela.numero_boleto}</TableCell>
+                        <TableCell className="text-xs py-2 text-gray-600">{parcela.descricao || "-"}</TableCell>
                         <TableCell className="font-semibold text-green-600 text-xs py-2">
                           {formatarMoeda(parcela.valor)}
                         </TableCell>
                         <TableCell className="text-xs py-2">{formatarData(parcela.vencimento)}</TableCell>
+                        <TableCell className="text-xs py-2 text-center text-red-600">
+                          {parcela.multa_percentual?.toFixed(2)}%
+                        </TableCell>
+                        <TableCell className="text-xs py-2 text-center text-orange-600">
+                          {parcela.juros_mes_percentual?.toFixed(2)}%
+                        </TableCell>
                         <TableCell className="py-2">{getStatusBadge(parcela.status)}</TableCell>
                       </TableRow>
                     ))}
