@@ -130,30 +130,33 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const {
-      clienteId,
-      numeroNota,
-      dataNota,
-      descricaoProduto,
-      valorTotal,
+      cliente_id,
+      numero_nota,
+      data_nota,
+      valor_total,
+      primeiro_vencimento,
+      numero_parcelas,
+      intervalo,
+      forma_pagamento,
       observacoes,
-      parcelas,
-      formaPagamento,
       multa_percentual = 2.0,
       juros_mes_percentual = 2.0,
+      desconto = 0,
     } = body
 
     console.log("[v0] Dados recebidos para criar boleto:", {
-      clienteId,
-      numeroNota,
-      dataNota,
-      descricaoProduto,
-      valorTotal,
-      parcelas: parcelas?.length || 0,
+      cliente_id,
+      numero_nota,
+      data_nota,
+      valor_total,
+      primeiro_vencimento,
+      numero_parcelas,
+      intervalo,
       multa_percentual,
       juros_mes_percentual,
     })
 
-    if (!clienteId || !numeroNota || !valorTotal || !parcelas || !Array.isArray(parcelas) || parcelas.length === 0) {
+    if (!cliente_id || !numero_nota || !valor_total || !primeiro_vencimento || !numero_parcelas) {
       return NextResponse.json(
         {
           success: false,
@@ -161,6 +164,29 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 },
       )
+    }
+
+    const descricao_produto = `NOTA FISCAL - ${numero_nota} - ${data_nota} - Parcelas 1/${numero_parcelas}`
+
+    const parcelas = []
+    const valorParcela = valor_total / numero_parcelas
+    let dataVencimento = new Date(primeiro_vencimento)
+
+    for (let i = 1; i <= numero_parcelas; i++) {
+      const descricaoParcela = `NOTA FISCAL - ${numero_nota} - ${data_nota} - Parcelas ${i}/${numero_parcelas}`
+
+      parcelas.push({
+        parcela: i,
+        valor: valorParcela,
+        dataVencimento: dataVencimento.toISOString().split("T")[0],
+        descricao: descricaoParcela,
+      })
+
+      // Adicionar intervalo para próxima parcela
+      if (i < numero_parcelas) {
+        dataVencimento = new Date(dataVencimento)
+        dataVencimento.setDate(dataVencimento.getDate() + intervalo)
+      }
     }
 
     // Função para verificar se é fim de semana
@@ -202,7 +228,7 @@ export async function POST(request: NextRequest) {
       return vencimento < hoje ? "vencido" : "pendente"
     }
 
-    const clientes = await query(`SELECT * FROM clientes WHERE id = ?`, [clienteId])
+    const clientes = await query(`SELECT * FROM clientes WHERE id = ?`, [cliente_id])
 
     if (clientes.length === 0) {
       return NextResponse.json({ success: false, message: "Cliente não encontrado" }, { status: 404 })
@@ -220,7 +246,7 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < parcelas.length; i++) {
       const parcela = parcelas[i]
       const numeroBoleto =
-        parcelas.length > 1 ? `${numeroNota}-${String(parcela.parcela).padStart(2, "0")}` : numeroNota
+        parcelas.length > 1 ? `${numero_nota}-${String(parcela.parcela).padStart(2, "0")}` : numero_nota
 
       // Ajustar data de vencimento para dia útil
       const dataVencimentoAjustada = adjustToBusinessDay(parcela.dataVencimento)
@@ -253,7 +279,7 @@ export async function POST(request: NextRequest) {
           const taxId = (cliente.cnpj || cliente.cpf || "").replace(/\D/g, "")
           const taxIdValido = taxId.length >= 11 ? taxId : "00000000000"
           const emailValido =
-            cliente.email && cliente.email.includes("@") ? cliente.email : `cliente${clienteId}@sistema.com`
+            cliente.email && cliente.email.includes("@") ? cliente.email : `cliente${cliente_id}@sistema.com`
           const cepValido = (cliente.cep || "").replace(/\D/g, "")
           const cepCompleto = cepValido.length === 8 ? cepValido : "01310100"
 
@@ -276,10 +302,7 @@ export async function POST(request: NextRequest) {
             valorMinimo,
           })
 
-          const descricaoParcela =
-            parcelas.length > 1
-              ? descricaoProduto?.replace(/Parcelas 1\/\d+/, `Parcelas ${parcela.parcela}/${parcelas.length}`)
-              : descricaoProduto
+          const descricaoParcela = parcela.descricao || descricao_produto
 
           const multaPercentual = multa_percentual || 2.0
           const jurosMesPercentual = juros_mes_percentual || 1.0
@@ -453,29 +476,29 @@ export async function POST(request: NextRequest) {
           link_impressao,
           data_nota,
           descricao_produto,
-          multa_percentual,
-          juros_mes_percentual,
+          multa,
+          juros,
           created_at,
           updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `,
         [
           numeroBoleto,
-          clienteId,
+          cliente_id, // Usando cliente_id
           parcela.valor,
           dataVencimentoAjustada,
           status,
           parcela.parcela,
           parcelas.length,
           observacoes || null,
-          formaPagamento || "boleto",
+          forma_pagamento || "boleto",
           charge?.id || null,
           boletoInfo?.formatted_barcode || null,
           boletoInfo?.barcode || null,
           linkPDF || null,
           linkPNG || null,
-          dataNota || null,
-          descricaoProduto || null,
+          data_nota || null, // Usando data_nota
+          parcela.descricao, // Usando descrição da parcela
           multa_percentual || 2.0,
           juros_mes_percentual || 2.0,
         ],
