@@ -193,9 +193,12 @@ export function Header() {
             }
 
             // Se o status é "pendente", verifica se a data de vencimento já passou
-            if (boleto.status === "pendente") {
-              if (boleto.data_vencimento && boleto.data_vencimento.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                const [year, month, day] = boleto.data_vencimento.split("-")
+            if (boleto.status === "pendente" && boleto.data_vencimento) {
+              const dataStr = boleto.data_vencimento.split("T")[0]
+
+              // Verificar se está no formato YYYY-MM-DD
+              if (dataStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [year, month, day] = dataStr.split("-")
                 const vencimento = new Date(
                   Number.parseInt(year),
                   Number.parseInt(month) - 1,
