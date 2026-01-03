@@ -128,6 +128,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const body = await request.json()
     const {
       clienteId,
       numeroNota,
@@ -137,9 +138,9 @@ export async function POST(request: NextRequest) {
       observacoes,
       parcelas,
       formaPagamento,
-      multa_percentual,
-      juros_mes_percentual,
-    } = await request.json()
+      multa_percentual = 2.0,
+      juros_mes_percentual = 2.0,
+    } = body
 
     console.log("[v0] Dados recebidos para criar boleto:", {
       clienteId,
@@ -147,12 +148,12 @@ export async function POST(request: NextRequest) {
       dataNota,
       descricaoProduto,
       valorTotal,
-      parcelas: parcelas.length,
+      parcelas: parcelas?.length || 0,
       multa_percentual,
       juros_mes_percentual,
     })
 
-    if (!clienteId || !numeroNota || !valorTotal || !parcelas || parcelas.length === 0) {
+    if (!clienteId || !numeroNota || !valorTotal || !parcelas || !Array.isArray(parcelas) || parcelas.length === 0) {
       return NextResponse.json(
         {
           success: false,
@@ -476,7 +477,7 @@ export async function POST(request: NextRequest) {
           dataNota || null,
           descricaoProduto || null,
           multa_percentual || 2.0,
-          juros_mes_percentual || 1.0,
+          juros_mes_percentual || 2.0,
         ],
       )
 
