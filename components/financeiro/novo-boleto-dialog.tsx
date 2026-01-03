@@ -329,8 +329,8 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
   return (
     <>
       <Dialog open={open && !previewOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-3xl border-0 shadow-2xl">
-          <DialogHeader className="bg-gradient-to-r from-green-600 to-blue-600 text-white -m-6 mb-6 p-6 rounded-t-lg">
+        <DialogContent className="max-w-3xl border-0 shadow-2xl p-0">
+          <DialogHeader className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 rounded-t-lg">
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <div className="p-2 bg-white/20 rounded-lg">
                 <Plus className="h-5 w-5" />
@@ -342,7 +342,7 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="cliente" className="text-sm font-semibold text-gray-700">
                 Cliente *
@@ -506,7 +506,7 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-6">
+          <div className="flex justify-end gap-3 p-6 pt-0">
             <Button variant="outline" onClick={handleClose} className="border-gray-200 hover:bg-gray-50 bg-transparent">
               Cancelar
             </Button>
