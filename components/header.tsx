@@ -207,8 +207,8 @@ export function Header() {
       // Se a data vem no formato ISO com timezone
       if (dateString.includes("T")) {
         const date = new Date(dateString)
-        const day = date.getDate().toString().padStart(2, "0")
-        const month = (date.getMonth() + 1).toString().padStart(2, "0")
+        const day = String(date.getDate()).padStart(2, "0")
+        const month = String(date.getMonth() + 1).padStart(2, "0")
         return `${day}/${month}`
       }
 
@@ -218,12 +218,13 @@ export function Header() {
         return `${day}/${month}`
       }
 
-      // Fallback: tentar usar parseDate
-      const date = parseDate(dateString)
-      if (!date) return dateString
-      const day = date.getDate().toString().padStart(2, "0")
-      const month = (date.getMonth() + 1).toString().padStart(2, "0")
-      return `${day}/${month}`
+      // Fallback: usar split manual
+      const [year, month, day] = dateString.split("-")
+      if (day && month) {
+        return `${day}/${month}`
+      }
+
+      return dateString
     } catch (error) {
       console.error("Erro ao formatar data:", dateString, error)
       return dateString
