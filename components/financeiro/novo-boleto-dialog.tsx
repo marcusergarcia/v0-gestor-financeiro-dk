@@ -43,7 +43,8 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
   const [formaPagamento, setFormaPagamento] = useState("boleto")
   const [observacoes, setObservacoes] = useState("")
   const [multaPercentual, setMultaPercentual] = useState("2.00")
-  const [jurosMesPercentual, setJurosMesPercentual] = useState("1.00")
+  const [jurosMesPercentual, setJurosMesPercentual] = useState("2.00")
+  const [desconto, setDesconto] = useState("0.00")
   const [loading, setLoading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [parcelas, setParcelas] = useState<ParcelaPreview[]>([])
@@ -284,6 +285,7 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
           observacoes,
           multa_percentual: Number.parseFloat(multaPercentual),
           juros_mes_percentual: Number.parseFloat(jurosMesPercentual),
+          desconto: Number.parseFloat(desconto.replace(",", ".")),
         }),
       })
 
@@ -330,7 +332,8 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
     setObservacoes("")
     setParcelas([])
     setMultaPercentual("2.00")
-    setJurosMesPercentual("1.00")
+    setJurosMesPercentual("2.00")
+    setDesconto("0.00")
   }
 
   const handleClose = () => {
@@ -505,9 +508,26 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
                   value={jurosMesPercentual}
                   onChange={(e) => setJurosMesPercentual(e.target.value)}
                   className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                  placeholder="1.00"
+                  placeholder="2.00"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="desconto" className="text-sm font-semibold text-gray-700">
+                Desconto (%)
+              </Label>
+              <Input
+                id="desconto"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={desconto}
+                onChange={(e) => setDesconto(e.target.value)}
+                className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                placeholder="0.00"
+              />
             </div>
 
             <div className="space-y-2">
@@ -594,6 +614,7 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
         formaPagamento={formaPagamento}
         multaPercentual={Number.parseFloat(multaPercentual)}
         jurosMesPercentual={Number.parseFloat(jurosMesPercentual)}
+        desconto={Number.parseFloat(desconto.replace(",", "."))}
         onEmitir={handleEmitirBoletos}
         onVoltar={() => setPreviewOpen(false)}
         loading={loading}
