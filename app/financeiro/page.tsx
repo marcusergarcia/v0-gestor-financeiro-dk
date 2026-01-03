@@ -74,6 +74,18 @@ interface Recibo {
   created_at: string
 }
 
+function criarDataLocal(dateString: string | null | undefined): Date | null {
+  if (!dateString) return null
+  const [ano, mes, dia] = dateString.split("T")[0].split("-").map(Number)
+  return new Date(ano, mes - 1, dia)
+}
+
+function obterHojeZerado(): Date {
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  return hoje
+}
+
 export default function FinanceiroPage() {
   const [boletos, setBoletos] = useState<Boleto[]>([])
   const [recibos, setRecibos] = useState<Recibo[]>([])
@@ -232,14 +244,9 @@ export default function FinanceiroPage() {
     }
   }
 
-  const getStatusBadge = (status: string, dataVencimento?: string) => {
-    const hoje = new Date()
-    const vencimento = dataVencimento ? new Date(dataVencimento) : null
-
-    if (vencimento) {
-      hoje.setHours(0, 0, 0, 0)
-      vencimento.setHours(0, 0, 0, 0)
-    }
+  const getStatusBadge = (status: string, dataVencimento: string | null) => {
+    const hoje = obterHojeZerado()
+    const vencimento = criarDataLocal(dataVencimento)
 
     const isVencido = status === "pendente" && vencimento && vencimento < hoje
 
@@ -339,11 +346,9 @@ export default function FinanceiroPage() {
     let matchesStatus = true
     if (statusFilter !== "all") {
       if (statusFilter === "vencido") {
-        const hoje = new Date()
-        const vencimento = new Date(boleto.data_vencimento)
-        hoje.setHours(0, 0, 0, 0)
-        vencimento.setHours(0, 0, 0, 0)
-        matchesStatus = (boleto.status === "pendente" && vencimento < hoje) || boleto.status === "vencido"
+        const hoje = obterHojeZerado()
+        const vencimento = criarDataLocal(boleto.data_vencimento)
+        matchesStatus = (boleto.status === "pendente" && vencimento && vencimento < hoje) || boleto.status === "vencido"
       } else {
         matchesStatus = boleto.status === statusFilter
       }
@@ -395,19 +400,15 @@ export default function FinanceiroPage() {
   const boletosStats = {
     total: filteredBoletos.length,
     pendentes: filteredBoletos.filter((b) => {
-      const hoje = new Date()
-      const vencimento = new Date(b.data_vencimento)
-      hoje.setHours(0, 0, 0, 0)
-      vencimento.setHours(0, 0, 0, 0)
-      return b.status === "pendente" && vencimento >= hoje
+      const hoje = obterHojeZerado()
+      const vencimento = criarDataLocal(b.data_vencimento)
+      return b.status === "pendente" && vencimento && vencimento >= hoje
     }).length,
     pagos: filteredBoletos.filter((b) => b.status === "pago").length,
     vencidos: filteredBoletos.filter((b) => {
-      const hoje = new Date()
-      const vencimento = new Date(b.data_vencimento)
-      hoje.setHours(0, 0, 0, 0)
-      vencimento.setHours(0, 0, 0, 0)
-      return (b.status === "pendente" && vencimento < hoje) || b.status === "vencido"
+      const hoje = obterHojeZerado()
+      const vencimento = criarDataLocal(b.data_vencimento)
+      return (b.status === "pendente" && vencimento && vencimento < hoje) || b.status === "vencido"
     }).length,
     valorTotal: filteredBoletos.reduce((acc, b) => {
       const valor = typeof b.valor === "number" && !isNaN(b.valor) ? b.valor : 0
@@ -432,39 +433,31 @@ export default function FinanceiroPage() {
   const boletosStatsPorPeriodo = {
     total: boletosFiltradosPorPeriodo.length,
     pendentes: boletosFiltradosPorPeriodo.filter((b) => {
-      const hoje = new Date()
-      const vencimento = new Date(b.data_vencimento)
-      hoje.setHours(0, 0, 0, 0)
-      vencimento.setHours(0, 0, 0, 0)
-      return b.status === "pendente" && vencimento >= hoje
+      const hoje = obterHojeZerado()
+      const vencimento = criarDataLocal(b.data_vencimento)
+      return b.status === "pendente" && vencimento && vencimento >= hoje
     }).length,
     pagos: boletosFiltradosPorPeriodo.filter((b) => b.status === "pago").length,
     vencidos: boletosFiltradosPorPeriodo.filter((b) => {
-      const hoje = new Date()
-      const vencimento = new Date(b.data_vencimento)
-      hoje.setHours(0, 0, 0, 0)
-      vencimento.setHours(0, 0, 0, 0)
-      return (b.status === "pendente" && vencimento < hoje) || b.status === "vencido"
+      const hoje = obterHojeZerado()
+      const vencimento = criarDataLocal(b.data_vencimento)
+      return (b.status === "pendente" && vencimento && vencimento < hoje) || b.status === "vencido"
     }).length,
     valorPagos: boletosFiltradosPorPeriodo
       .filter((b) => b.status === "pago")
       .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
     valorPendentes: boletosFiltradosPorPeriodo
       .filter((b) => {
-        const hoje = new Date()
-        const vencimento = new Date(b.data_vencimento)
-        hoje.setHours(0, 0, 0, 0)
-        vencimento.setHours(0, 0, 0, 0)
-        return b.status === "pendente" && vencimento >= hoje
+        const hoje = obterHojeZerado()
+        const vencimento = criarDataLocal(b.data_vencimento)
+        return b.status === "pendente" && vencimento && vencimento >= hoje
       })
       .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
     valorVencidos: boletosFiltradosPorPeriodo
       .filter((b) => {
-        const hoje = new Date()
-        const vencimento = new Date(b.data_vencimento)
-        hoje.setHours(0, 0, 0, 0)
-        vencimento.setHours(0, 0, 0, 0)
-        return (b.status === "pendente" && vencimento < hoje) || b.status === "vencido"
+        const hoje = obterHojeZerado()
+        const vencimento = criarDataLocal(b.data_vencimento)
+        return (b.status === "pendente" && vencimento && vencimento < hoje) || b.status === "vencido"
       })
       .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
   }
