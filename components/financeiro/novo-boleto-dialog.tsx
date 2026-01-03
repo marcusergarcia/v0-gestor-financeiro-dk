@@ -30,6 +30,7 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [contratoInfo, setContratoInfo] = useState<{ dia_contrato?: number; tem_contrato?: boolean } | null>(null)
   const [numeroNota, setNumeroNota] = useState("")
+  const [dataNota, setDataNota] = useState("")
   const [numeroNotaError, setNumeroNotaError] = useState("")
   const [valorTotal, setValorTotal] = useState("")
   const [primeiroVencimento, setPrimeiroVencimento] = useState("")
@@ -41,29 +42,36 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
   const [previewOpen, setPreviewOpen] = useState(false)
   const [parcelas, setParcelas] = useState<ParcelaPreview[]>([])
 
+  const gerarDescricao = (): string => {
+    if (!numeroNota.trim()) return ""
+
+    const partes: string[] = ["NOTA FISCAL", numeroNota.trim()]
+
+    if (dataNota) {
+      const dataFormatada = new Date(dataNota + "T00:00:00").toLocaleDateString("pt-BR")
+      partes.push(dataFormatada)
+    }
+
+    if (Number.parseInt(numeroParcelas) > 1) {
+      partes.push(`Parcelas 1/${numeroParcelas}`)
+    }
+
+    return partes.join(" - ")
+  }
+
   useEffect(() => {
     if (open) {
-      // Definir data padrão como hoje + 7 dias
       const hoje = new Date()
       hoje.setDate(hoje.getDate() + 7)
       setPrimeiroVencimento(hoje.toISOString().split("T")[0])
+      setDataNota(new Date().toISOString().split("T")[0])
     }
   }, [open])
-
-  // Buscar informações do contrato quando cliente for selecionado
-  useEffect(() => {
-    if (cliente?.id) {
-      buscarInfoCliente(cliente.id)
-    } else {
-      setContratoInfo(null)
-    }
-  }, [cliente])
 
   const buscarInfoCliente = async (clienteId: string) => {
     try {
       console.log("Buscando informações do cliente:", clienteId)
 
-      // Buscar dados do cliente para verificar se tem contrato
       const clienteResponse = await fetch(`/api/clientes/${clienteId}`)
       if (clienteResponse.ok) {
         const clienteData = await clienteResponse.json()
@@ -78,7 +86,6 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
         } else {
           console.log("Cliente não tem contrato definido, buscando contrato de conservação...")
 
-          // Buscar contrato de conservação
           const conservacaoResponse = await fetch(`/api/contratos-conservacao/cliente/${clienteId}`)
 
           if (conservacaoResponse.ok) {
@@ -133,7 +140,6 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
     }
   }
 
-  // Função para lidar com a seleção do cliente
   const handleClienteChange = (clienteSelecionado: Cliente | null) => {
     console.log("Cliente selecionado no dialog:", clienteSelecionado)
     setCliente(clienteSelecionado)
@@ -143,7 +149,6 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
     const hoje = new Date()
     const vencimento = new Date(dataVencimento + "T00:00:00")
 
-    // Zerar as horas para comparar apenas as datas
     hoje.setHours(0, 0, 0, 0)
     vencimento.setHours(0, 0, 0, 0)
 
@@ -160,7 +165,6 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
     for (let i = 0; i < numeroParcelas; i++) {
       const novaData = new Date(dataBase)
       novaData.setDate(dataBase.getDate() + i * intervaloDias)
-      // Retornar no formato YYYY-MM-DD para manter consistência
       datas.push(novaData.toISOString().split("T")[0])
     }
 
@@ -202,7 +206,6 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
         return
       }
 
-      // Verificar novamente se o número não existe
       const existe = await verificarNumeroExistente(numeroNota.trim())
       if (existe) {
         setNumeroNotaError("Este número já existe. Escolha outro número.")
@@ -214,10 +217,8 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
         return
       }
 
-      // Calcular datas de vencimento
       const datasVencimento = calcularDatasVencimento(primeiroVencimento, intervaloDias, numParcelas)
 
-      // Calcular valor das parcelas
       const valorParcela = valor / numParcelas
       const valorUltimaParcela = valor - valorParcela * (numParcelas - 1)
 
@@ -265,6 +266,8 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
         body: JSON.stringify({
           clienteId: cliente.id,
           numeroNota,
+          dataNota,
+          descricaoProduto: gerarDescricao(),
           valorTotal: Number.parseFloat(valorTotal.replace(",", ".")),
           observacoes,
           parcelas: parcelas.map((p) => ({
@@ -308,6 +311,7 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
     setCliente(null)
     setContratoInfo(null)
     setNumeroNota("")
+    setDataNota("")
     setNumeroNotaError("")
     setValorTotal("")
     setPrimeiroVencimento("")
@@ -341,7 +345,6 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Cliente - linha completa */}
             <div className="space-y-2">
               <Label htmlFor="cliente" className="text-sm font-semibold text-gray-700">
                 Cliente *
@@ -371,7 +374,6 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
               </div>
             </div>
 
-            {/* Campos em grid */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="numero-nota" className="text-sm font-semibold text-gray-700">
@@ -387,6 +389,19 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
                   }`}
                 />
                 {numeroNotaError && <p className="text-sm text-red-500 mt-1">{numeroNotaError}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="data-nota" className="text-sm font-semibold text-gray-700">
+                  Data da Nota *
+                </Label>
+                <Input
+                  id="data-nota"
+                  type="date"
+                  value={dataNota}
+                  onChange={(e) => setDataNota(e.target.value)}
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                />
               </div>
 
               <div className="space-y-2">
@@ -462,7 +477,22 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
               </div>
             </div>
 
-            {/* Observações - linha completa */}
+            {numeroNota.trim() && (
+              <div className="space-y-2">
+                <Label htmlFor="descricao-produto" className="text-sm font-semibold text-gray-700">
+                  Descrição do Produto/Serviço (PagBank)
+                </Label>
+                <Input
+                  id="descricao-produto"
+                  value={gerarDescricao()}
+                  readOnly
+                  disabled
+                  className="border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed"
+                />
+                <p className="text-xs text-gray-500">Esta descrição será enviada automaticamente ao PagBank</p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="observacoes" className="text-sm font-semibold text-gray-700">
                 Observações
@@ -521,5 +551,4 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
   )
 }
 
-// Exportação alternativa para compatibilidade
 export { NovoBoletoDialog as NovoBoletoDiaolog }

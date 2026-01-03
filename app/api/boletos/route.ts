@@ -128,11 +128,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { clienteId, numeroNota, valorTotal, observacoes, parcelas, formaPagamento } = await request.json()
+    const { clienteId, numeroNota, dataNota, descricaoProduto, valorTotal, observacoes, parcelas, formaPagamento } =
+      await request.json()
 
     console.log("[v0] Dados recebidos para criar boleto:", {
       clienteId,
       numeroNota,
+      dataNota,
+      descricaoProduto,
       valorTotal,
       parcelas: parcelas.length,
     })
@@ -260,6 +263,11 @@ export async function POST(request: NextRequest) {
             valorMinimo,
           })
 
+          const descricaoParcela =
+            parcelas.length > 1
+              ? descricaoProduto?.replace(/Parcelas 1\/\d+/, `Parcelas ${parcela.parcela}/${parcelas.length}`)
+              : descricaoProduto
+
           const boletoRequest = {
             customer: {
               name: cliente.nome,
@@ -270,7 +278,7 @@ export async function POST(request: NextRequest) {
             items: [
               {
                 reference_id: numeroBoleto,
-                name: `Boleto ${numeroBoleto}`,
+                name: descricaoParcela || `Boleto ${numeroBoleto}`,
                 quantity: 1,
                 unit_amount: Math.round(valorParcela * 100),
               },
@@ -287,7 +295,7 @@ export async function POST(request: NextRequest) {
             charges: [
               {
                 reference_id: numeroBoleto,
-                description: `Boleto ${numeroBoleto}${observacoes ? ` - ${observacoes}` : ""}`,
+                description: descricaoParcela || `Boleto ${numeroBoleto}${observacoes ? ` - ${observacoes}` : ""}`,
                 amount: {
                   value: Math.round(valorParcela * 100),
                   currency: "BRL",
@@ -420,9 +428,11 @@ export async function POST(request: NextRequest) {
           codigo_barras,
           link_pdf,
           link_impressao,
+          data_nota,
+          descricao_produto,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `,
         [
           numeroBoleto,
@@ -439,6 +449,8 @@ export async function POST(request: NextRequest) {
           boletoInfo?.barcode || null,
           linkPDF || null,
           linkPNG || null,
+          dataNota || null,
+          descricaoProduto || null,
         ],
       )
 
