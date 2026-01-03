@@ -110,26 +110,27 @@ export function Header() {
     setWelcomeMessage(message)
   }
 
-  // Função para converter data do banco para Date
   const parseDate = (dateString: string): Date | null => {
     try {
-      // Se a data já vem no formato ISO
-      if (dateString.includes("T")) {
-        return new Date(dateString)
+      // Se a data vem no formato YYYY-MM-DD (formato do banco)
+      if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const [year, month, day] = dateString.split("-")
+        // Cria data local sem conversão UTC
+        return new Date(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day))
       }
 
-      // Se a data vem no formato YYYY-MM-DD
-      if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        return new Date(dateString + "T00:00:00.000Z")
+      // Se a data já vem no formato ISO com timezone
+      if (dateString.includes("T")) {
+        return new Date(dateString)
       }
 
       // Se a data vem no formato DD/MM/YYYY
       if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
         const [day, month, year] = dateString.split("/")
-        return new Date(`${year}-${month}-${day}T00:00:00.000Z`)
+        return new Date(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day))
       }
 
-      // Tentar parsing direto
+      // Tentar parsing direto como último recurso
       const date = new Date(dateString)
       if (isNaN(date.getTime())) {
         return null
