@@ -170,23 +170,27 @@ export function Header() {
           hoje.setHours(0, 0, 0, 0)
 
           const vencidos = boletosResult.data.filter((boleto: any) => {
-            if (boleto.status !== "pendente" && boleto.status !== "vencido") {
-              return false
+            // Se o status já é "vencido", deve aparecer na notificação
+            if (boleto.status === "vencido") {
+              return true
             }
 
-            if (boleto.data_vencimento && boleto.data_vencimento.match(/^\d{4}-\d{2}-\d{2}$/)) {
-              const [year, month, day] = boleto.data_vencimento.split("-")
-              const vencimento = new Date(
-                Number.parseInt(year),
-                Number.parseInt(month) - 1,
-                Number.parseInt(day),
-                0,
-                0,
-                0,
-                0,
-              )
-              // Boleto vencido = vencimento é ANTES de hoje (não inclui hoje)
-              return vencimento < hoje
+            // Se o status é "pendente", verifica se a data de vencimento já passou
+            if (boleto.status === "pendente") {
+              if (boleto.data_vencimento && boleto.data_vencimento.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                const [year, month, day] = boleto.data_vencimento.split("-")
+                const vencimento = new Date(
+                  Number.parseInt(year),
+                  Number.parseInt(month) - 1,
+                  Number.parseInt(day),
+                  0,
+                  0,
+                  0,
+                  0,
+                )
+                // Boleto vencido = vencimento é ANTES de hoje (não inclui hoje)
+                return vencimento < hoje
+              }
             }
 
             return false
