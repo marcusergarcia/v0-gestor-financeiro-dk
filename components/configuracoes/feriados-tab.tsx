@@ -156,23 +156,21 @@ export function FeriadosTab() {
     try {
       if (!data) return "Data inválida"
 
-      // Se já está no formato YYYY-MM-DD, converte para exibição
+      // Se já está no formato YYYY-MM-DD, converte diretamente sem timezone
       if (data.match(/^\d{4}-\d{2}-\d{2}$/)) {
         const [ano, mes, dia] = data.split("-")
         return `${dia}/${mes}/${ano}`
       }
 
-      // Se está no formato ISO completo
+      // Se está no formato ISO completo, usa apenas a parte da data
       if (data.includes("T")) {
-        const date = new Date(data)
-        if (isNaN(date.getTime())) return "Data inválida"
-        return date.toLocaleDateString("pt-BR")
+        const dateOnly = data.split("T")[0]
+        const [ano, mes, dia] = dateOnly.split("-")
+        return `${dia}/${mes}/${ano}`
       }
 
-      // Tenta criar data diretamente
-      const date = new Date(data + "T00:00:00")
-      if (isNaN(date.getTime())) return "Data inválida"
-      return date.toLocaleDateString("pt-BR")
+      // Para outros formatos, tenta conversão direta
+      return "Data inválida"
     } catch (error) {
       console.error("Erro ao formatar data:", error)
       return "Data inválida"
@@ -186,11 +184,9 @@ export function FeriadosTab() {
       // Se já está no formato YYYY-MM-DD, retorna como está
       if (data.match(/^\d{4}-\d{2}-\d{2}$/)) return data
 
-      // Se está no formato ISO completo
+      // Se está no formato ISO completo, extrai apenas a data
       if (data.includes("T")) {
-        const date = new Date(data)
-        if (isNaN(date.getTime())) return ""
-        return date.toISOString().split("T")[0]
+        return data.split("T")[0]
       }
 
       // Se está no formato DD/MM/YYYY
@@ -199,10 +195,7 @@ export function FeriadosTab() {
         return `${ano}-${mes}-${dia}`
       }
 
-      // Tenta criar data e converter
-      const date = new Date(data)
-      if (isNaN(date.getTime())) return ""
-      return date.toISOString().split("T")[0]
+      return ""
     } catch (error) {
       console.error("Erro ao formatar data para input:", error)
       return ""
