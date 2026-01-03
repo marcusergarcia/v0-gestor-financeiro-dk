@@ -52,9 +52,7 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
       partes.push(dataFormatada)
     }
 
-    if (Number.parseInt(numeroParcelas) > 1) {
-      partes.push(`Parcelas 1/${numeroParcelas}`)
-    }
+    partes.push(`Parcelas 1/${numeroParcelas}`)
 
     return partes.join(" - ")
   }
@@ -331,7 +329,7 @@ export function NovoBoletoDialog({ open, onOpenChange, onSuccess }: NovoBoletoDi
   return (
     <>
       <Dialog open={open && !previewOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl border-0 shadow-2xl">
+        <DialogContent className="max-w-3xl border-0 shadow-2xl">
           <DialogHeader className="bg-gradient-to-r from-green-600 to-blue-600 text-white -m-6 mb-6 p-6 rounded-t-lg">
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <div className="p-2 bg-white/20 rounded-lg">
