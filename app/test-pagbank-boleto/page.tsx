@@ -20,6 +20,9 @@ export default function TestPagBankBoletoPage() {
     valorTotal: "100.00",
     numeroParcelas: "1",
     primeiroVencimento: "",
+    descricao: "",
+    multa: "2.00",
+    juros: "2.00",
   })
 
   useEffect(() => {
@@ -57,6 +60,9 @@ export default function TestPagBankBoletoPage() {
           valorTotal: Number.parseFloat(formData.valorTotal),
           numeroParcelas: Number.parseInt(formData.numeroParcelas),
           primeiroVencimento: formData.primeiroVencimento,
+          descricao: formData.descricao || `Boleto ${formData.numeroNota}`,
+          multa: Number.parseFloat(formData.multa),
+          juros: Number.parseFloat(formData.juros),
         }),
       })
 
@@ -217,6 +223,55 @@ export default function TestPagBankBoletoPage() {
                   <p className="text-muted-foreground">Boleto simples (à vista)</p>
                 )}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="descricao">Descrição do Boleto</Label>
+              <Input
+                id="descricao"
+                name="descricao"
+                value={formData.descricao}
+                onChange={handleChange}
+                placeholder={`Boleto ${formData.numeroNota || "XXX"}`}
+              />
+              <p className="text-xs text-muted-foreground">Aparecerá na descrição do boleto. Se vazio, usa o padrão.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="multa">Multa (%) após vencimento</Label>
+              <Input
+                id="multa"
+                name="multa"
+                type="number"
+                step="0.01"
+                min="0"
+                max="10"
+                value={formData.multa}
+                onChange={handleChange}
+                placeholder="2.00"
+              />
+              <p className="text-xs text-muted-foreground">
+                Padrão: 2% (valor em centavos enviado: {Math.round(Number.parseFloat(formData.multa || "0") * 100)})
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="juros">Juros (%) ao mês após vencimento</Label>
+              <Input
+                id="juros"
+                name="juros"
+                type="number"
+                step="0.01"
+                min="0"
+                max="5"
+                value={formData.juros}
+                onChange={handleChange}
+                placeholder="2.00"
+              />
+              <p className="text-xs text-muted-foreground">
+                Padrão: 2% ao mês (valor em centavos enviado:{" "}
+                {Math.round(Number.parseFloat(formData.juros || "0") * 100)})
+              </p>
             </div>
 
             {formData.numeroNota &&

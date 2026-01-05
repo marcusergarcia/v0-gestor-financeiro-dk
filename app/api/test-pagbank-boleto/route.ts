@@ -38,7 +38,7 @@ function obterNomeEstado(uf: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { clienteId, numeroNota, valorTotal, numeroParcelas, primeiroVencimento } = body
+    const { clienteId, numeroNota, valorTotal, numeroParcelas, primeiroVencimento, descricao, multa, juros } = body
 
     const clientes = await query(`SELECT * FROM clientes WHERE id = ?`, [clienteId])
 
@@ -117,9 +117,13 @@ export async function POST(request: NextRequest) {
       dataMultaJuros.setDate(dataMultaJuros.getDate() + 1)
       const dataMultaJurosStr = dataMultaJuros.toISOString().split("T")[0]
 
+      const multaEmCentavos = multa ? Math.round(multa * 100) : 200
+      const jurosEmCentavos = juros ? Math.round(juros * 100) : 33
+      const descricaoPersonalizada = descricao || `Boleto ${numeroBoleto}`
+
       requestPayload.charges.push({
         reference_id: numeroBoleto,
-        description: `Boleto ${numeroBoleto}`,
+        description: descricaoPersonalizada,
         amount: {
           value: valorParcelaEmCentavos,
           currency: "BRL",
@@ -154,11 +158,11 @@ export async function POST(request: NextRequest) {
         payment_instructions: {
           fine: {
             date: dataMultaJurosStr,
-            value: 200,
+            value: multaEmCentavos,
           },
           interest: {
             date: dataMultaJurosStr,
-            value: 33,
+            value: jurosEmCentavos,
           },
         },
       })
