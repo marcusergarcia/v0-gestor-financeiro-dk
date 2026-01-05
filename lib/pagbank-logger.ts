@@ -90,7 +90,7 @@ export class PagBankLogger {
 
       output += "REQUEST:\n"
       output += "-".repeat(80) + "\n"
-      output += `POST ${log.endpoint}\n`
+      output += `${log.method} ${log.endpoint}\n`
       output += `Content-Type: application/json\n`
       output += `Authorization: Bearer ${process.env.PAGSEGURO_TOKEN ? "***" + process.env.PAGSEGURO_TOKEN.slice(-8) : "***"}\n`
       output += `\nBody:\n`

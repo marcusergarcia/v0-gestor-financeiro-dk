@@ -163,7 +163,7 @@ export class PagSeguroAPI {
 
       await PagBankLogger.log({
         method,
-        endpoint,
+        endpoint: url, // URL completa ao invés de apenas endpoint
         request: data || {},
         response: responseData,
         status: response.status,
@@ -180,7 +180,7 @@ export class PagSeguroAPI {
 
       await PagBankLogger.log({
         method,
-        endpoint,
+        endpoint: url, // URL completa ao invés de apenas endpoint
         request: data || {},
         response: error instanceof Error ? { error: error.message } : { error: String(error) },
         status: 500,
