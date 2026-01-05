@@ -364,7 +364,7 @@ export async function POST(request: NextRequest) {
                         city: cidadeValida,
                         region: nomeEstado,
                         region_code: ufNormalizada,
-                        country: "Brasil",
+                        country: "BRA",
                       },
                     },
                     instruction_lines: {
