@@ -78,70 +78,34 @@ export class PagBankLogger {
 
   static async getFormattedLogs(): Promise<string> {
     const logs = await this.getLogs()
-    let output = "=".repeat(80) + "\n"
-    output += "LOGS DE INTEGRAÇÃO PAGBANK - FORMATO PARA APROVAÇÃO\n"
-    output += "Gerado em: " + new Date().toLocaleString("pt-BR") + "\n"
-    output += "=".repeat(80) + "\n\n"
+    let output = ""
 
     logs.forEach((log, index) => {
-      output += `\n${"=".repeat(80)}\n`
-      output += `TRANSAÇÃO #${index + 1} - ${log.paymentType.toUpperCase()}\n`
-      output += `${"=".repeat(80)}\n\n`
+      const timestamp = new Date(log.timestamp).toLocaleString("pt-BR", {
+        timeZone: "America/Sao_Paulo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
 
-      output += "REQUEST:\n"
-      output += "-".repeat(80) + "\n"
+      output += `[${timestamp}] REQUEST\n`
       output += `${log.method} ${log.endpoint}\n`
-      output += `Content-Type: application/json\n`
-      output += `Authorization: Bearer ${process.env.PAGSEGURO_TOKEN ? "***" + process.env.PAGSEGURO_TOKEN.slice(-8) : "***"}\n`
+      output += `Headers:\n`
+      output += `  Content-Type: application/json\n`
+      output += `  Authorization: Bearer ${process.env.PAGSEGURO_TOKEN ? "***" + process.env.PAGSEGURO_TOKEN.slice(-8) : "***"}\n`
       output += `\nBody:\n`
       output += JSON.stringify(log.request, null, 2) + "\n\n"
 
-      output += "RESPONSE:\n"
-      output += "-".repeat(80) + "\n"
+      output += `[${timestamp}] RESPONSE\n`
       output += `HTTP ${log.status}\n`
-      output += `\nBody:\n`
+      output += `Body:\n`
       output += JSON.stringify(log.response, null, 2) + "\n\n"
 
-      output += "RESULTADO:\n"
-      output += "-".repeat(80) + "\n"
-
-      if (log.response && typeof log.response === "object") {
-        if (log.response.error) {
-          output += `❌ ERRO: ${log.response.error}\n`
-          if (log.response.error_messages) {
-            log.response.error_messages.forEach((msg: any) => {
-              output += `   ${msg.description || msg}\n`
-            })
-          }
-        } else {
-          output += `✅ SUCESSO\n`
-          if (log.request?.reference_id) {
-            output += `reference_id: ${log.request.reference_id}\n`
-          }
-          if (log.response.id) {
-            output += `order_id: ${log.response.id}\n`
-          }
-          if (log.response.charges && log.response.charges[0]) {
-            const charge = log.response.charges[0]
-            output += `charge_id: ${charge.id}\n`
-            output += `status: ${charge.status}\n`
-
-            if (charge.payment_method?.boleto) {
-              const boleto = charge.payment_method.boleto
-              if (boleto.id) output += `boleto_id: ${boleto.id}\n`
-              if (boleto.barcode) output += `barcode: ${boleto.barcode}\n`
-              if (boleto.formatted_barcode) output += `linha_digitavel: ${boleto.formatted_barcode}\n`
-            }
-          }
-        }
-      }
-
-      output += "\n"
+      output += "-".repeat(80) + "\n\n"
     })
-
-    output += "\n" + "=".repeat(80) + "\n"
-    output += `TOTAL DE TRANSAÇÕES: ${logs.length}\n`
-    output += "=".repeat(80) + "\n"
 
     return output
   }
