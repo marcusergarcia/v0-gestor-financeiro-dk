@@ -201,6 +201,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Registra o log no formato correto
+    console.log("[v0] Tentando registrar log com dados:", {
+      method: "POST",
+      endpoint: "https://sandbox.api.pagseguro.com/orders",
+      hasRequestBody: !!requestPayload,
+      hasResponseBody: !!responsePayload,
+      orderId,
+      chargeId,
+    })
+
     await logPagBankTransaction({
       method: "POST",
       endpoint: "https://sandbox.api.pagseguro.com/orders",
@@ -211,7 +220,10 @@ export async function POST(request: NextRequest) {
       charge_id: chargeId,
       reference_id: referenceId || "ex-00001",
       status: "PAID",
+      payment_type: "CREDIT_CARD",
     })
+
+    console.log("[v0] Log registrado com sucesso!")
 
     return NextResponse.json({
       success: true,
