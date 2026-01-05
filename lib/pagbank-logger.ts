@@ -10,6 +10,9 @@ interface PagBankLogEntry {
   status: number
   paymentType: string
   success: boolean
+  orderId?: string
+  chargeId?: string
+  referenceId?: string
 }
 
 export class PagBankLogger {
@@ -28,8 +31,8 @@ export class PagBankLogger {
     try {
       await query(
         `INSERT INTO pagbank_logs 
-        (timestamp, method, endpoint, request_data, response_data, status, payment_type, success) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (timestamp, method, endpoint, request_data, response_data, status, payment_type, success, order_id, charge_id, reference_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           logEntry.timestamp ?? null,
           logEntry.method ?? null,
@@ -39,6 +42,9 @@ export class PagBankLogger {
           logEntry.status ?? null,
           logEntry.paymentType ?? null,
           logEntry.success ?? false,
+          logEntry.orderId ?? null,
+          logEntry.chargeId ?? null,
+          logEntry.referenceId ?? null,
         ],
       )
       console.log("[PagBank Logger] Log salvo no banco com sucesso")
@@ -59,7 +65,10 @@ export class PagBankLogger {
           response_data as response,
           status,
           payment_type as paymentType,
-          success
+          success,
+          order_id as orderId,
+          charge_id as chargeId,
+          reference_id as referenceId
         FROM pagbank_logs 
         ORDER BY timestamp DESC 
         LIMIT 100`,
@@ -123,18 +132,31 @@ export class PagBankLogger {
 export async function logPagBankTransaction(data: {
   method: string
   endpoint: string
-  request: any
-  response: any
+  request?: any
+  request_body?: any
+  response?: any
+  response_body?: any
   status?: number
-  success: boolean
+  response_status?: number
+  success?: boolean
+  order_id?: string
+  charge_id?: string
+  reference_id?: string
 }) {
+  const requestData = data.request_body || data.request || {}
+  const responseData = data.response_body || data.response || {}
+  const statusCode = data.response_status || data.status || (data.success !== false ? 201 : 400)
+
   await PagBankLogger.log({
     method: data.method ?? "UNKNOWN",
     endpoint: data.endpoint ?? "",
-    request: data.request ?? {},
-    response: data.response ?? {},
-    status: data.status ?? (data.success ? 200 : 400),
+    request: requestData,
+    response: responseData,
+    status: statusCode,
     paymentType: data.method ?? "UNKNOWN",
-    success: data.success ?? false,
+    success: data.success !== false,
+    orderId: data.order_id,
+    chargeId: data.charge_id,
+    referenceId: data.reference_id,
   })
 }
