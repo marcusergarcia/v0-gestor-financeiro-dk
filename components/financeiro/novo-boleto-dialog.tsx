@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,6 +48,7 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
   const [loading, setLoading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [parcelas, setParcelas] = useState<ParcelaPreview[]>([])
+  const verificarNumeroTimeoutRef = useRef<NodeJS.Timeout>()
 
   const gerarDescricao = (): string => {
     if (!numeroNota.trim()) return ""
@@ -137,11 +138,17 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
     setNumeroNota(value)
     setNumeroNotaError("")
 
+    if (verificarNumeroTimeoutRef.current) {
+      clearTimeout(verificarNumeroTimeoutRef.current)
+    }
+
     if (value.trim()) {
-      const existe = await verificarNumeroExistente(value.trim())
-      if (existe) {
-        setNumeroNotaError("Este número já existe. Escolha outro número.")
-      }
+      verificarNumeroTimeoutRef.current = setTimeout(async () => {
+        const existe = await verificarNumeroExistente(value.trim())
+        if (existe) {
+          setNumeroNotaError("Este número já existe. Escolha outro número.")
+        }
+      }, 500)
     }
   }
 
@@ -341,6 +348,14 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
     setPreviewOpen(false)
     onOpenChange(false)
   }
+
+  useEffect(() => {
+    return () => {
+      if (verificarNumeroTimeoutRef.current) {
+        clearTimeout(verificarNumeroTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
