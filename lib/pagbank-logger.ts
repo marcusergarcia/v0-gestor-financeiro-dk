@@ -22,44 +22,20 @@ export class PagBankLogger {
       ...entry,
     }
 
-    console.log("[v0] [PagBank Logger] Registrando transação:", {
-      paymentType: entry.paymentType,
-      method: entry.method,
-      status: entry.status,
-      hasRequest: !!entry.request,
-      hasResponse: !!entry.response,
-    })
-
     try {
       const values = [
-        logEntry.timestamp ?? null,
-        logEntry.method ?? null,
-        logEntry.endpoint ?? null,
-        logEntry.request ? JSON.stringify(logEntry.request) : null,
-        logEntry.response ? JSON.stringify(logEntry.response) : null,
-        logEntry.status ?? null,
-        logEntry.paymentType ?? null,
-        logEntry.success ?? false,
-        logEntry.orderId ?? null,
-        logEntry.chargeId ?? null,
-        logEntry.referenceId ?? null,
+        logEntry.timestamp,
+        logEntry.method,
+        logEntry.endpoint,
+        JSON.stringify(logEntry.request || {}),
+        JSON.stringify(logEntry.response || {}),
+        logEntry.status,
+        logEntry.paymentType,
+        logEntry.success ? 1 : 0,
+        logEntry.orderId || null,
+        logEntry.chargeId || null,
+        logEntry.referenceId || null,
       ]
-
-      console.log("[v0] [PagBank Logger] Valores para inserir:", {
-        timestamp: values[0],
-        method: values[1],
-        endpoint: values[2],
-        hasRequestData: !!values[3],
-        requestDataLength: values[3]?.length,
-        hasResponseData: !!values[4],
-        responseDataLength: values[4]?.length,
-        status: values[5],
-        paymentType: values[6],
-        success: values[7],
-        orderId: values[8],
-        chargeId: values[9],
-        referenceId: values[10],
-      })
 
       const result = await query(
         `INSERT INTO pagbank_logs 
@@ -68,9 +44,10 @@ export class PagBankLogger {
         values,
       )
 
-      console.log("[v0] [PagBank Logger] Log salvo no banco com sucesso. Result:", result)
+      console.log("[v0] Log PagBank salvo. ID:", result.insertId)
+      return result
     } catch (error) {
-      console.error("[v0] [PagBank Logger] Erro ao salvar log:", error)
+      console.error("[v0] Erro ao salvar log PagBank:", error)
       throw error
     }
   }
@@ -102,7 +79,7 @@ export class PagBankLogger {
         response: log.response ? JSON.parse(log.response) : {},
       }))
     } catch (error) {
-      console.error("[v0] [PagBank Logger] Erro ao ler logs:", error)
+      console.error("[v0] Erro ao ler logs PagBank:", error)
       return []
     }
   }
@@ -111,7 +88,7 @@ export class PagBankLogger {
     const logs = await this.getLogs()
     let output = ""
 
-    logs.forEach((log, index) => {
+    logs.forEach((log) => {
       const timestamp = new Date(log.timestamp).toLocaleString("pt-BR", {
         timeZone: "America/Sao_Paulo",
         year: "numeric",
@@ -144,9 +121,9 @@ export class PagBankLogger {
   static async clearLogs(): Promise<void> {
     try {
       await query(`DELETE FROM pagbank_logs`)
-      console.log("[v0] [PagBank Logger] Logs limpos com sucesso")
+      console.log("[v0] Logs PagBank limpos")
     } catch (error) {
-      console.error("[v0] [PagBank Logger] Erro ao limpar logs:", error)
+      console.error("[v0] Erro ao limpar logs PagBank:", error)
     }
   }
 }
@@ -166,37 +143,20 @@ export async function logPagBankTransaction(data: {
   reference_id?: string
   payment_type?: string
 }) {
-  console.log("[v0] logPagBankTransaction chamada com dados:", {
-    method: data.method,
-    endpoint: data.endpoint,
-    hasRequest: !!(data.request_body || data.request),
-    hasResponse: !!(data.response_body || data.response),
-    payment_type: data.payment_type,
-  })
-
   const requestData = data.request_body || data.request || {}
   const responseData = data.response_body || data.response || {}
-  const statusCode = data.response_status || data.status || (data.success !== false ? 201 : 400)
-
-  let paymentType = data.payment_type || "UNKNOWN"
-  if (data.endpoint.includes("/orders") && requestData.charges?.[0]?.payment_method?.type === "CREDIT_CARD") {
-    paymentType = "CREDIT_CARD"
-  } else if (data.endpoint.includes("/orders") && requestData.charges?.[0]?.payment_method?.type === "BOLETO") {
-    paymentType = "BOLETO"
-  }
+  const statusCode = data.response_status || data.status || 201
 
   await PagBankLogger.log({
-    method: data.method ?? "UNKNOWN",
-    endpoint: data.endpoint ?? "",
+    method: data.method,
+    endpoint: data.endpoint,
     request: requestData,
     response: responseData,
     status: statusCode,
-    paymentType: paymentType,
+    paymentType: data.payment_type || "UNKNOWN",
     success: data.success !== false,
     orderId: data.order_id,
     chargeId: data.charge_id,
     referenceId: data.reference_id,
   })
-
-  console.log("[v0] logPagBankTransaction concluída")
 }

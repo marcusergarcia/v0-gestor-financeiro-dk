@@ -210,29 +210,40 @@ export async function POST(request: NextRequest) {
       chargeId,
     })
 
-    await logPagBankTransaction({
-      method: "POST",
-      endpoint: "https://sandbox.api.pagseguro.com/orders",
-      request_body: requestPayload,
-      response_status: 201,
-      response_body: responsePayload,
-      order_id: orderId,
-      charge_id: chargeId,
-      reference_id: referenceId || "ex-00001",
-      status: "PAID",
-      payment_type: "CREDIT_CARD",
-    })
-
-    console.log("[v0] Log registrado com sucesso!")
+    try {
+      await logPagBankTransaction({
+        method: "POST",
+        endpoint: "https://sandbox.api.pagseguro.com/orders",
+        request_body: requestPayload,
+        response_status: 201,
+        response_body: responsePayload,
+        order_id: orderId,
+        charge_id: chargeId,
+        reference_id: referenceId || "ex-00001",
+        status: "PAID",
+        payment_type: "CREDIT_CARD",
+      })
+      console.log("[v0] Log registrado com sucesso!")
+    } catch (logError) {
+      console.error("[v0] Erro ao registrar log (não bloqueia resposta):", logError)
+    }
 
     return NextResponse.json({
       success: true,
       order_id: orderId,
       charge_id: chargeId,
       status: "PAID",
+      request: requestPayload,
+      response: responsePayload,
     })
   } catch (error) {
     console.error("[v0] Erro ao simular pagamento com cartão:", error)
-    return NextResponse.json({ error: "Erro ao simular pagamento" }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: "Erro ao simular pagamento",
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
+    )
   }
 }
