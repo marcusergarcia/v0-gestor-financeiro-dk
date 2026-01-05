@@ -38,7 +38,8 @@ function obterNomeEstado(uf: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { clienteId, numeroNota, valorTotal, numeroParcelas, primeiroVencimento, descricao, multa, juros } = body
+    const { clienteId, numeroNota, dataNota, valorTotal, numeroParcelas, primeiroVencimento, descricao, multa, juros } =
+      body
 
     const clientes = await query(`SELECT * FROM clientes WHERE id = ?`, [clienteId])
 
@@ -65,6 +66,10 @@ export async function POST(request: NextRequest) {
     const valorParcela = valorTotal / numeroParcelas
     const valorParcelaEmCentavos = Math.round(valorParcela * 100)
 
+    const dataNotaFormatada = dataNota
+      ? new Date(dataNota + "T00:00:00").toLocaleDateString("pt-BR")
+      : new Date().toLocaleDateString("pt-BR")
+
     const requestPayload: any = {
       reference_id: numeroNota,
       customer: {
@@ -83,7 +88,7 @@ export async function POST(request: NextRequest) {
       items: [
         {
           reference_id: numeroNota,
-          name: `Boleto ${numeroNota}`,
+          name: descricao || `NOTA FISCAL - ${numeroNota} - ${dataNotaFormatada} - Parcelas 1/${numeroParcelas}`,
           quantity: 1,
           unit_amount: Math.round(valorTotal * 100),
         },
@@ -112,18 +117,18 @@ export async function POST(request: NextRequest) {
 
       const numeroBoleto = numeroParcelas > 1 ? `${numeroNota}-${String(i + 1).padStart(2, "0")}` : numeroNota
 
-      // Data para multa e juros (D+1 após vencimento)
       const dataMultaJuros = new Date(dataVencimento)
       dataMultaJuros.setDate(dataMultaJuros.getDate() + 1)
       const dataMultaJurosStr = dataMultaJuros.toISOString().split("T")[0]
 
       const multaEmCentavos = multa ? Math.round(multa * 100) : 200
-      const jurosEmCentavos = juros ? Math.round(juros * 100) : 33
-      const descricaoPersonalizada = descricao || `Boleto ${numeroBoleto}`
+      const jurosEmCentavos = juros ? Math.round(juros * 100) : 200
+
+      const descricaoParcela = `NOTA FISCAL - ${numeroNota} - ${dataNotaFormatada} - Parcelas ${i + 1}/${numeroParcelas}`
 
       requestPayload.charges.push({
         reference_id: numeroBoleto,
-        description: descricaoPersonalizada,
+        description: descricaoParcela,
         amount: {
           value: valorParcelaEmCentavos,
           currency: "BRL",

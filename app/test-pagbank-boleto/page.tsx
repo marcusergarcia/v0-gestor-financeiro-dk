@@ -17,22 +17,40 @@ export default function TestPagBankBoletoPage() {
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [formData, setFormData] = useState({
     numeroNota: "",
+    dataNota: "",
     valorTotal: "100.00",
     numeroParcelas: "1",
     primeiroVencimento: "",
-    descricao: "",
     multa: "2.00",
     juros: "2.00",
   })
 
   useEffect(() => {
     const hoje = new Date()
+    const dataNotaStr = hoje.toISOString().split("T")[0]
+
     hoje.setDate(hoje.getDate() + 7)
     setFormData((prev) => ({
       ...prev,
+      dataNota: dataNotaStr,
       primeiroVencimento: hoje.toISOString().split("T")[0],
     }))
   }, [])
+
+  const gerarDescricao = (): string => {
+    if (!formData.numeroNota.trim()) return ""
+
+    const partes: string[] = ["NOTA FISCAL", formData.numeroNota.trim()]
+
+    if (formData.dataNota) {
+      const dataFormatada = new Date(formData.dataNota + "T00:00:00").toLocaleDateString("pt-BR")
+      partes.push(dataFormatada)
+    }
+
+    partes.push(`Parcelas 1/${formData.numeroParcelas}`)
+
+    return partes.join(" - ")
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
@@ -57,10 +75,11 @@ export default function TestPagBankBoletoPage() {
         body: JSON.stringify({
           clienteId: cliente.id,
           numeroNota: formData.numeroNota,
+          dataNota: formData.dataNota,
           valorTotal: Number.parseFloat(formData.valorTotal),
           numeroParcelas: Number.parseInt(formData.numeroParcelas),
           primeiroVencimento: formData.primeiroVencimento,
-          descricao: formData.descricao || `Boleto ${formData.numeroNota}`,
+          descricao: gerarDescricao(),
           multa: Number.parseFloat(formData.multa),
           juros: Number.parseFloat(formData.juros),
         }),
@@ -176,6 +195,12 @@ export default function TestPagBankBoletoPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="dataNota">Data da Nota</Label>
+              <Input id="dataNota" name="dataNota" type="date" value={formData.dataNota} onChange={handleChange} />
+              <p className="text-xs text-muted-foreground">Data de emissão da nota fiscal</p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="valorTotal">Valor Total (R$) *</Label>
               <Input
                 id="valorTotal"
@@ -226,15 +251,9 @@ export default function TestPagBankBoletoPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="descricao">Descrição do Boleto</Label>
-              <Input
-                id="descricao"
-                name="descricao"
-                value={formData.descricao}
-                onChange={handleChange}
-                placeholder={`Boleto ${formData.numeroNota || "XXX"}`}
-              />
-              <p className="text-xs text-muted-foreground">Aparecerá na descrição do boleto. Se vazio, usa o padrão.</p>
+              <Label>Descrição do Boleto (gerada automaticamente)</Label>
+              <Input value={gerarDescricao()} readOnly disabled className="bg-muted cursor-not-allowed" />
+              <p className="text-xs text-muted-foreground">Esta descrição será enviada automaticamente ao PagBank</p>
             </div>
 
             <div className="space-y-2">
