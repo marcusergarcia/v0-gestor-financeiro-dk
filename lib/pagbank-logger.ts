@@ -76,8 +76,8 @@ export class PagBankLogger {
 
       return logs.map((log: any) => ({
         ...log,
-        request: JSON.parse(log.request),
-        response: JSON.parse(log.response),
+        request: log.request ? JSON.parse(log.request) : {},
+        response: log.response ? JSON.parse(log.response) : {},
       }))
     } catch (error) {
       console.error("[PagBank Logger] Erro ao ler logs:", error)
