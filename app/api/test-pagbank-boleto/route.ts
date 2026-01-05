@@ -256,12 +256,11 @@ export async function POST(request: NextRequest) {
     }
 
     await logPagBankTransaction({
-      method: numeroParcelas > 1 ? "BOLETO_PARCELADO" : "BOLETO",
-      endpoint: "/charges",
+      method: "POST",
+      endpoint: "https://sandbox.api.pagseguro.com/orders",
       request: requestPayload,
       response: responsePayload,
       success: true,
-      statusCode: 200,
     })
 
     return NextResponse.json({
