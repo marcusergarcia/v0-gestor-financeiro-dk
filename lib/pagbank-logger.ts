@@ -26,29 +26,29 @@ export class PagBankLogger {
       paymentType: entry.paymentType,
     })
 
-    const logEntry: Omit<PagBankLogEntry, "id"> = {
-      timestamp: new Date().toISOString(),
-      ...entry,
-    }
+    const timestamp = new Date().toISOString().slice(0, 19).replace("T", " ")
 
     try {
       const values = [
-        logEntry.timestamp,
-        logEntry.method || "POST",
-        logEntry.endpoint || "",
-        JSON.stringify(logEntry.request || {}),
-        JSON.stringify(logEntry.response || {}),
-        logEntry.status || 200,
-        logEntry.paymentType || "UNKNOWN",
-        logEntry.success ? 1 : 0,
-        logEntry.orderId ?? null,
-        logEntry.chargeId ?? null,
-        logEntry.referenceId ?? null,
+        timestamp,
+        entry.method || "POST",
+        entry.endpoint || "",
+        JSON.stringify(entry.request || {}),
+        JSON.stringify(entry.response || {}),
+        entry.status || 200,
+        entry.paymentType || "UNKNOWN",
+        entry.success ? 1 : 0,
+        entry.orderId ?? null,
+        entry.chargeId ?? null,
+        entry.referenceId ?? null,
       ]
 
       console.log(
         "[v0] Valores preparados para INSERT:",
-        values.map((v, i) => `${i}: ${typeof v}`),
+        values.map(
+          (v, i) =>
+            `${i}: ${typeof v} = ${v === null ? "NULL" : typeof v === "string" && v.length > 50 ? v.substring(0, 50) + "..." : v}`,
+        ),
       )
 
       const result = await query(
