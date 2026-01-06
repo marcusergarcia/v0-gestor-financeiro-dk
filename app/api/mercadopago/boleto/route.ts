@@ -4,7 +4,7 @@ import { createBoletoPayment } from "@/lib/mercadopago"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { nome, cpf, email, valor, numeroNota, endereco } = body
+    const { nome, cpf, email, valor, numeroNota } = body
 
     console.log("[v0] Recebendo requisição boleto Mercado Pago:", {
       nome,
@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Valor mínimo de R$ 0,50" }, { status: 400 })
     }
 
-    // Preparar dados do pagamento
     const paymentData = {
       transaction_amount: valorCentavos / 100, // Converter centavos para reais
       description: `Nota Fiscal ${numeroNota || "N/A"}`,
@@ -35,22 +34,10 @@ export async function POST(request: NextRequest) {
         first_name: nome.split(" ")[0],
         last_name: nome.split(" ").slice(1).join(" ") || nome.split(" ")[0],
         identification: {
-          type: "CPF",
+          type: cpf.length === 14 ? "CNPJ" : "CPF",
           number: cpf.replace(/\D/g, ""),
         },
-        address: endereco
-          ? {
-              street_name: endereco.rua || "Rua Exemplo",
-              street_number: endereco.numero || 123,
-              neighborhood: endereco.bairro || "Centro",
-              zip_code: endereco.cep?.replace(/\D/g, "") || "01000000",
-              federal_unit: endereco.estado || "SP",
-              city: endereco.cidade || "São Paulo",
-            }
-          : undefined,
       },
-      external_reference: numeroNota,
-      notification_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/mercadopago/webhook`,
     }
 
     // Criar pagamento no Mercado Pago
@@ -60,11 +47,8 @@ export async function POST(request: NextRequest) {
       success: true,
       payment_id: response.id,
       status: response.status,
-      boleto: {
-        barcode: response.barcode?.content,
-        external_resource_url: response.transaction_details?.external_resource_url,
-        digitable_line: response.barcode?.content,
-      },
+      status_detail: response.status_detail,
+      external_resource_url: response.transaction_details?.external_resource_url,
       response: response,
     })
   } catch (error: any) {
@@ -73,7 +57,6 @@ export async function POST(request: NextRequest) {
       {
         error: "Erro ao criar boleto",
         details: error.message,
-        cause: error.cause,
       },
       { status: 500 },
     )

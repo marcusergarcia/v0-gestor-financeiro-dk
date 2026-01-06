@@ -1,5 +1,3 @@
-import { MercadoPagoConfig, Payment } from "mercadopago"
-
 export interface MercadoPagoPaymentRequest {
   transaction_amount: number
   description: string
@@ -12,45 +10,39 @@ export interface MercadoPagoPaymentRequest {
       type: string
       number: string
     }
-    address?: {
-      street_name: string
-      street_number: number
-      neighborhood: string
-      zip_code: string
-      federal_unit: string
-      city: string
-    }
   }
   external_reference?: string
   notification_url?: string
 }
 
-export function getMercadoPagoClient() {
+export async function createBoletoPayment(data: MercadoPagoPaymentRequest) {
   const accessToken = process.env.MERCADOPAGO_ACCESS_TOKEN
 
   if (!accessToken) {
+    console.error("[v0] MERCADOPAGO_ACCESS_TOKEN não encontrado nas variáveis de ambiente")
     throw new Error("MERCADOPAGO_ACCESS_TOKEN não configurado")
   }
 
-  return new MercadoPagoConfig({
-    accessToken,
-    options: {
-      timeout: 10000,
-    },
-  })
-}
-
-export async function createBoletoPayment(data: MercadoPagoPaymentRequest) {
-  const client = getMercadoPagoClient()
-  const payment = new Payment(client)
-
+  console.log("[v0] Access Token encontrado:", accessToken.substring(0, 20) + "...")
   console.log("[v0] Criando pagamento Mercado Pago:", JSON.stringify(data, null, 2))
 
-  const response = await payment.create({
-    body: data,
+  const response = await fetch("https://api.mercadopago.com/v1/payments", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(data),
   })
 
-  console.log("[v0] Resposta Mercado Pago:", JSON.stringify(response, null, 2))
+  const responseData = await response.json()
 
-  return response
+  console.log("[v0] Status HTTP:", response.status)
+  console.log("[v0] Resposta Mercado Pago:", JSON.stringify(responseData, null, 2))
+
+  if (!response.ok) {
+    throw new Error(`Mercado Pago API Error: ${responseData.message || JSON.stringify(responseData)}`)
+  }
+
+  return responseData
 }
