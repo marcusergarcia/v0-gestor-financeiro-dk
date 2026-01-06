@@ -130,7 +130,12 @@ export class PagSeguroAPI {
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
 
-    console.log("[PagSeguro API] Request:", { method, url, data })
+    console.log("[v0] [PagSeguro API] ========== INICIANDO REQUISIÇÃO ==========")
+    console.log("[v0] [PagSeguro API] URL:", url)
+    console.log("[v0] [PagSeguro API] Method:", method)
+    console.log("[v0] [PagSeguro API] Environment:", this.config.environment)
+    console.log("[v0] [PagSeguro API] Token (primeiros 10 chars):", this.config.token?.substring(0, 10))
+    console.log("[v0] [PagSeguro API] Request Data:", JSON.stringify(data, null, 2))
 
     const headers: HeadersInit = {
       Authorization: `Bearer ${this.config.token}`,
@@ -156,27 +161,39 @@ export class PagSeguroAPI {
           : "OTHER"
 
     try {
+      console.log("[v0] [PagSeguro API] Enviando fetch para:", url)
       const response = await fetch(url, options)
       const responseData = await response.json()
 
-      console.log("[PagSeguro API] Response:", { status: response.status, data: responseData })
+      console.log("[v0] [PagSeguro API] ========== RESPOSTA RECEBIDA ==========")
+      console.log("[v0] [PagSeguro API] Status HTTP:", response.status)
+      console.log("[v0] [PagSeguro API] Status OK:", response.ok)
+      console.log("[v0] [PagSeguro API] Response Headers:", Object.fromEntries(response.headers.entries()))
+      console.log("[v0] [PagSeguro API] Response Data:", JSON.stringify(responseData, null, 2))
 
       await PagBankLogger.log({
         method,
-        endpoint: url, // URL completa ao invés de apenas endpoint
+        endpoint: url,
         request: data || {},
         response: responseData,
         status: response.status,
         paymentType,
-      }).catch((err) => console.error("[PagSeguro] Erro ao registrar log:", err))
+      }).catch((err) => console.error("[v0] [PagSeguro] Erro ao registrar log:", err))
 
       if (!response.ok) {
+        console.error("[v0] [PagSeguro API] ========== ERRO NA REQUISIÇÃO ==========")
+        console.error("[v0] [PagSeguro API] Status:", response.status)
+        console.error("[v0] [PagSeguro API] Response:", responseData)
         throw new Error(`PagSeguro API Error: ${response.status} - ${JSON.stringify(responseData)}`)
       }
 
+      console.log("[v0] [PagSeguro API] ========== REQUISIÇÃO CONCLUÍDA COM SUCESSO ==========")
       return responseData as T
     } catch (error) {
-      console.error("[PagSeguro API] Error:", error)
+      console.error("[v0] [PagSeguro API] ========== EXCEÇÃO CAPTURADA ==========")
+      console.error("[v0] [PagSeguro API] Error:", error)
+      console.error("[v0] [PagSeguro API] Error Message:", error instanceof Error ? error.message : String(error))
+      console.error("[v0] [PagSeguro API] Error Stack:", error instanceof Error ? error.stack : "N/A")
 
       await PagBankLogger.log({
         method,
@@ -185,7 +202,7 @@ export class PagSeguroAPI {
         response: error instanceof Error ? { error: error.message } : { error: String(error) },
         status: 500,
         paymentType,
-      }).catch((err) => console.error("[PagSeguro] Erro ao registrar log de erro:", err))
+      }).catch((err) => console.error("[v0] [PagSeguro] Erro ao registrar log de erro:", err))
 
       throw error
     }
