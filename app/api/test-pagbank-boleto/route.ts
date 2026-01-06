@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { logPagBankTransaction } from "@/lib/pagbank-logger"
 import { query } from "@/lib/db"
+import { getPagSeguroAPI } from "@/lib/pagseguro"
 
 function obterNomeEstado(uf: string): string {
   const mapeamentoUF: Record<string, string> = {
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     const { clienteId, numeroNota, dataNota, valorTotal, numeroParcelas, primeiroVencimento, descricao, multa, juros } =
       body
 
+    console.log("[v0] Buscando cliente no banco de dados...")
     const clientes = await query(`SELECT * FROM clientes WHERE id = ?`, [clienteId])
 
     if (clientes.length === 0) {
@@ -70,20 +71,13 @@ export async function POST(request: NextRequest) {
       ? new Date(dataNota + "T00:00:00").toLocaleDateString("pt-BR")
       : new Date().toLocaleDateString("pt-BR")
 
-    const requestPayload: any = {
+    const boletoData: any = {
       reference_id: `my_order_${numeroNota}`,
       customer: {
         name: cliente.nome,
         email: emailValido,
         tax_id: taxIdValido,
-        phones: [
-          {
-            country: "55",
-            area: telefoneCompleto.substring(0, 2),
-            number: telefoneCompleto.substring(2),
-            type: "MOBILE",
-          },
-        ],
+        phone: telefoneCompleto,
       },
       items: [
         {
@@ -93,17 +87,15 @@ export async function POST(request: NextRequest) {
           unit_amount: valorParcelaEmCentavos,
         },
       ],
-      shipping: {
-        address: {
-          street: enderecoValido,
-          number: numeroEndereco,
-          complement: cliente.complemento || "",
-          locality: bairroValido,
-          city: cidadeValida,
-          region_code: ufNormalizada,
-          country: "BRA",
-          postal_code: cepCompleto,
-        },
+      shipping_address: {
+        street: enderecoValido,
+        number: numeroEndereco,
+        complement: cliente.complemento || "",
+        locality: bairroValido,
+        city: cidadeValida,
+        region_code: ufNormalizada,
+        country: "BRA",
+        postal_code: cepCompleto,
       },
       charges: [],
     }
@@ -124,29 +116,19 @@ export async function POST(request: NextRequest) {
 
       const descricaoParcela = descricao || `Boleto de fatura - Parcela ${i + 1}/${numeroParcelas}`
 
-      requestPayload.charges.push({
+      boletoData.charges.push({
         reference_id: numeroBoleto,
         description: descricaoParcela,
         amount: {
           value: valorParcelaEmCentavos,
           currency: "BRL",
         },
-        payment_instructions: {
-          fine: {
-            date: dataMultaJurosStr,
-            value: multaEmCentavos,
-          },
-          interest: {
-            date: dataMultaJurosStr,
-            value: jurosEmCentavos,
-          },
-        },
         payment_method: {
           type: "BOLETO",
           boleto: {
             template: "COBRANCA",
             due_date: dueDate,
-            days_until_expiration: "45",
+            days_until_expiration: 45,
             holder: {
               name: cliente.nome,
               tax_id: taxIdValido,
@@ -168,119 +150,39 @@ export async function POST(request: NextRequest) {
             },
           },
         },
+        payment_instructions: {
+          fine: {
+            date: dataMultaJurosStr,
+            value: multaEmCentavos,
+          },
+          interest: {
+            date: dataMultaJurosStr,
+            value: jurosEmCentavos,
+          },
+        },
       })
     }
 
-    const orderId = `ORDE_${Math.random().toString(36).substring(2, 15).toUpperCase()}`
-    const responsePayload: any = {
-      id: orderId,
-      reference_id: requestPayload.reference_id,
-      created_at: new Date().toISOString(),
-      customer: requestPayload.customer,
-      items: requestPayload.items,
-      shipping: requestPayload.shipping,
-      charges: requestPayload.charges.map((charge: any) => {
-        const chargeId = `CHAR_${Math.random().toString(36).substring(2, 15).toUpperCase()}`
-        const boletoId = Math.random().toString(36).substring(2, 15).toUpperCase()
+    console.log("[v0] Fazendo chamada REAL à API do PagBank...")
 
-        return {
-          id: chargeId,
-          reference_id: charge.reference_id,
-          status: "WAITING",
-          created_at: new Date().toISOString(),
-          description: charge.description,
-          amount: {
-            ...charge.amount,
-            summary: {
-              total: charge.amount.value,
-              paid: 0,
-              refunded: 0,
-            },
-          },
-          payment_instructions: charge.payment_instructions,
-          payment_response: {
-            code: "20000",
-            message: "SUCESSO",
-          },
-          payment_method: {
-            type: "BOLETO",
-            boleto: {
-              id: boletoId,
-              barcode: "08197081080010000001701152240436612400000034343",
-              formatted_barcode: "08197.08108 00100.000017 01152.240436 6 12400000034343",
-              due_date: charge.payment_method.boleto.due_date,
-              instruction_lines: charge.payment_method.boleto.instruction_lines,
-              holder: charge.payment_method.boleto.holder,
-              days_until_expiration: 45,
-            },
-          },
-          links: [
-            {
-              rel: "SELF",
-              href: `https://boleto.pagseguro.com.br/${boletoId}.pdf`,
-              media: "application/pdf",
-              type: "GET",
-            },
-            {
-              rel: "SELF",
-              href: `https://boleto.pagseguro.com.br/${boletoId}.png`,
-              media: "image/png",
-              type: "GET",
-            },
-            {
-              rel: "SELF",
-              href: `https://api.pagseguro.com/charges/${chargeId}`,
-              media: "application/json",
-              type: "GET",
-            },
-          ],
-        }
-      }),
-      notification_urls: [],
-      links: [
-        {
-          rel: "SELF",
-          href: `https://api.pagseguro.com/orders/${orderId}`,
-          media: "application/json",
-          type: "GET",
-        },
-        {
-          rel: "PAY",
-          href: `https://api.pagseguro.com/orders/${orderId}/pay`,
-          media: "application/json",
-          type: "POST",
-        },
-      ],
-    }
+    const pagSeguro = getPagSeguroAPI()
+    const responsePayload = await pagSeguro.criarBoleto(boletoData)
 
-    console.log("[v0] Iniciando gravação do log no banco...")
-    console.log("[v0] Parâmetros do log:", {
-      method: "POST",
-      endpoint: "https://sandbox.api.pagseguro.com/orders",
-      hasRequest: !!requestPayload,
-      hasResponse: !!responsePayload,
-    })
-
-    await logPagBankTransaction({
-      method: "POST",
-      endpoint: "https://sandbox.api.pagseguro.com/orders",
-      request: requestPayload,
-      response: responsePayload,
-      success: true,
-    })
-
-    console.log("[v0] Log gravado com sucesso!")
+    console.log("[v0] Resposta REAL recebida do PagBank:", responsePayload)
 
     return NextResponse.json({
       success: true,
-      request: requestPayload,
+      request: boletoData,
       response: responsePayload,
-      message: `Log de ${numeroParcelas > 1 ? `boleto parcelado (${numeroParcelas}x)` : "boleto simples"} gerado com sucesso!`,
+      message: `Boleto REAL criado com sucesso! ${numeroParcelas > 1 ? `(${numeroParcelas}x parcelas)` : ""}`,
     })
   } catch (error) {
-    console.error("[v0] Erro ao gerar boleto simulado:", error)
+    console.error("[v0] Erro ao criar boleto real:", error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erro ao gerar boleto simulado" },
+      {
+        error: "Erro ao criar boleto real",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 },
     )
   }
