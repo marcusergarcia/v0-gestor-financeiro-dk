@@ -4,7 +4,18 @@ import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Download, Settings, ImageIcon, Layout, Wrench, Calendar, Car, FileText, Database } from "lucide-react"
+import {
+  Download,
+  Settings,
+  ImageIcon,
+  Layout,
+  Wrench,
+  Calendar,
+  Car,
+  FileText,
+  Database,
+  CreditCard,
+} from "lucide-react"
 import { LogosTab } from "@/components/configuracoes/logos-tab"
 import { LayoutTab } from "@/components/configuracoes/layout-tab"
 import { EquipamentosTab } from "@/components/configuracoes/equipamentos-tab"
@@ -13,6 +24,7 @@ import { VisitasTab } from "@/components/configuracoes/visitas-tab"
 import { ValorKmTab } from "@/components/configuracoes/valor-km-tab"
 import { TermosTab } from "@/components/configuracoes/termos-tab"
 import { BackupTab } from "@/components/configuracoes/backup-tab"
+import { PagBankTab } from "@/components/configuracoes/pagbank-tab"
 import { useEffect } from "react"
 
 export default function ConfiguracoesPage() {
@@ -75,9 +87,9 @@ export default function ConfiguracoesPage() {
         <Card className="border-0 shadow-lg bg-white">
           <CardContent className="p-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              {/* Desktop: Grid 8 colunas normal */}
+              {/* Desktop: Grid 9 colunas agora */}
               <div className="hidden md:block border-b bg-gradient-to-r from-indigo-50 to-purple-50">
-                <TabsList className="grid w-full grid-cols-8 h-auto p-2 bg-transparent">
+                <TabsList className="grid w-full grid-cols-9 h-auto p-2 bg-transparent">
                   <TabsTrigger
                     value="logos"
                     className="flex flex-col items-center gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
@@ -133,6 +145,13 @@ export default function ConfiguracoesPage() {
                   >
                     <Database className="h-4 w-4" />
                     Backup
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="pagbank"
+                    className="flex flex-col items-center gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    PagBank
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -196,6 +215,13 @@ export default function ConfiguracoesPage() {
                     <Database className="h-4 w-4" />
                     <span>Backup</span>
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="pagbank"
+                    className="flex flex-col items-center gap-1 py-2 text-[9px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white rounded"
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    <span>PagBank</span>
+                  </TabsTrigger>
                 </TabsList>
               </div>
 
@@ -230,6 +256,10 @@ export default function ConfiguracoesPage() {
 
                 <TabsContent value="backup" className="mt-0">
                   <BackupTab />
+                </TabsContent>
+
+                <TabsContent value="pagbank" className="mt-0">
+                  <PagBankTab />
                 </TabsContent>
               </div>
             </Tabs>
