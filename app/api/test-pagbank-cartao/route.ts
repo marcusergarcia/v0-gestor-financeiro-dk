@@ -6,14 +6,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { clienteNome, clienteEmail, clienteTaxId, valorTotal, referenceId } = body
 
-    // Simula um número de pedido único
     const orderId = `ORDE_${Math.random().toString(36).substring(2, 15).toUpperCase()}`
     const chargeId = `CHAR_${Math.random().toString(36).substring(2, 15).toUpperCase()}`
     const cardId = `CARD_${Math.random().toString(36).substring(2, 15).toUpperCase()}`
 
     const timestamp = new Date().toISOString()
 
-    // REQUEST - Exatamente como o exemplo do PagBank
     const requestPayload = {
       reference_id: referenceId || "ex-00001",
       customer: {
@@ -52,7 +50,7 @@ export async function POST(request: NextRequest) {
       notification_urls: [
         process.env.NEXT_PUBLIC_APP_URL
           ? `${process.env.NEXT_PUBLIC_APP_URL}/api/pagseguro/webhook`
-          : "https://meusite.com/notificacoes",
+          : "https://gestor9.vercel.app/api/pagseguro/webhook",
       ],
       charges: [
         {
@@ -80,7 +78,6 @@ export async function POST(request: NextRequest) {
       ],
     }
 
-    // RESPONSE - Exatamente como o exemplo do PagBank
     const responsePayload = {
       id: orderId,
       reference_id: referenceId || "ex-00001",
@@ -182,7 +179,7 @@ export async function POST(request: NextRequest) {
       notification_urls: [
         process.env.NEXT_PUBLIC_APP_URL
           ? `${process.env.NEXT_PUBLIC_APP_URL}/api/pagseguro/webhook`
-          : "https://meusite.com/notificacoes",
+          : "https://gestor9.vercel.app/api/pagseguro/webhook",
       ],
       links: [
         {
@@ -200,16 +197,6 @@ export async function POST(request: NextRequest) {
       ],
     }
 
-    // Registra o log no formato correto
-    console.log("[v0] Tentando registrar log com dados:", {
-      method: "POST",
-      endpoint: "https://sandbox.api.pagseguro.com/orders",
-      hasRequestBody: !!requestPayload,
-      hasResponseBody: !!responsePayload,
-      orderId,
-      chargeId,
-    })
-
     try {
       await logPagBankTransaction({
         method: "POST",
@@ -220,12 +207,10 @@ export async function POST(request: NextRequest) {
         order_id: orderId,
         charge_id: chargeId,
         reference_id: referenceId || "ex-00001",
-        status: "PAID",
         payment_type: "CREDIT_CARD",
       })
-      console.log("[v0] Log registrado com sucesso!")
     } catch (logError) {
-      console.error("[v0] Erro ao registrar log (não bloqueia resposta):", logError)
+      console.error("Erro ao registrar log:", logError)
     }
 
     return NextResponse.json({
@@ -237,7 +222,7 @@ export async function POST(request: NextRequest) {
       response: responsePayload,
     })
   } catch (error) {
-    console.error("[v0] Erro ao simular pagamento com cartão:", error)
+    console.error("Erro ao simular pagamento com cartão:", error)
     return NextResponse.json(
       {
         error: "Erro ao simular pagamento",
