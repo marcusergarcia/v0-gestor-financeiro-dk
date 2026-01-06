@@ -38,9 +38,6 @@ export class PagBankLogger {
         entry.status || 200,
         entry.paymentType || "UNKNOWN",
         entry.success ? 1 : 0,
-        entry.orderId ?? null,
-        entry.chargeId ?? null,
-        entry.referenceId ?? null,
       ]
 
       console.log(
@@ -53,8 +50,8 @@ export class PagBankLogger {
 
       const result = await query(
         `INSERT INTO pagbank_logs 
-        (timestamp, method, endpoint, request_data, response_data, status, payment_type, success, order_id, charge_id, reference_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (timestamp, method, endpoint, request_data, response_data, status, payment_type, success) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         values,
       )
 
@@ -79,20 +76,25 @@ export class PagBankLogger {
           response_data as response,
           status,
           payment_type as paymentType,
-          success,
-          order_id as orderId,
-          charge_id as chargeId,
-          reference_id as referenceId
+          success
         FROM pagbank_logs 
         ORDER BY timestamp DESC 
         LIMIT 100`,
       )
 
-      return logs.map((log: any) => ({
-        ...log,
-        request: log.request ? JSON.parse(log.request) : {},
-        response: log.response ? JSON.parse(log.response) : {},
-      }))
+      return logs.map((log: any) => {
+        const request = log.request ? JSON.parse(log.request) : {}
+        const response = log.response ? JSON.parse(log.response) : {}
+
+        return {
+          ...log,
+          request,
+          response,
+          orderId: response.id || null,
+          chargeId: response.charges?.[0]?.id || null,
+          referenceId: response.reference_id || request.reference_id || null,
+        }
+      })
     } catch (error) {
       console.error("Erro ao ler logs PagBank:", error)
       return []
