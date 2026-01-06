@@ -23,6 +23,8 @@ export class PagBankLogger {
     }
 
     try {
+      console.log("[v0] DEBUG - Dados recebidos no logger:", JSON.stringify(entry, null, 2))
+
       const values = [
         logEntry.timestamp,
         logEntry.method,
@@ -37,6 +39,20 @@ export class PagBankLogger {
         logEntry.referenceId || null,
       ]
 
+      console.log("[v0] DEBUG - Valores para INSERT:", JSON.stringify(values, null, 2))
+
+      const hasUndefined = values.some((v, i) => {
+        if (v === undefined) {
+          console.error(`[v0] ERRO - Valor undefined no índice ${i}`)
+          return true
+        }
+        return false
+      })
+
+      if (hasUndefined) {
+        throw new Error("Parâmetros contêm undefined")
+      }
+
       const result = await query(
         `INSERT INTO pagbank_logs 
         (timestamp, method, endpoint, request_data, response_data, status, payment_type, success, order_id, charge_id, reference_id) 
@@ -48,6 +64,7 @@ export class PagBankLogger {
       return result
     } catch (error) {
       console.error("[v0] Erro ao salvar log PagBank:", error)
+      console.error("[v0] Dados que causaram o erro:", JSON.stringify(entry, null, 2))
       throw error
     }
   }
@@ -143,6 +160,8 @@ export async function logPagBankTransaction(data: {
   reference_id?: string
   payment_type?: string
 }) {
+  console.log("[v0] DEBUG - logPagBankTransaction recebeu:", JSON.stringify(data, null, 2))
+
   const requestData = data.request_body || data.request || {}
   const responseData = data.response_body || data.response || {}
   const statusCode = data.response_status || data.status || 201

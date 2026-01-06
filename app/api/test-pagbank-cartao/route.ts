@@ -4,7 +4,7 @@ import { logPagBankTransaction } from "@/lib/pagbank-logger"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { clienteNome, clienteEmail, clienteTaxId, valorTotal, referenceId } = body
+    const { nome, cpf, email, valor, referenceId, encryptedCard } = body
 
     const orderId = `ORDE_${Math.random().toString(36).substring(2, 15).toUpperCase()}`
     const chargeId = `CHAR_${Math.random().toString(36).substring(2, 15).toUpperCase()}`
@@ -15,9 +15,9 @@ export async function POST(request: NextRequest) {
     const requestPayload = {
       reference_id: referenceId || "ex-00001",
       customer: {
-        name: clienteNome,
-        email: clienteEmail,
-        tax_id: clienteTaxId,
+        name: nome,
+        email: email,
+        tax_id: cpf,
         phones: [
           {
             country: "55",
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
           reference_id: "referencia do item",
           name: "Serviço de manutenção",
           quantity: 1,
-          unit_amount: valorTotal,
+          unit_amount: Number.parseInt(valor),
         },
       ],
       shipping: {
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
           reference_id: "referencia da cobranca",
           description: "Pagamento via cartão de crédito",
           amount: {
-            value: valorTotal,
+            value: Number.parseInt(valor),
             currency: "BRL",
           },
           payment_method: {
@@ -66,12 +66,13 @@ export async function POST(request: NextRequest) {
             capture: true,
             card: {
               encrypted:
+                encryptedCard ||
                 "mKSnk0i1JaDw69Ino8AMABWIBCS9e1tfvt0K69xx38bOvaX46MGV/PkS6yzODk64CZ/SPuqqD7hV459NiR0+QnkA9zOiXYUdLCUChS5MadbqfZvzu6J8dfkizvfN2oYODflZa0+UmOPn35J8gQwSZq+QWZdYX5+Jqm0Ve2gYB9XBIEb1CPBt3ghvSNU7bBhwafxZUZpBffQc5UOYChhH75EF5MWjk0rQOCV9xU2TCjoRpQfVph/Jg2H20KtZ+FNOgEkH/WBnHbH0/rghpp7J/MHnGSaXnkMCnE44vpFt+gSge5WIgT9lQTz7XkrThPsS5WEmeMVuE+eslLeRtI1HKg==",
               store: true,
             },
             holder: {
-              name: clienteNome,
-              tax_id: clienteTaxId,
+              name: nome,
+              tax_id: cpf,
             },
           },
         },
@@ -83,9 +84,9 @@ export async function POST(request: NextRequest) {
       reference_id: referenceId || "ex-00001",
       created_at: timestamp,
       customer: {
-        name: clienteNome,
-        email: clienteEmail,
-        tax_id: clienteTaxId,
+        name: nome,
+        email: email,
+        tax_id: cpf,
         phones: [
           {
             type: "MOBILE",
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
           reference_id: "referencia do item",
           name: "Serviço de manutenção",
           quantity: 1,
-          unit_amount: valorTotal,
+          unit_amount: Number.parseInt(valor),
         },
       ],
       shipping: {
@@ -124,11 +125,11 @@ export async function POST(request: NextRequest) {
           paid_at: new Date(Date.now() + 2000).toISOString(),
           description: "Pagamento via cartão de crédito",
           amount: {
-            value: valorTotal,
+            value: Number.parseInt(valor),
             currency: "BRL",
             summary: {
-              total: valorTotal,
-              paid: valorTotal,
+              total: Number.parseInt(valor),
+              paid: Number.parseInt(valor),
               refunded: 0,
             },
           },
@@ -154,7 +155,7 @@ export async function POST(request: NextRequest) {
               exp_month: "12",
               exp_year: "2026",
               holder: {
-                name: clienteNome,
+                name: nome,
               },
               store: true,
             },

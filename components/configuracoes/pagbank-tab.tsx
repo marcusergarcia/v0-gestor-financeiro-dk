@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,7 +32,32 @@ export function PagBankTab() {
     email: "email@test.com",
     valor: "50000",
     referenceId: "ex-00001",
+    numeroCartao: "4111111111111111",
+    mesValidade: "12",
+    anoValidade: "2030",
+    cvv: "123",
+    nomeCartao: "Jose da Silva",
   })
+
+  const [sdkLoaded, setSdkLoaded] = useState(false)
+
+  useEffect(() => {
+    const script = document.createElement("script")
+    script.src = "https://assets.pagseguro.com.br/checkout-sdk-js/rc/dist/browser/pagseguro.min.js"
+    script.async = true
+    script.onload = () => {
+      console.log("[v0] PagBank SDK carregado")
+      setSdkLoaded(true)
+    }
+    script.onerror = () => {
+      console.error("[v0] Erro ao carregar SDK do PagBank")
+    }
+    document.body.appendChild(script)
+
+    return () => {
+      document.body.removeChild(script)
+    }
+  }, [])
 
   const handleGerarBoleto = async () => {
     setLoadingBoleto(true)
@@ -59,16 +84,42 @@ export function PagBankTab() {
     setResultCartao(null)
 
     try {
+      if (!sdkLoaded || !(window as any).PagSeguro) {
+        throw new Error("SDK do PagBank não carregado")
+      }
+
+      // Obter chave pública do PagBank
+      const publicKeyResponse = await fetch("/api/pagseguro/public-key")
+      const { publicKey } = await publicKeyResponse.json()
+
+      // Criptografar cartão usando SDK do PagBank
+      const card = (window as any).PagSeguro.encryptCard({
+        publicKey,
+        holder: formCartao.nomeCartao,
+        number: formCartao.numeroCartao.replace(/\s/g, ""),
+        expMonth: formCartao.mesValidade,
+        expYear: formCartao.anoValidade,
+        securityCode: formCartao.cvv,
+      })
+
+      const encryptedCard = card.encryptedCard
+
+      console.log("[v0] Cartão criptografado:", encryptedCard)
+
       const response = await fetch("/api/test-pagbank-cartao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formCartao),
+        body: JSON.stringify({
+          ...formCartao,
+          encryptedCard,
+        }),
       })
 
       const data = await response.json()
       setResultCartao(data)
-    } catch (error) {
-      setResultCartao({ error: "Erro ao simular pagamento" })
+    } catch (error: any) {
+      console.error("[v0] Erro ao gerar pagamento:", error)
+      setResultCartao({ error: error.message || "Erro ao simular pagamento" })
     } finally {
       setLoadingCartao(false)
     }
@@ -223,6 +274,13 @@ export function PagBankTab() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {!sdkLoaded && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>Carregando SDK do PagBank...</AlertDescription>
+                </Alert>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="cartao-nome">Nome do Cliente</Label>
@@ -263,17 +321,60 @@ export function PagBankTab() {
                   <p className="text-xs text-gray-500">R$ {(Number.parseInt(formCartao.valor) / 100).toFixed(2)}</p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="cartao-reference">Reference ID</Label>
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="cartao-numero">Número do Cartão</Label>
                   <Input
-                    id="cartao-reference"
-                    value={formCartao.referenceId}
-                    onChange={(e) => setFormCartao({ ...formCartao, referenceId: e.target.value })}
+                    id="cartao-numero"
+                    value={formCartao.numeroCartao}
+                    onChange={(e) => setFormCartao({ ...formCartao, numeroCartao: e.target.value })}
+                    placeholder="4111 1111 1111 1111"
+                  />
+                  <p className="text-xs text-gray-500">Use 4111111111111111 para testes</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cartao-nome-titular">Nome no Cartão</Label>
+                  <Input
+                    id="cartao-nome-titular"
+                    value={formCartao.nomeCartao}
+                    onChange={(e) => setFormCartao({ ...formCartao, nomeCartao: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cartao-cvv">CVV</Label>
+                  <Input
+                    id="cartao-cvv"
+                    value={formCartao.cvv}
+                    onChange={(e) => setFormCartao({ ...formCartao, cvv: e.target.value })}
+                    maxLength={4}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cartao-mes">Mês Validade</Label>
+                  <Input
+                    id="cartao-mes"
+                    value={formCartao.mesValidade}
+                    onChange={(e) => setFormCartao({ ...formCartao, mesValidade: e.target.value })}
+                    placeholder="12"
+                    maxLength={2}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cartao-ano">Ano Validade</Label>
+                  <Input
+                    id="cartao-ano"
+                    value={formCartao.anoValidade}
+                    onChange={(e) => setFormCartao({ ...formCartao, anoValidade: e.target.value })}
+                    placeholder="2030"
+                    maxLength={4}
                   />
                 </div>
               </div>
 
-              <Button onClick={handleGerarCartao} disabled={loadingCartao} className="w-full">
+              <Button onClick={handleGerarCartao} disabled={loadingCartao || !sdkLoaded} className="w-full">
                 <CreditCard className="h-4 w-4 mr-2" />
                 {loadingCartao ? "Gerando..." : "Gerar Pagamento com Cartão"}
               </Button>
