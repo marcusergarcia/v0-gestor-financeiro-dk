@@ -10,9 +10,9 @@ interface PagBankLogEntry {
   status: number
   paymentType: string
   success: boolean
-  orderId?: string
-  chargeId?: string
-  referenceId?: string
+  orderId?: string | null
+  chargeId?: string | null
+  referenceId?: string | null
 }
 
 export class PagBankLogger {
@@ -23,35 +23,19 @@ export class PagBankLogger {
     }
 
     try {
-      console.log("[v0] DEBUG - Dados recebidos no logger:", JSON.stringify(entry, null, 2))
-
       const values = [
         logEntry.timestamp,
-        logEntry.method,
-        logEntry.endpoint,
+        logEntry.method || "POST",
+        logEntry.endpoint || "",
         JSON.stringify(logEntry.request || {}),
         JSON.stringify(logEntry.response || {}),
-        logEntry.status,
-        logEntry.paymentType,
+        logEntry.status || 200,
+        logEntry.paymentType || "UNKNOWN",
         logEntry.success ? 1 : 0,
-        logEntry.orderId || null,
-        logEntry.chargeId || null,
-        logEntry.referenceId || null,
+        logEntry.orderId ?? null,
+        logEntry.chargeId ?? null,
+        logEntry.referenceId ?? null,
       ]
-
-      console.log("[v0] DEBUG - Valores para INSERT:", JSON.stringify(values, null, 2))
-
-      const hasUndefined = values.some((v, i) => {
-        if (v === undefined) {
-          console.error(`[v0] ERRO - Valor undefined no índice ${i}`)
-          return true
-        }
-        return false
-      })
-
-      if (hasUndefined) {
-        throw new Error("Parâmetros contêm undefined")
-      }
 
       const result = await query(
         `INSERT INTO pagbank_logs 
@@ -60,11 +44,9 @@ export class PagBankLogger {
         values,
       )
 
-      console.log("[v0] Log PagBank salvo. ID:", result.insertId)
       return result
     } catch (error) {
-      console.error("[v0] Erro ao salvar log PagBank:", error)
-      console.error("[v0] Dados que causaram o erro:", JSON.stringify(entry, null, 2))
+      console.error("Erro ao salvar log PagBank:", error)
       throw error
     }
   }
@@ -96,7 +78,7 @@ export class PagBankLogger {
         response: log.response ? JSON.parse(log.response) : {},
       }))
     } catch (error) {
-      console.error("[v0] Erro ao ler logs PagBank:", error)
+      console.error("Erro ao ler logs PagBank:", error)
       return []
     }
   }
@@ -138,9 +120,8 @@ export class PagBankLogger {
   static async clearLogs(): Promise<void> {
     try {
       await query(`DELETE FROM pagbank_logs`)
-      console.log("[v0] Logs PagBank limpos")
     } catch (error) {
-      console.error("[v0] Erro ao limpar logs PagBank:", error)
+      console.error("Erro ao limpar logs PagBank:", error)
     }
   }
 }
@@ -160,22 +141,13 @@ export async function logPagBankTransaction(data: {
   reference_id?: string
   payment_type?: string
 }) {
-  console.log("[v0] DEBUG - logPagBankTransaction recebeu:", JSON.stringify(data, null, 2))
-
-  const requestData = data.request_body || data.request || {}
-  const responseData = data.response_body || data.response || {}
-  const statusCode = data.response_status || data.status || 201
-  const method = data.method || "POST"
-  const endpoint = data.endpoint || ""
-  const paymentType = data.payment_type || "UNKNOWN"
-
   await PagBankLogger.log({
-    method,
-    endpoint,
-    request: requestData,
-    response: responseData,
-    status: statusCode,
-    paymentType,
+    method: data.method || "POST",
+    endpoint: data.endpoint || "",
+    request: data.request_body || data.request || {},
+    response: data.response_body || data.response || {},
+    status: data.response_status || data.status || 201,
+    paymentType: data.payment_type || "UNKNOWN",
     success: data.success !== false,
     orderId: data.order_id || null,
     chargeId: data.charge_id || null,
