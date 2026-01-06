@@ -60,19 +60,33 @@ export function PagBankTab() {
   }, [])
 
   const handleGerarBoleto = async () => {
+    console.log("[v0] handleGerarBoleto() iniciado")
     setLoadingBoleto(true)
     setResultBoleto(null)
 
     try {
+      console.log("[v0] Dados do formulário:", formBoleto)
+
       const response = await fetch("/api/test-pagbank-boleto", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formBoleto),
+        body: JSON.stringify({
+          nome: formBoleto.nome,
+          cpf: formBoleto.cpf,
+          email: formBoleto.email,
+          valor: Number.parseInt(formBoleto.valor),
+          numeroNota: formBoleto.numeroNota,
+        }),
       })
 
+      console.log("[v0] Response status:", response.status)
+
       const data = await response.json()
+      console.log("[v0] Response data:", data)
+
       setResultBoleto(data)
     } catch (error) {
+      console.error("[v0] Erro no handleGerarBoleto:", error)
       setResultBoleto({ error: "Erro ao simular pagamento" })
     } finally {
       setLoadingBoleto(false)

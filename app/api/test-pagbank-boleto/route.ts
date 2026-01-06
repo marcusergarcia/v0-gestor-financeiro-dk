@@ -253,6 +253,14 @@ export async function POST(request: NextRequest) {
       ],
     }
 
+    console.log("[v0] Iniciando gravação do log no banco...")
+    console.log("[v0] Parâmetros do log:", {
+      method: "POST",
+      endpoint: "https://sandbox.api.pagseguro.com/orders",
+      hasRequest: !!requestPayload,
+      hasResponse: !!responsePayload,
+    })
+
     await logPagBankTransaction({
       method: "POST",
       endpoint: "https://sandbox.api.pagseguro.com/orders",
@@ -260,6 +268,8 @@ export async function POST(request: NextRequest) {
       response: responsePayload,
       success: true,
     })
+
+    console.log("[v0] Log gravado com sucesso!")
 
     return NextResponse.json({
       success: true,
