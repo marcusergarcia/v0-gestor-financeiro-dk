@@ -26,11 +26,14 @@ export async function createBoletoPayment(data: MercadoPagoPaymentRequest) {
   console.log("[v0] Access Token encontrado:", accessToken.substring(0, 20) + "...")
   console.log("[v0] Criando pagamento Mercado Pago:", JSON.stringify(data, null, 2))
 
+  const idempotencyKey = `${Date.now()}-${Math.random().toString(36).substring(7)}`
+
   const response = await fetch("https://api.mercadopago.com/v1/payments", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
+      "X-Idempotency-Key": idempotencyKey,
     },
     body: JSON.stringify(data),
   })
