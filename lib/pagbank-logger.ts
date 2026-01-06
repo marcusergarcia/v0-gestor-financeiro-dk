@@ -146,17 +146,20 @@ export async function logPagBankTransaction(data: {
   const requestData = data.request_body || data.request || {}
   const responseData = data.response_body || data.response || {}
   const statusCode = data.response_status || data.status || 201
+  const method = data.method || "POST"
+  const endpoint = data.endpoint || ""
+  const paymentType = data.payment_type || "UNKNOWN"
 
   await PagBankLogger.log({
-    method: data.method,
-    endpoint: data.endpoint,
+    method,
+    endpoint,
     request: requestData,
     response: responseData,
     status: statusCode,
-    paymentType: data.payment_type || "UNKNOWN",
+    paymentType,
     success: data.success !== false,
-    orderId: data.order_id,
-    chargeId: data.charge_id,
-    referenceId: data.reference_id,
+    orderId: data.order_id || null,
+    chargeId: data.charge_id || null,
+    referenceId: data.reference_id || null,
   })
 }
