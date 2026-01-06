@@ -335,7 +335,7 @@ export async function POST(request: NextRequest) {
               locality: bairroValido,
               city: cidadeValida,
               region_code: ufNormalizada,
-              country: "BRA",
+              country: "Brasil",
               postal_code: cepCompleto,
             },
             charges: [
@@ -364,7 +364,7 @@ export async function POST(request: NextRequest) {
                         city: cidadeValida,
                         region: nomeEstado,
                         region_code: ufNormalizada,
-                        country: "BRA",
+                        country: "Brasil",
                       },
                     },
                     instruction_lines: {
