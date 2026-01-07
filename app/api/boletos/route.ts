@@ -285,27 +285,38 @@ export async function POST(request: NextRequest) {
           const jurosValorFinal = Math.max(1, Math.min(5999, jurosValor))
 
           const boletoRequest = {
+            reference_id: numeroBoleto,
             customer: {
               name: cliente.nome,
               email: emailValido,
               tax_id: taxIdValido,
-              phone: telefoneCompleto,
+              phones: [
+                {
+                  country: "55",
+                  area: ddd,
+                  number: numeroTelefone,
+                  type: "MOBILE",
+                },
+              ],
             },
             items: [
               {
                 reference_id: numeroBoleto,
-                name: descricaoParcela || `Boleto ${numeroBoleto}`,
+                name: descricaoParcela.substring(0, 255),
                 quantity: 1,
                 unit_amount: Math.round(valorParcela * 100),
               },
             ],
-            shipping_address: {
-              street: enderecoValido,
-              number: numeroEndereco,
-              locality: bairroValido,
-              city: cidadeValida,
-              region_code: ufNormalizada,
-              country: "Brasil",
+            shipping: {
+              address: {
+                street: enderecoValido,
+                number: numeroEndereco,
+                locality: bairroValido,
+                city: cidadeValida,
+                region_code: ufNormalizada,
+                country: "BRA",
+                postal_code: cepCompleto,
+              },
             },
             charges: [
               {
@@ -356,7 +367,7 @@ export async function POST(request: NextRequest) {
                   discounts: [
                     {
                       due_date: dataVencimentoAjustada,
-                      value: desconto > 0 ? Math.round(desconto * 100) : 0,
+                      value: desconto || 0,
                     },
                   ],
                 },
