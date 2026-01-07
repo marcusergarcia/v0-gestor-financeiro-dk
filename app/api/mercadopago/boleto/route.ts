@@ -17,16 +17,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Dados do cliente incompletos" }, { status: 400 })
     }
 
-    if (!cliente.endereco || !cliente.numero || !cliente.bairro || !cliente.cidade || !cliente.estado || !cliente.cep) {
-      return NextResponse.json(
-        {
-          error: "Endereço do cliente incompleto",
-          details: "O Mercado Pago exige endereço completo para boleto registrado",
-        },
-        { status: 400 },
-      )
-    }
-
     if (!valor) {
       return NextResponse.json({ error: "Valor é obrigatório" }, { status: 400 })
     }
@@ -39,7 +29,7 @@ export async function POST(request: NextRequest) {
 
     const paymentData = {
       transaction_amount: valorCentavos / 100,
-      description: `Nota Fiscal ${numeroNota || "N/A"}`,
+      description: numeroNota ? `Nota Fiscal ${numeroNota}` : "Mensalidade Condomínio",
       payment_method_id: "bolbradesco",
       payer: {
         email: cliente.email,
@@ -49,20 +39,11 @@ export async function POST(request: NextRequest) {
           type: cliente.cpf_cnpj.replace(/\D/g, "").length === 14 ? "CNPJ" : "CPF",
           number: cliente.cpf_cnpj.replace(/\D/g, ""),
         },
-        address: {
-          zip_code: cliente.cep.replace(/\D/g, ""),
-          street_name: cliente.endereco,
-          street_number: cliente.numero,
-          neighborhood: cliente.bairro,
-          city: cliente.cidade,
-          federal_unit: cliente.estado,
-        },
       },
     }
 
     console.log("[v0] Payload Mercado Pago:", JSON.stringify(paymentData, null, 2))
 
-    // Criar pagamento no Mercado Pago
     const response = await createBoletoPayment(paymentData)
 
     return NextResponse.json({
