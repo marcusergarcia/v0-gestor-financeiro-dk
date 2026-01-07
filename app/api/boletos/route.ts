@@ -305,7 +305,7 @@ export async function POST(request: NextRequest) {
               locality: bairroValido,
               city: cidadeValida,
               region_code: ufNormalizada,
-              country: "BRA",
+              country: "Brasil",
             },
             charges: [
               {
@@ -322,7 +322,7 @@ export async function POST(request: NextRequest) {
                   boleto: {
                     template: "COBRANCA",
                     due_date: dataVencimentoAjustada,
-                    days_until_expiration: 45,
+                    days_until_expiration: "45",
                     holder: {
                       name: cliente.nome,
                       tax_id: taxIdValido,
@@ -335,7 +335,7 @@ export async function POST(request: NextRequest) {
                         city: cidadeValida,
                         region: nomeEstado,
                         region_code: ufNormalizada,
-                        country: "BRA",
+                        country: "Brasil",
                       },
                     },
                     instruction_lines: {
@@ -344,16 +344,22 @@ export async function POST(request: NextRequest) {
                     },
                   },
                 },
-                // payment_instructions: {
-                //   fine: {
-                //     date: dataMultaJurosStr,
-                //     value: multaValorFinal,
-                //   },
-                //   interest: {
-                //     date: dataMultaJurosStr,
-                //     value: jurosValorFinal,
-                //   },
-                // },
+                payment_instructions: {
+                  fine: {
+                    date: dataMultaJurosStr,
+                    value: multaValorFinal,
+                  },
+                  interest: {
+                    date: dataMultaJurosStr,
+                    value: jurosValorFinal,
+                  },
+                  discounts: [
+                    {
+                      due_date: dataVencimentoAjustada,
+                      value: desconto > 0 ? Math.round(desconto * 100) : 0,
+                    },
+                  ],
+                },
               },
             ],
           }
