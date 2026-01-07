@@ -248,7 +248,6 @@ export async function POST(request: NextRequest) {
       const numeroBoleto =
         parcelas.length > 1 ? `${numero_nota}-${String(parcela.parcela).padStart(2, "0")}` : numero_nota
 
-      // Ajustar data de vencimento para dia útil
       const dataVencimentoAjustada = adjustToBusinessDay(parcela.dataVencimento)
       const status = calcularStatus(dataVencimentoAjustada)
 
@@ -256,21 +255,17 @@ export async function POST(request: NextRequest) {
 
       if (pagseguroHabilitado) {
         try {
-          console.log("[v0] Tentando criar boleto no PagSeguro para parcela", parcela.parcela)
-
           const { getPagSeguroAPI } = await import("@/lib/pagseguro")
           const pagseguro = getPagSeguroAPI()
 
           const ufNormalizada = normalizarEstado(cliente.estado)
           const nomeEstado = obterNomeEstado(ufNormalizada)
-          console.log("[v0] Estado normalizado:", cliente.estado, "->", ufNormalizada, "->", nomeEstado)
 
           const telefoneLimpo = (cliente.telefone || "11999999999").replace(/\D/g, "")
           const telefoneCompleto = telefoneLimpo.length >= 10 ? telefoneLimpo : "11999999999"
           const ddd = telefoneCompleto.substring(0, 2)
           const numeroTelefone = telefoneCompleto.substring(2)
 
-          // Calcular data para multa e juros (D+1 após vencimento)
           const dataVenc = new Date(dataVencimentoAjustada)
           const dataMultaJuros = new Date(dataVenc)
           dataMultaJuros.setDate(dataMultaJuros.getDate() + 1)
@@ -291,26 +286,12 @@ export async function POST(request: NextRequest) {
           const valorMinimo = 0.2
           const valorParcela = parcela.valor < valorMinimo ? valorMinimo : parcela.valor
 
-          console.log("[v0] Validação de campos PagSeguro:", {
-            taxId: taxIdValido.substring(0, 3) + "***",
-            email: emailValido,
-            cep: cepCompleto,
-            endereco: enderecoValido,
-            uf: ufNormalizada,
-            estado: nomeEstado,
-            valorParcela,
-            valorMinimo,
-          })
-
           const descricaoParcela = parcela.descricao || descricao_produto
 
           const multaPercentual = multa_percentual || 2.0
           const jurosMesPercentual = juros_mes_percentual || 1.0
 
-          // Converter percentuais para valores absolutos (PagBank usa valores em centavos)
-          // Multa: percentual do valor da parcela
           const multaValor = Math.round(((valorParcela * multaPercentual) / 100) * 100)
-          // Juros: percentual mensal convertido para diário (aproximado)
           const jurosDiarioPercentual = jurosMesPercentual / 30
           const jurosValor = Math.round(((valorParcela * jurosDiarioPercentual) / 100) * 100)
 
@@ -335,7 +316,7 @@ export async function POST(request: NextRequest) {
               locality: bairroValido,
               city: cidadeValida,
               region_code: ufNormalizada,
-              country: "Brasil",
+              country: "BRA",
               postal_code: cepCompleto,
             },
             charges: [
@@ -398,13 +379,6 @@ export async function POST(request: NextRequest) {
           })
 
           pagseguroData = boletoPagSeguro
-          console.log("[v0] Boleto PagSeguro criado com sucesso:", {
-            id: boletoPagSeguro.id,
-            charge_id: boletoPagSeguro.charges?.[0]?.id,
-            status: boletoPagSeguro.charges?.[0]?.status,
-            barcode: boletoPagSeguro.charges?.[0]?.payment_method?.boleto?.formatted_barcode ? "Presente" : "Ausente",
-            links: boletoPagSeguro.charges?.[0]?.links?.length || 0,
-          })
         } catch (error) {
           await logPagBankTransaction({
             method: "BOLETO",
@@ -418,13 +392,7 @@ export async function POST(request: NextRequest) {
             success: false,
           })
 
-          console.error("[v0] Erro ao criar boleto no PagSeguro:", error)
-          if (error instanceof Error) {
-            console.error("[v0] Mensagem de erro:", error.message)
-            console.error("[v0] Stack trace:", error.stack)
-          } else {
-            console.error("[v0] Detalhes do erro:", JSON.stringify(error, null, 2))
-          }
+          console.error("Erro ao criar boleto no PagSeguro:", error)
 
           let mensagemErro = "Erro ao criar boleto no PagSeguro. Verifique os dados do cliente e tente novamente."
 
@@ -448,8 +416,6 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           )
         }
-      } else {
-        console.log("[v0] PagSeguro não configurado, criando boleto apenas no sistema interno")
       }
 
       const charge = pagseguroData?.charges?.[0]
@@ -484,7 +450,7 @@ export async function POST(request: NextRequest) {
         `,
         [
           numeroBoleto,
-          cliente_id, // Usando cliente_id
+          cliente_id,
           parcela.valor,
           dataVencimentoAjustada,
           status,
@@ -497,14 +463,12 @@ export async function POST(request: NextRequest) {
           boletoInfo?.barcode || null,
           linkPDF || null,
           linkPNG || null,
-          data_nota || null, // Usando data_nota
-          parcela.descricao, // Usando descrição da parcela
+          data_nota || null,
+          parcela.descricao,
           multa_percentual || 2.0,
           juros_mes_percentual || 2.0,
         ],
       )
-
-      console.log("[v0] Boleto salvo no banco:", numeroBoleto)
     }
 
     console.log("[v0] Todos os boletos criados com sucesso")
