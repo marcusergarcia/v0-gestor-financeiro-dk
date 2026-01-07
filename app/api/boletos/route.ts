@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
                   boleto: {
                     template: "COBRANCA",
                     due_date: dataVencimentoAjustada,
-                    days_until_expiration: 45,
+                    days_until_expiration: "45", // Convertendo days_until_expiration para string conforme documentação PagBank
                     holder: {
                       name: cliente.nome,
                       tax_id: taxIdValido,
