@@ -306,7 +306,6 @@ export async function POST(request: NextRequest) {
               city: cidadeValida,
               region_code: ufNormalizada,
               country: "BRA",
-              postal_code: cepCompleto,
             },
             charges: [
               {
@@ -323,7 +322,7 @@ export async function POST(request: NextRequest) {
                   boleto: {
                     template: "COBRANCA",
                     due_date: dataVencimentoAjustada,
-                    days_until_expiration: "45", // Convertendo days_until_expiration para string conforme documentação PagBank
+                    days_until_expiration: 45,
                     holder: {
                       name: cliente.nome,
                       tax_id: taxIdValido,
@@ -336,7 +335,7 @@ export async function POST(request: NextRequest) {
                         city: cidadeValida,
                         region: nomeEstado,
                         region_code: ufNormalizada,
-                        country: "Brasil",
+                        country: "BRA",
                       },
                     },
                     instruction_lines: {
@@ -345,16 +344,16 @@ export async function POST(request: NextRequest) {
                     },
                   },
                 },
-                payment_instructions: {
-                  fine: {
-                    date: dataMultaJurosStr,
-                    value: multaValorFinal, // usando valor com validação de limites
-                  },
-                  interest: {
-                    date: dataMultaJurosStr,
-                    value: jurosValorFinal, // usando valor com validação de limites
-                  },
-                },
+                // payment_instructions: {
+                //   fine: {
+                //     date: dataMultaJurosStr,
+                //     value: multaValorFinal,
+                //   },
+                //   interest: {
+                //     date: dataMultaJurosStr,
+                //     value: jurosValorFinal,
+                //   },
+                // },
               },
             ],
           }
