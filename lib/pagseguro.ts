@@ -157,14 +157,27 @@ export class PagSeguroAPI {
       const response = await fetch(url, options)
       const responseData = await response.json()
 
-      await PagBankLogger.log({
-        method,
-        endpoint: url,
-        request: data || {},
-        response: responseData,
-        status: response.status,
-        paymentType,
-      }).catch((err) => console.error("Erro ao registrar log PagBank:", err))
+      if (response.ok) {
+        await PagBankLogger.log({
+          method,
+          endpoint: url,
+          request: data || {},
+          response: responseData,
+          status: response.status,
+          paymentType,
+          success: true,
+        }).catch((err) => console.error("Erro ao registrar log PagBank:", err))
+      } else {
+        await PagBankLogger.log({
+          method,
+          endpoint: url,
+          request: data || {},
+          response: responseData,
+          status: response.status,
+          paymentType,
+          success: false,
+        }).catch((err) => console.error("Erro ao registrar log PagBank:", err))
+      }
 
       if (!response.ok) {
         throw new Error(`PagSeguro API Error: ${response.status} - ${JSON.stringify(responseData)}`)
@@ -172,15 +185,6 @@ export class PagSeguroAPI {
 
       return responseData as T
     } catch (error) {
-      await PagBankLogger.log({
-        method,
-        endpoint: url,
-        request: data || {},
-        response: error instanceof Error ? { error: error.message } : { error: String(error) },
-        status: 500,
-        paymentType,
-      }).catch((err) => console.error("Erro ao registrar log de erro PagBank:", err))
-
       throw error
     }
   }

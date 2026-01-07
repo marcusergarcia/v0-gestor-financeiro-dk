@@ -17,15 +17,6 @@ interface PagBankLogEntry {
 
 export class PagBankLogger {
   static async log(entry: Omit<PagBankLogEntry, "timestamp" | "id">) {
-    console.log("[v0] PagBankLogger.log() chamado com:", {
-      method: entry.method,
-      endpoint: entry.endpoint,
-      hasRequest: !!entry.request,
-      hasResponse: !!entry.response,
-      status: entry.status,
-      paymentType: entry.paymentType,
-    })
-
     const timestamp = new Date().toISOString().slice(0, 19).replace("T", " ")
 
     try {
@@ -40,14 +31,6 @@ export class PagBankLogger {
         entry.success ? 1 : 0,
       ]
 
-      console.log(
-        "[v0] Valores preparados para INSERT:",
-        values.map(
-          (v, i) =>
-            `${i}: ${typeof v} = ${v === null ? "NULL" : typeof v === "string" && v.length > 50 ? v.substring(0, 50) + "..." : v}`,
-        ),
-      )
-
       const result = await query(
         `INSERT INTO pagbank_logs 
         (timestamp, method, endpoint, request_data, response_data, status, payment_type, success) 
@@ -55,11 +38,9 @@ export class PagBankLogger {
         values,
       )
 
-      console.log("[v0] INSERT executado com sucesso, resultado:", result)
-
       return result
     } catch (error) {
-      console.error("[v0] Erro ao salvar log PagBank:", error)
+      console.error("Erro ao salvar log PagBank:", error)
       throw error
     }
   }
@@ -159,13 +140,6 @@ export async function logPagBankTransaction(data: {
   reference_id?: string
   payment_type?: string
 }) {
-  console.log("[v0] logPagBankTransaction() chamada com:", {
-    method: data.method,
-    endpoint: data.endpoint,
-    hasRequest: !!(data.request_body || data.request),
-    hasResponse: !!(data.response_body || data.response),
-  })
-
   let paymentType = data.payment_type || "UNKNOWN"
 
   const requestData = data.request_body || data.request || {}
@@ -175,8 +149,6 @@ export async function logPagBankTransaction(data: {
       paymentType = firstCharge.payment_method.type
     }
   }
-
-  console.log("[v0] Tipo de pagamento detectado:", paymentType)
 
   await PagBankLogger.log({
     method: data.method || "POST",
@@ -190,6 +162,4 @@ export async function logPagBankTransaction(data: {
     chargeId: data.charge_id || null,
     referenceId: data.reference_id || null,
   })
-
-  console.log("[v0] logPagBankTransaction() concluída")
 }

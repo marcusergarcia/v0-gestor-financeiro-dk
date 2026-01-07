@@ -273,11 +273,15 @@ export async function POST(request: NextRequest) {
           const descricaoParcela = parcela.descricao || descricao_produto
 
           const multaPercentual = multa_percentual || 2.0
-          const jurosMesPercentual = juros_mes_percentual || 1.0
+          const jurosMesPercentual = juros_mes_percentual || 2.0
 
-          const multaValor = Math.round(((valorParcela * multaPercentual) / 100) * 100)
-          const jurosDiarioPercentual = jurosMesPercentual / 30
-          const jurosValor = Math.round(((valorParcela * jurosDiarioPercentual) / 100) * 100)
+          // Exemplo: 2% = 200, 0.033% = 3 (arredondado)
+          const multaValor = Math.round(multaPercentual * 100) // 2% -> 200
+          const jurosDiarioPercentual = jurosMesPercentual / 30 // 1% ao mês -> 0.033% ao dia
+          const jurosValor = Math.round(jurosDiarioPercentual * 100) // 0.033% -> 3
+          // Validando limites do PagBank: fine (1-9999), interest (1-5999)
+          const multaValorFinal = Math.max(1, Math.min(9999, multaValor))
+          const jurosValorFinal = Math.max(1, Math.min(5999, jurosValor))
 
           const boletoRequest = {
             customer: {
@@ -343,11 +347,11 @@ export async function POST(request: NextRequest) {
                 payment_instructions: {
                   fine: {
                     date: dataMultaJurosStr,
-                    value: multaValor,
+                    value: multaValorFinal, // usando valor com validação de limites
                   },
                   interest: {
                     date: dataMultaJurosStr,
-                    value: jurosValor,
+                    value: jurosValorFinal, // usando valor com validação de limites
                   },
                 },
               },
