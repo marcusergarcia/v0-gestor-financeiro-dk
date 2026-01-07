@@ -39,7 +39,6 @@
     "fs": "latest",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.454.0",
-    "mercadopago": "2.11.0",
     "mysql2": "latest",
     "next": "15.5.7",
     "next-themes": "latest",

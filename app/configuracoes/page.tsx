@@ -15,7 +15,6 @@ import {
   FileText,
   Database,
   CreditCard,
-  Wallet,
 } from "lucide-react"
 import { LogosTab } from "@/components/configuracoes/logos-tab"
 import { LayoutTab } from "@/components/configuracoes/layout-tab"
@@ -26,7 +25,6 @@ import { ValorKmTab } from "@/components/configuracoes/valor-km-tab"
 import { TermosTab } from "@/components/configuracoes/termos-tab"
 import { BackupTab } from "@/components/configuracoes/backup-tab"
 import { PagBankTab } from "@/components/configuracoes/pagbank-tab"
-import { MercadoPagoTab } from "@/components/configuracoes/mercadopago-tab"
 import { useEffect } from "react"
 
 export default function ConfiguracoesPage() {
@@ -91,7 +89,7 @@ export default function ConfiguracoesPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               {/* Desktop: Grid 9 colunas agora */}
               <div className="hidden md:block border-b bg-gradient-to-r from-indigo-50 to-purple-50">
-                <TabsList className="grid w-full grid-cols-10 h-auto p-2 bg-transparent">
+                <TabsList className="grid w-full grid-cols-9 h-auto p-2 bg-transparent">
                   <TabsTrigger
                     value="logos"
                     className="flex flex-col items-center gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
@@ -155,19 +153,12 @@ export default function ConfiguracoesPage() {
                     <CreditCard className="h-4 w-4" />
                     PagBank
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="mercadopago"
-                    className="flex flex-col items-center gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-sky-600 data-[state=active]:text-white"
-                  >
-                    <Wallet className="h-4 w-4" />
-                    Mercado Pago
-                  </TabsTrigger>
                 </TabsList>
               </div>
 
               {/* Mobile: Grid 4x2 fixo no rodapé */}
               <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-2xl">
-                <TabsList className="grid grid-cols-5 grid-rows-2 w-full h-auto p-2 gap-1 bg-gradient-to-r from-indigo-50 to-purple-50">
+                <TabsList className="grid grid-cols-4 grid-rows-2 w-full h-auto p-2 gap-1 bg-gradient-to-r from-indigo-50 to-purple-50">
                   <TabsTrigger
                     value="logos"
                     className="flex flex-col items-center gap-1 py-2 text-[9px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white rounded"
@@ -231,13 +222,6 @@ export default function ConfiguracoesPage() {
                     <CreditCard className="h-4 w-4" />
                     <span>PagBank</span>
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="mercadopago"
-                    className="flex flex-col items-center gap-1 py-2 text-[9px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-sky-500 data-[state=active]:to-sky-600 data-[state=active]:text-white rounded"
-                  >
-                    <Wallet className="h-4 w-4" />
-                    <span>MP</span>
-                  </TabsTrigger>
                 </TabsList>
               </div>
 
@@ -276,10 +260,6 @@ export default function ConfiguracoesPage() {
 
                 <TabsContent value="pagbank" className="mt-0">
                   <PagBankTab />
-                </TabsContent>
-
-                <TabsContent value="mercadopago" className="mt-0">
-                  <MercadoPagoTab />
                 </TabsContent>
               </div>
             </Tabs>
