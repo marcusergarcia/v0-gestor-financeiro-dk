@@ -306,7 +306,9 @@ export async function POST(request: NextRequest) {
             charges: [
               {
                 reference_id: numeroBoleto,
-                description: descricaoParcela || `Boleto ${numeroBoleto}${observacoes ? ` - ${observacoes}` : ""}`,
+                description: descricaoParcela
+                  ? descricaoParcela.substring(0, 64)
+                  : `Boleto ${numeroBoleto}`.substring(0, 64),
                 amount: {
                   value: Math.round(valorParcela * 100),
                   currency: "BRL",
