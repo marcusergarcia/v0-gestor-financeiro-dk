@@ -275,10 +275,11 @@ export async function POST(request: NextRequest) {
           const multaPercentual = multa_percentual || 2.0
           const jurosMesPercentual = juros_mes_percentual || 2.0
 
-          // Exemplo: 2% = 200, 0.033% = 3 (arredondado)
+          // PagBank espera: multa e juros como percentual × 100
+          // Exemplo: 2% = 200 (tanto para multa quanto para juros)
           const multaValor = Math.round(multaPercentual * 100) // 2% -> 200
-          const jurosDiarioPercentual = jurosMesPercentual / 30 // 1% ao mês -> 0.033% ao dia
-          const jurosValor = Math.round(jurosDiarioPercentual * 100) // 0.033% -> 3
+          const jurosValor = Math.round(jurosMesPercentual * 100) // 2% -> 200
+
           // Validando limites do PagBank: fine (1-9999), interest (1-5999)
           const multaValorFinal = Math.max(1, Math.min(9999, multaValor))
           const jurosValorFinal = Math.max(1, Math.min(5999, jurosValor))
