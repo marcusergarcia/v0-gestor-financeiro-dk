@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { logPagBankTransaction } from "@/lib/pagbank-logger"
 
 function normalizarEstado(estado: string | null | undefined): string {
   if (!estado) return "SP" // Padrão SP se não fornecido
@@ -144,18 +143,6 @@ export async function POST(request: NextRequest) {
       desconto = 0,
     } = body
 
-    console.log("[v0] Dados recebidos para criar boleto:", {
-      cliente_id,
-      numero_nota,
-      data_nota,
-      valor_total,
-      primeiro_vencimento,
-      numero_parcelas,
-      intervalo,
-      multa_percentual,
-      juros_mes_percentual,
-    })
-
     if (!cliente_id || !numero_nota || !valor_total || !primeiro_vencimento || !numero_parcelas) {
       return NextResponse.json(
         {
@@ -235,12 +222,9 @@ export async function POST(request: NextRequest) {
     }
 
     const cliente = clientes[0]
-    console.log("[v0] Cliente encontrado:", cliente.nome)
 
     const pagseguroToken = process.env.PAGSEGURO_TOKEN
     const pagseguroHabilitado = pagseguroToken && pagseguroToken !== "test_token_temporario"
-
-    console.log("[v0] PagSeguro habilitado:", pagseguroHabilitado, "Token presente:", !!pagseguroToken)
 
     // Inserir cada parcela como um boleto separado
     for (let i = 0; i < parcelas.length; i++) {
@@ -370,28 +354,8 @@ export async function POST(request: NextRequest) {
 
           const boletoPagSeguro = await pagseguro.criarBoleto(boletoRequest)
 
-          await logPagBankTransaction({
-            method: "BOLETO",
-            endpoint: "/charges",
-            request: boletoRequest,
-            response: boletoPagSeguro,
-            success: true,
-          })
-
           pagseguroData = boletoPagSeguro
         } catch (error) {
-          await logPagBankTransaction({
-            method: "BOLETO",
-            endpoint: "/charges",
-            request: {
-              reference_id: numeroBoleto,
-              customer_name: cliente.nome,
-              amount: parcela.valor,
-            },
-            response: error instanceof Error ? { error: error.message } : { error: "Erro desconhecido" },
-            success: false,
-          })
-
           console.error("Erro ao criar boleto no PagSeguro:", error)
 
           let mensagemErro = "Erro ao criar boleto no PagSeguro. Verifique os dados do cliente e tente novamente."
@@ -471,14 +435,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log("[v0] Todos os boletos criados com sucesso")
-
     return NextResponse.json({
       success: true,
       message: `${parcelas.length} boleto(s) criado(s) com sucesso!`,
     })
   } catch (error) {
-    console.error("[v0] Erro ao criar boletos:", error)
+    console.error("Erro ao criar boletos:", error)
     return NextResponse.json(
       {
         success: false,
