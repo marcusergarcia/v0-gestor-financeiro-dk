@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
             items: [
               {
                 reference_id: numeroBoleto,
-                name: descricaoParcela.substring(0, 255),
+                name: (descricaoParcela || `Boleto ${numeroBoleto}`).substring(0, 255),
                 quantity: 1,
                 unit_amount: Math.round(valorParcela * 100),
               },
