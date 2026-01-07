@@ -4,19 +4,31 @@ import { createBoletoPayment } from "@/lib/mercadopago"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { nome, cpf, email, valor, numeroNota } = body
+    const { cliente, valor, numeroNota } = body
 
-    console.log("[v0] Recebendo requisição boleto Mercado Pago:", {
-      nome,
-      cpf,
-      email,
+    console.log("[v0] Recebendo requisição boleto Mercado Pago com cliente:", {
+      clienteId: cliente?.id,
+      clienteNome: cliente?.nome,
       valor,
       numeroNota,
     })
 
-    // Validações
-    if (!nome || !cpf || !email || !valor) {
-      return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 })
+    if (!cliente || !cliente.nome || !cliente.email || !cliente.cpf_cnpj) {
+      return NextResponse.json({ error: "Dados do cliente incompletos" }, { status: 400 })
+    }
+
+    if (!cliente.endereco || !cliente.numero || !cliente.bairro || !cliente.cidade || !cliente.estado || !cliente.cep) {
+      return NextResponse.json(
+        {
+          error: "Endereço do cliente incompleto",
+          details: "O Mercado Pago exige endereço completo para boleto registrado",
+        },
+        { status: 400 },
+      )
+    }
+
+    if (!valor) {
+      return NextResponse.json({ error: "Valor é obrigatório" }, { status: 400 })
     }
 
     const valorCentavos = typeof valor === "number" ? valor : Number.parseFloat(valor)
@@ -26,19 +38,29 @@ export async function POST(request: NextRequest) {
     }
 
     const paymentData = {
-      transaction_amount: valorCentavos / 100, // Converter centavos para reais
+      transaction_amount: valorCentavos / 100,
       description: `Nota Fiscal ${numeroNota || "N/A"}`,
       payment_method_id: "bolbradesco",
       payer: {
-        email,
-        first_name: nome.split(" ")[0],
-        last_name: nome.split(" ").slice(1).join(" ") || nome.split(" ")[0],
+        email: cliente.email,
+        first_name: cliente.nome.split(" ")[0],
+        last_name: cliente.nome.split(" ").slice(1).join(" ") || cliente.nome.split(" ")[0],
         identification: {
-          type: cpf.length === 14 ? "CNPJ" : "CPF",
-          number: cpf.replace(/\D/g, ""),
+          type: cliente.cpf_cnpj.replace(/\D/g, "").length === 14 ? "CNPJ" : "CPF",
+          number: cliente.cpf_cnpj.replace(/\D/g, ""),
+        },
+        address: {
+          zip_code: cliente.cep.replace(/\D/g, ""),
+          street_name: cliente.endereco,
+          street_number: cliente.numero,
+          neighborhood: cliente.bairro,
+          city: cliente.cidade,
+          federal_unit: cliente.estado,
         },
       },
     }
+
+    console.log("[v0] Payload Mercado Pago:", JSON.stringify(paymentData, null, 2))
 
     // Criar pagamento no Mercado Pago
     const response = await createBoletoPayment(paymentData)
