@@ -290,34 +290,14 @@ export async function POST(request: NextRequest) {
               name: cliente.nome,
               email: emailValido,
               tax_id: taxIdValido,
-              phones: [
-                {
-                  country: "55",
-                  area: ddd,
-                  number: numeroTelefone,
-                  type: "MOBILE",
-                },
-              ],
             },
             items: [
               {
-                reference_id: numeroBoleto,
                 name: (descricaoParcela || `Boleto ${numeroBoleto}`).substring(0, 255),
                 quantity: 1,
                 unit_amount: Math.round(valorParcela * 100),
               },
             ],
-            shipping: {
-              address: {
-                street: enderecoValido,
-                number: numeroEndereco,
-                locality: bairroValido,
-                city: cidadeValida,
-                region_code: ufNormalizada,
-                country: "BRA",
-                postal_code: cepCompleto,
-              },
-            },
             charges: [
               {
                 reference_id: numeroBoleto,
@@ -333,7 +313,11 @@ export async function POST(request: NextRequest) {
                   boleto: {
                     template: "COBRANCA",
                     due_date: dataVencimentoAjustada,
-                    days_until_expiration: "45",
+                    days_until_expiration: 30, // mudado de "45" (string) para 30 (número) conforme REQUEST aprovado
+                    instruction_lines: {
+                      line_1: observacoes?.substring(0, 80) || "Pagamento ate o vencimento",
+                      line_2: "Documento para homologacao",
+                    },
                     holder: {
                       name: cliente.nome,
                       tax_id: taxIdValido,
@@ -346,36 +330,20 @@ export async function POST(request: NextRequest) {
                         city: cidadeValida,
                         region: nomeEstado,
                         region_code: ufNormalizada,
-                        country: "Brasil",
+                        country: "BRA", // mudado de "Brasil" para "BRA" conforme REQUEST aprovado
                       },
                     },
-                    instruction_lines: {
-                      line_1: observacoes?.substring(0, 80) || "Pagamento de serviço",
-                      line_2: "Não receber após o vencimento",
-                    },
                   },
-                },
-                payment_instructions: {
-                  fine: {
-                    date: dataMultaJurosStr,
-                    value: multaValorFinal,
-                  },
-                  interest: {
-                    date: dataMultaJurosStr,
-                    value: jurosValorFinal,
-                  },
-                  discounts: [
-                    {
-                      due_date: dataVencimentoAjustada,
-                      value: desconto || 0,
-                    },
-                  ],
                 },
               },
             ],
           }
 
+          console.log("[v0] Payload enviado ao PagBank:", JSON.stringify(boletoRequest, null, 2))
+
           const boletoPagSeguro = await pagseguro.criarBoleto(boletoRequest)
+
+          console.log("[v0] Resposta do PagBank:", JSON.stringify(boletoPagSeguro, null, 2))
 
           pagseguroData = boletoPagSeguro
         } catch (error) {
