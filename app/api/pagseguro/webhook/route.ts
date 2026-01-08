@@ -2,70 +2,131 @@ import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 
 export async function POST(request: NextRequest) {
+  console.log("[v0][PagSeguro Webhook] ===== WEBHOOK RECEBIDO =====")
+  console.log("[v0][PagSeguro Webhook] Timestamp:", new Date().toISOString())
+  console.log("[v0][PagSeguro Webhook] Headers:", Object.fromEntries(request.headers.entries()))
+
   try {
     const contentType = request.headers.get("content-type") || ""
-    console.log("[PagSeguro Webhook] Content-Type:", contentType)
+    console.log("[v0][PagSeguro Webhook] Content-Type:", contentType)
 
     let data: any
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
-      // Eventos pós-transacionais: notificationCode e notificationType
+      console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded")
       const formData = await request.formData()
-      const notificationCode = formData.get("notificationCode")
-      const notificationType = formData.get("notificationType")
+      const notificationCode = formData.get("notificationCode") as string
+      const notificationType = formData.get("notificationType") as string
 
-      console.log("[PagSeguro Webhook] Form data recebido:", { notificationCode, notificationType })
+      console.log("[v0][PagSeguro Webhook] Form data recebido:", { notificationCode, notificationType })
 
-      // Esses eventos precisam ser consultados na API do PagSeguro
-      // Por enquanto, apenas retornamos sucesso
-      return NextResponse.json({
-        success: true,
-        message: "Notificação pós-transacional recebida. Consulte a API do PagSeguro para detalhes.",
-        notificationCode,
-        notificationType,
+      if (!notificationCode) {
+        console.log("[v0][PagSeguro Webhook] ERRO: notificationCode não fornecido")
+        return NextResponse.json({ success: false, error: "notificationCode não fornecido" }, { status: 400 })
+      }
+
+      // Buscar detalhes da transação na API do PagSeguro
+      console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação via API...")
+      const token = process.env.PAGSEGURO_TOKEN
+      const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
+      const baseUrl = environment === "production" ? "https://api.pagseguro.com" : "https://sandbox.api.pagseguro.com"
+
+      const url = `${baseUrl}/charges/notifications/${notificationCode}`
+      console.log("[v0][PagSeguro Webhook] URL da consulta:", url)
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       })
+
+      console.log("[v0][PagSeguro Webhook] Status da consulta:", response.status)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.log("[v0][PagSeguro Webhook] ERRO na consulta:", errorText)
+        return NextResponse.json({ success: false, error: "Erro ao consultar transação" }, { status: 500 })
+      }
+
+      data = await response.json()
+      console.log("[v0][PagSeguro Webhook] Dados da transação obtidos:", JSON.stringify(data, null, 2))
     } else {
       // Eventos transacionais: JSON completo
+      console.log("[v0][PagSeguro Webhook] Processando como JSON")
       data = await request.json()
-      console.log("[PagSeguro Webhook] JSON recebido:", JSON.stringify(data, null, 2))
+      console.log("[v0][PagSeguro Webhook] JSON recebido:", JSON.stringify(data, null, 2))
     }
 
-    // Processar eventos transacionais (PAID, WAITING, etc)
     const { charges } = data
+
+    // Processar eventos transacionais (PAID, WAITING, etc)
+    console.log("[v0][PagSeguro Webhook] Charges encontradas:", charges?.length || 0)
 
     if (charges && charges.length > 0) {
       for (const charge of charges) {
         const { id: pagseguroId, reference_id, status } = charge
 
+        console.log("[v0][PagSeguro Webhook] Processando charge:", {
+          pagseguroId,
+          reference_id,
+          status,
+        })
+
+        const boletoExistente = await query(`SELECT id, status FROM boletos WHERE pagseguro_id = ?`, [pagseguroId])
+
+        console.log(
+          "[v0][PagSeguro Webhook] Boleto encontrado:",
+          boletoExistente.length > 0 ? boletoExistente[0] : "Não encontrado",
+        )
+
+        if (boletoExistente.length === 0) {
+          console.log("[v0][PagSeguro Webhook] ERRO: Boleto não encontrado no banco:", pagseguroId)
+          continue
+        }
+
         // Atualizar boleto no banco de dados
-        await query(
+        const statusMapeado = mapPagSeguroStatus(status)
+        console.log("[v0][PagSeguro Webhook] Status mapeado:", status, "->", statusMapeado)
+
+        const updateResult = await query(
           `UPDATE boletos 
            SET status = ?, 
                pagseguro_status = ?,
                webhook_notificado = TRUE,
                updated_at = CURRENT_TIMESTAMP
            WHERE pagseguro_id = ?`,
-          [mapPagSeguroStatus(status), status, pagseguroId],
+          [statusMapeado, status, pagseguroId],
         )
 
-        // Se foi pago, registrar data de pagamento
+        console.log("[v0][PagSeguro Webhook] UPDATE executado, linhas afetadas:", updateResult)
+
         if (status === "PAID") {
-          await query(
+          console.log("[v0][PagSeguro Webhook] Status PAID - atualizando data_pagamento")
+
+          const paymentResult = await query(
             `UPDATE boletos 
              SET data_pagamento = CURRENT_TIMESTAMP
              WHERE pagseguro_id = ?`,
             [pagseguroId],
           )
 
+          console.log("[v0][PagSeguro Webhook] Data pagamento atualizada, linhas afetadas:", paymentResult)
+
           // Processar cashback se configurado
+          console.log("[v0][PagSeguro Webhook] Processando cashback...")
           await processarCashback(pagseguroId)
         }
       }
+    } else {
+      console.log("[v0][PagSeguro Webhook] AVISO: Nenhuma charge encontrada no payload")
     }
 
+    console.log("[v0][PagSeguro Webhook] ===== PROCESSAMENTO CONCLUÍDO =====")
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("[PagSeguro Webhook] Erro:", error)
+    console.error("[v0][PagSeguro Webhook] ERRO FATAL:", error)
+    console.error("[v0][PagSeguro Webhook] Stack:", error instanceof Error ? error.stack : "N/A")
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
   }
 }
