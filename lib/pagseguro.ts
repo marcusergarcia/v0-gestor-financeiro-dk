@@ -191,9 +191,10 @@ export class PagSeguroAPI {
 
   // BOLETOS
   async criarBoleto(data: BoletoData) {
-    const telefone = data.customer.phone?.replace(/\D/g, "") || "11999999999"
-    const ddd = telefone.length >= 2 ? telefone.substring(0, 2) : "11"
-    const numero = telefone.length >= 2 ? telefone.substring(2) : "999999999"
+    const telefoneRaw = typeof data.customer.phone === "string" ? data.customer.phone.replace(/\D/g, "") : ""
+    const telefone = telefoneRaw.length >= 10 ? telefoneRaw : "11999999999"
+    const ddd = telefone.substring(0, 2)
+    const numero = telefone.substring(2)
 
     const payload = {
       reference_id: data.charges[0].reference_id,
