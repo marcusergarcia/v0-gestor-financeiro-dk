@@ -196,7 +196,7 @@ export class PagSeguroAPI {
     const ddd = telefone.substring(0, 2)
     const numero = telefone.substring(2)
 
-    const payload = {
+    const payload: any = {
       reference_id: data.charges[0].reference_id,
       customer: {
         name: data.customer.name,
@@ -212,9 +212,6 @@ export class PagSeguroAPI {
         ],
       },
       items: data.items,
-      shipping: {
-        address: data.shipping_address,
-      },
       charges: data.charges,
     }
 
