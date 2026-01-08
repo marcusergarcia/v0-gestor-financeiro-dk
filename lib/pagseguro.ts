@@ -191,6 +191,10 @@ export class PagSeguroAPI {
 
   // BOLETOS
   async criarBoleto(data: BoletoData) {
+    const telefone = data.customer.phone?.replace(/\D/g, "") || "11999999999"
+    const ddd = telefone.length >= 2 ? telefone.substring(0, 2) : "11"
+    const numero = telefone.length >= 2 ? telefone.substring(2) : "999999999"
+
     const payload = {
       reference_id: data.charges[0].reference_id,
       customer: {
@@ -200,8 +204,8 @@ export class PagSeguroAPI {
         phones: [
           {
             country: "55",
-            area: data.customer.phone.substring(0, 2),
-            number: data.customer.phone.substring(2),
+            area: ddd,
+            number: numero,
             type: "MOBILE",
           },
         ],
