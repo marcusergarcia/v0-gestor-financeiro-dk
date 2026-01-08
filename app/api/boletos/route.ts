@@ -247,8 +247,8 @@ export async function POST(request: NextRequest) {
 
           const telefoneLimpo = (cliente.telefone || "11999999999").replace(/\D/g, "")
           const telefoneCompleto = telefoneLimpo.length >= 10 ? telefoneLimpo : "11999999999"
-          const ddd = telefoneCompleto.substring(0, 2)
-          const numeroTelefone = telefoneCompleto.substring(2)
+          const ddd = typeof telefoneCompleto === "string" ? telefoneCompleto.substring(0, 2) : "11"
+          const numeroTelefone = typeof telefoneCompleto === "string" ? telefoneCompleto.substring(2) : "999999999"
 
           const dataVenc = new Date(dataVencimentoAjustada)
           const dataMultaJuros = new Date(dataVenc)
@@ -262,15 +262,16 @@ export async function POST(request: NextRequest) {
           const cepValido = (cliente.cep || "").replace(/\D/g, "")
           const cepCompleto = cepValido.length === 8 ? cepValido : "01310100"
 
-          const enderecoValido = (cliente.endereco || "Rua Principal").substring(0, 160)
-          const bairroValido = (cliente.bairro || "Centro").substring(0, 60)
-          const cidadeValida = (cliente.cidade || "São Paulo").substring(0, 90)
+          const enderecoValido =
+            typeof cliente.endereco === "string" ? cliente.endereco.substring(0, 160) : "Rua Principal"
+          const bairroValido = typeof cliente.bairro === "string" ? cliente.bairro.substring(0, 60) : "Centro"
+          const cidadeValida = typeof cliente.cidade === "string" ? cliente.cidade.substring(0, 90) : "São Paulo"
           const numeroEndereco = cliente.numero || "S/N"
 
           const valorMinimo = 0.2
           const valorParcela = parcela.valor < valorMinimo ? valorMinimo : parcela.valor
 
-          const descricaoParcela = parcela.descricao || descricao_produto
+          const descricaoParcela = parcela.descricao || descricao_produto || `Boleto ${numeroBoleto}`
 
           const multaPercentual = multa_percentual || 2.0
           const jurosMesPercentual = juros_mes_percentual || 2.0
@@ -293,7 +294,10 @@ export async function POST(request: NextRequest) {
             },
             items: [
               {
-                name: (descricaoParcela || `Boleto ${numeroBoleto}`).substring(0, 255),
+                name:
+                  typeof descricaoParcela === "string"
+                    ? descricaoParcela.substring(0, 255)
+                    : `Boleto ${numeroBoleto}`.substring(0, 255),
                 quantity: 1,
                 unit_amount: Math.round(valorParcela * 100),
               },
@@ -301,9 +305,10 @@ export async function POST(request: NextRequest) {
             charges: [
               {
                 reference_id: numeroBoleto,
-                description: descricaoParcela
-                  ? descricaoParcela.substring(0, 64)
-                  : `Boleto ${numeroBoleto}`.substring(0, 64),
+                description:
+                  typeof descricaoParcela === "string" && descricaoParcela.length > 0
+                    ? descricaoParcela.substring(0, 64)
+                    : `Boleto ${numeroBoleto}`.substring(0, 64),
                 amount: {
                   value: Math.round(valorParcela * 100),
                   currency: "BRL",
@@ -315,7 +320,8 @@ export async function POST(request: NextRequest) {
                     due_date: dataVencimentoAjustada,
                     days_until_expiration: 30, // mudado de "45" (string) para 30 (número) conforme REQUEST aprovado
                     instruction_lines: {
-                      line_1: observacoes?.substring(0, 80) || "Pagamento ate o vencimento",
+                      line_1:
+                        typeof observacoes === "string" ? observacoes.substring(0, 80) : "Pagamento ate o vencimento",
                       line_2: "Documento para homologacao",
                     },
                     holder: {
@@ -401,7 +407,7 @@ export async function POST(request: NextRequest) {
           juros,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `,
         [
           numeroBoleto,
