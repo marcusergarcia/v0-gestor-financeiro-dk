@@ -3,9 +3,31 @@ import { query } from "@/lib/db"
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json()
+    const contentType = request.headers.get("content-type")
+    console.log("[PagSeguro Webhook] Content-Type:", contentType)
 
-    console.log("[PagSeguro Webhook] Recebido:", data)
+    // Tentar ler o body de múltiplas formas
+    let data: any
+
+    try {
+      // Primeiro tentar JSON
+      data = await request.json()
+    } catch (jsonError) {
+      // Se falhar, tentar como texto
+      const text = await request.text()
+      console.log("[PagSeguro Webhook] Body como texto:", text)
+
+      // Tentar fazer parse manual
+      try {
+        data = JSON.parse(text)
+      } catch (parseError) {
+        console.error("[PagSeguro Webhook] Erro ao fazer parse do JSON:", parseError)
+        console.error("[PagSeguro Webhook] Texto recebido:", text.substring(0, 200))
+        throw new Error(`JSON inválido: ${text.substring(0, 100)}`)
+      }
+    }
+
+    console.log("[PagSeguro Webhook] Recebido:", JSON.stringify(data, null, 2))
 
     // PagSeguro envia notificações de mudança de status
     const { charges } = data
@@ -43,7 +65,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("[PagSeguro Webhook] Erro:", error)
-    return NextResponse.json({ success: false, error: "Erro ao processar webhook" }, { status: 500 })
+    return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
   }
 }
 
