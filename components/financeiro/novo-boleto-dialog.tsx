@@ -42,6 +42,8 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
   const [intervalo, setIntervalo] = useState("30")
   const [formaPagamento, setFormaPagamento] = useState("boleto")
   const [observacoes, setObservacoes] = useState("")
+  const [instrucaoLinha1, setInstrucaoLinha1] = useState("Pagamento ate o vencimento")
+  const [instrucaoLinha2, setInstrucaoLinha2] = useState("Apos vencimento cobrar multa e juros")
   const [multaPercentual, setMultaPercentual] = useState("2.00")
   const [jurosMesPercentual, setJurosMesPercentual] = useState("2.00")
   const [desconto, setDesconto] = useState("0.00")
@@ -290,6 +292,8 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
           intervalo: Number.parseInt(intervalo),
           forma_pagamento: formaPagamento,
           observacoes,
+          instrucao_linha1: instrucaoLinha1,
+          instrucao_linha2: instrucaoLinha2,
           multa_percentual: Number.parseFloat(multaPercentual),
           juros_mes_percentual: Number.parseFloat(jurosMesPercentual),
           desconto: Number.parseFloat(desconto.replace(",", ".")),
@@ -337,6 +341,8 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
     setIntervalo("30")
     setFormaPagamento("boleto")
     setObservacoes("")
+    setInstrucaoLinha1("Pagamento ate o vencimento")
+    setInstrucaoLinha2("Apos vencimento cobrar multa e juros")
     setParcelas([])
     setMultaPercentual("2.00")
     setJurosMesPercentual("2.00")
@@ -543,6 +549,38 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
                 className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
                 placeholder="0.00"
               />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="instrucao-linha1" className="text-sm font-semibold text-gray-700">
+                  Instrução Linha 1 (impresso no boleto)
+                </Label>
+                <Input
+                  id="instrucao-linha1"
+                  value={instrucaoLinha1}
+                  onChange={(e) => setInstrucaoLinha1(e.target.value)}
+                  maxLength={100}
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  placeholder="Ex: Pagamento ate o vencimento"
+                />
+                <p className="text-xs text-gray-500">{instrucaoLinha1.length}/100 caracteres</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="instrucao-linha2" className="text-sm font-semibold text-gray-700">
+                  Instrução Linha 2 (impresso no boleto)
+                </Label>
+                <Input
+                  id="instrucao-linha2"
+                  value={instrucaoLinha2}
+                  onChange={(e) => setInstrucaoLinha2(e.target.value)}
+                  maxLength={100}
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  placeholder="Ex: Apos vencimento cobrar multa e juros"
+                />
+                <p className="text-xs text-gray-500">{instrucaoLinha2.length}/100 caracteres</p>
+              </div>
             </div>
 
             <div className="space-y-2">

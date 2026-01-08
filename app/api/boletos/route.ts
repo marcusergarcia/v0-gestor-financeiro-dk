@@ -140,6 +140,8 @@ export async function POST(request: NextRequest) {
       multa_percentual = 2.0,
       juros_mes_percentual = 2.0,
       desconto = 0,
+      instrucao_linha1 = "Pagamento ate o vencimento",
+      instrucao_linha2 = "Apos vencimento cobrar multa e juros",
     } = body
 
     if (!cliente_id || !numero_nota || !valor_total || !primeiro_vencimento || !numero_parcelas) {
@@ -319,8 +321,8 @@ export async function POST(request: NextRequest) {
                     due_date: dataVencimentoAjustada,
                     days_until_expiration: 30, // mudado de "45" (string) para 30 (número) conforme REQUEST aprovado
                     instruction_lines: {
-                      line_1: "Pagamento ate o vencimento",
-                      line_2: "Documento para homologacao",
+                      line_1: instrucao_linha1 || "Pagamento ate o vencimento",
+                      line_2: instrucao_linha2 || "Apos vencimento cobrar multa e juros",
                     },
                     holder: {
                       name: cliente.nome,
