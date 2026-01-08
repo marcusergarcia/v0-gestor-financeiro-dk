@@ -137,7 +137,6 @@ export async function POST(request: NextRequest) {
       numero_parcelas,
       intervalo,
       forma_pagamento,
-      observacoes,
       multa_percentual = 2.0,
       juros_mes_percentual = 2.0,
       desconto = 0,
@@ -320,8 +319,7 @@ export async function POST(request: NextRequest) {
                     due_date: dataVencimentoAjustada,
                     days_until_expiration: 30, // mudado de "45" (string) para 30 (número) conforme REQUEST aprovado
                     instruction_lines: {
-                      line_1:
-                        typeof observacoes === "string" ? observacoes.substring(0, 80) : "Pagamento ate o vencimento",
+                      line_1: "Pagamento ate o vencimento",
                       line_2: "Documento para homologacao",
                     },
                     holder: {
@@ -417,7 +415,7 @@ export async function POST(request: NextRequest) {
           status,
           parcela.parcela,
           parcelas.length,
-          observacoes || null,
+          null,
           forma_pagamento || "boleto",
           charge?.id || null,
           boletoInfo?.formatted_barcode || null,
