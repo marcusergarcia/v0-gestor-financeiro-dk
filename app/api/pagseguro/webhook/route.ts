@@ -16,43 +16,14 @@ export async function POST(request: NextRequest) {
 
       console.log("[PagSeguro Webhook] Form data recebido:", { notificationCode, notificationType })
 
-      if (!notificationCode) {
-        return NextResponse.json({ success: false, error: "notificationCode ausente" }, { status: 400 })
-      }
-
-      // Buscar detalhes da transação na API do PagBank
-      const token = process.env.PAGSEGURO_TOKEN
-      const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
-      const baseUrl = environment === "production" ? "https://api.pagseguro.com" : "https://sandbox.api.pagseguro.com"
-
-      const response = await fetch(
-        `${baseUrl}/v2/transactions/notifications/${notificationCode}?email=seu_email&token=${token}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
-      )
-
-      if (!response.ok) {
-        console.error("[PagSeguro Webhook] Erro ao consultar notificationCode:", response.status, await response.text())
-        return NextResponse.json({ success: false, error: "Erro ao consultar PagBank" }, { status: 500 })
-      }
-
-      const transactionData = await response.json()
-      console.log("[PagSeguro Webhook] Dados da transação:", JSON.stringify(transactionData, null, 2))
-
-      // Converter formato antigo (v2) para o formato novo que o código espera
-      data = {
-        charges: [
-          {
-            id: transactionData.code || transactionData.id,
-            reference_id: transactionData.reference,
-            status: mapV2StatusToV4(transactionData.status),
-          },
-        ],
-      }
+      // Esses eventos precisam ser consultados na API do PagSeguro
+      // Por enquanto, apenas retornamos sucesso
+      return NextResponse.json({
+        success: true,
+        message: "Notificação pós-transacional recebida. Consulte a API do PagSeguro para detalhes.",
+        notificationCode,
+        notificationType,
+      })
     } else {
       // Eventos transacionais: JSON completo
       data = await request.json()
@@ -108,20 +79,6 @@ function mapPagSeguroStatus(pagseguroStatus: string): string {
   }
 
   return statusMap[pagseguroStatus] || "pendente"
-}
-
-function mapV2StatusToV4(v2Status: string): string {
-  const statusMap: Record<string, string> = {
-    "1": "WAITING", // Aguardando pagamento
-    "2": "WAITING", // Em análise
-    "3": "PAID", // Paga
-    "4": "PAID", // Disponível
-    "5": "WAITING", // Em disputa
-    "6": "CANCELED", // Devolvida
-    "7": "CANCELED", // Cancelada
-  }
-
-  return statusMap[v2Status] || "WAITING"
 }
 
 async function processarCashback(pagseguroId: string) {
