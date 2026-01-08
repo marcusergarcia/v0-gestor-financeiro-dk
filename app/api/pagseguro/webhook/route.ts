@@ -3,33 +3,34 @@ import { query } from "@/lib/db"
 
 export async function POST(request: NextRequest) {
   try {
-    const contentType = request.headers.get("content-type")
+    const contentType = request.headers.get("content-type") || ""
     console.log("[PagSeguro Webhook] Content-Type:", contentType)
 
-    // Tentar ler o body de múltiplas formas
     let data: any
 
-    try {
-      // Primeiro tentar JSON
-      data = await request.json()
-    } catch (jsonError) {
-      // Se falhar, tentar como texto
-      const text = await request.text()
-      console.log("[PagSeguro Webhook] Body como texto:", text)
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      // Eventos pós-transacionais: notificationCode e notificationType
+      const formData = await request.formData()
+      const notificationCode = formData.get("notificationCode")
+      const notificationType = formData.get("notificationType")
 
-      // Tentar fazer parse manual
-      try {
-        data = JSON.parse(text)
-      } catch (parseError) {
-        console.error("[PagSeguro Webhook] Erro ao fazer parse do JSON:", parseError)
-        console.error("[PagSeguro Webhook] Texto recebido:", text.substring(0, 200))
-        throw new Error(`JSON inválido: ${text.substring(0, 100)}`)
-      }
+      console.log("[PagSeguro Webhook] Form data recebido:", { notificationCode, notificationType })
+
+      // Esses eventos precisam ser consultados na API do PagSeguro
+      // Por enquanto, apenas retornamos sucesso
+      return NextResponse.json({
+        success: true,
+        message: "Notificação pós-transacional recebida. Consulte a API do PagSeguro para detalhes.",
+        notificationCode,
+        notificationType,
+      })
+    } else {
+      // Eventos transacionais: JSON completo
+      data = await request.json()
+      console.log("[PagSeguro Webhook] JSON recebido:", JSON.stringify(data, null, 2))
     }
 
-    console.log("[PagSeguro Webhook] Recebido:", JSON.stringify(data, null, 2))
-
-    // PagSeguro envia notificações de mudança de status
+    // Processar eventos transacionais (PAID, WAITING, etc)
     const { charges } = data
 
     if (charges && charges.length > 0) {
