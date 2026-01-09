@@ -207,34 +207,24 @@ export default function FinanceiroPage() {
   }
 
   const handleMarcarPago = async (boleto: Boleto) => {
-    console.log("[v0] handleMarcarPago iniciado para boleto:", boleto.id, boleto.numero)
-
     if (!confirm(`⚠️ TESTE: Marcar o boleto ${boleto.numero} como PAGO manualmente?`)) {
-      console.log("[v0] Usuário cancelou a confirmação")
       return
     }
-
-    console.log("[v0] Enviando requisição POST para /api/boletos/" + boleto.id + "/marcar-pago")
 
     try {
       const response = await fetch(`/api/boletos/${boleto.id}/marcar-pago`, {
         method: "POST",
       })
 
-      console.log("[v0] Resposta recebida, status:", response.status)
-
       const result = await response.json()
-      console.log("[v0] Resultado da API:", result)
 
       if (result.success) {
-        console.log("[v0] Sucesso! Atualizando lista de boletos...")
         toast({
           title: "Sucesso (TESTE)",
           description: `Boleto ${result.data.numero_boleto} marcado como pago`,
         })
         await loadData()
       } else {
-        console.error("[v0] Erro na API:", result.message)
         toast({
           title: "Erro",
           description: result.message || "Erro ao marcar boleto como pago",
@@ -242,7 +232,7 @@ export default function FinanceiroPage() {
         })
       }
     } catch (error) {
-      console.error("[v0] Exceção ao marcar boleto como pago:", error)
+      console.error("Erro ao marcar boleto como pago:", error)
       toast({
         title: "Erro",
         description: "Erro ao marcar boleto como pago",
