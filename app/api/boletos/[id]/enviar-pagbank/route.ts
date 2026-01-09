@@ -92,7 +92,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         c.cnpj,
         c.telefone,
         c.endereco,
-        c.numero,
         c.bairro,
         c.cidade,
         c.estado,
@@ -153,7 +152,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const enderecoValido = typeof boleto.endereco === "string" ? boleto.endereco.substring(0, 160) : "Rua Principal"
     const bairroValido = typeof boleto.bairro === "string" ? boleto.bairro.substring(0, 60) : "Centro"
     const cidadeValida = typeof boleto.cidade === "string" ? boleto.cidade.substring(0, 90) : "São Paulo"
-    const numeroEndereco = boleto.numero || "S/N"
+    const numeroEndereco = "S/N"
 
     const valorMinimo = 0.2
     const valorBoleto = boleto.valor < valorMinimo ? valorMinimo : boleto.valor
