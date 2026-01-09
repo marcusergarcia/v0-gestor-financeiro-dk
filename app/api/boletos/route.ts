@@ -228,10 +228,17 @@ export async function POST(request: NextRequest) {
     const pagseguroHabilitado = pagseguroToken && pagseguroToken !== "test_token_temporario"
 
     // Inserir cada parcela como um boleto separado
+    const resultados: any[] = []
+
     for (let i = 0; i < parcelas.length; i++) {
       const parcela = parcelas[i]
       const numeroBoleto =
         parcelas.length > 1 ? `${numero_nota}-${String(parcela.parcela).padStart(2, "0")}` : numero_nota
+
+      console.log(`[v0] ====== INICIANDO PARCELA ${i + 1}/${parcelas.length} ======`)
+      console.log(`[v0] Número do boleto: ${numeroBoleto}`)
+      console.log(`[v0] Valor: R$ ${parcela.valor.toFixed(2)}`)
+      console.log(`[v0] Vencimento: ${parcela.dataVencimento}`)
 
       const dataVencimentoAjustada = adjustToBusinessDay(parcela.dataVencimento)
       const status = calcularStatus(dataVencimentoAjustada)
@@ -240,6 +247,11 @@ export async function POST(request: NextRequest) {
 
       if (pagseguroHabilitado) {
         try {
+          if (i > 0) {
+            console.log(`[v0] Aguardando 2 segundos antes da próxima requisição...`)
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+          }
+
           const { getPagSeguroAPI } = await import("@/lib/pagseguro")
           const pagseguro = getPagSeguroAPI()
 
@@ -345,34 +357,60 @@ export async function POST(request: NextRequest) {
             ],
           }
 
-          console.log("[v0] Payload enviado ao PagBank:", JSON.stringify(boletoRequest, null, 2))
+          console.log(`[v0] Enviando requisição ao PagBank para parcela ${i + 1}/${parcelas.length}`)
+          console.log("[v0] Reference ID:", numeroBoleto)
 
           const boletoPagSeguro = await pagseguro.criarBoleto(boletoRequest)
 
-          console.log("[v0] Resposta do PagBank:", JSON.stringify(boletoPagSeguro, null, 2))
+          console.log(`[v0] ✓ SUCESSO! Parcela ${i + 1}/${parcelas.length} criada no PagBank`)
+          console.log(`[v0] ID PagBank: ${boletoPagSeguro.id}`)
+          console.log(`[v0] Status: ${boletoPagSeguro.charges?.[0]?.status}`)
 
           pagseguroData = boletoPagSeguro
+          resultados.push({
+            parcela: i + 1,
+            numeroBoleto,
+            sucesso: true,
+            pagseguroId: boletoPagSeguro.id,
+          })
         } catch (error) {
-          console.error("Erro ao criar boleto no PagSeguro:", error)
+          console.error(`[v0] ✗ ERRO na parcela ${i + 1}/${parcelas.length}`)
+          console.error(`[v0] Boleto: ${numeroBoleto}`)
+          console.error(`[v0] Erro completo:`, error)
+          console.error(`[v0] Stack trace:`, error instanceof Error ? error.stack : "N/A")
 
-          let mensagemErro = "Erro ao criar boleto no PagSeguro. Verifique os dados do cliente e tente novamente."
+          resultados.push({
+            parcela: i + 1,
+            numeroBoleto,
+            sucesso: false,
+            erro: error instanceof Error ? error.message : "Erro desconhecido",
+          })
+
+          let mensagemErro = `Erro ao criar parcela ${i + 1}/${parcelas.length} no PagSeguro.`
 
           if (error instanceof Error && error.message.includes("ACCESS_DENIED")) {
             mensagemErro =
-              "⚠️ Acesso negado pelo PagSeguro. O IP/domínio do servidor não está na whitelist da sua conta PagSeguro. Entre em contato com o suporte do PagSeguro para liberar o acesso da API."
+              "Acesso negado pelo PagSeguro. O IP/domínio do servidor não está na whitelist da sua conta PagSeguro."
           } else if (error instanceof Error && error.message.includes("403")) {
             mensagemErro =
-              "⚠️ Acesso negado pelo PagSeguro (403). Verifique se sua conta tem permissão para criar boletos ou se o domínio está na whitelist."
+              "Acesso negado pelo PagSeguro (403). Verifique se sua conta tem permissão para criar boletos."
           } else if (error instanceof Error && error.message.includes("401")) {
-            mensagemErro = "⚠️ Token de autenticação inválido. Verifique o PAGSEGURO_TOKEN nas variáveis de ambiente."
+            mensagemErro = "Token de autenticação inválido. Verifique o PAGSEGURO_TOKEN nas variáveis de ambiente."
+          } else if (error instanceof Error) {
+            mensagemErro += ` Erro: ${error.message}`
           }
+
+          const parcelasCriadas = resultados.filter((r) => r.sucesso).length
 
           return NextResponse.json(
             {
               success: false,
               message: mensagemErro,
               error: error instanceof Error ? error.message : "Erro desconhecido",
-              details: "Consulte os logs do servidor para mais informações.",
+              parcelaFalhou: i + 1,
+              totalParcelas: parcelas.length,
+              parcelasCriadas,
+              resultados,
             },
             { status: 400 },
           )
@@ -383,6 +421,8 @@ export async function POST(request: NextRequest) {
       const boletoInfo = charge?.payment_method?.boleto
       const linkPDF = charge?.links?.find((l: any) => l.media === "application/pdf")?.href
       const linkPNG = charge?.links?.find((l: any) => l.media === "image/png")?.href
+
+      console.log(`[v0] Inserindo parcela ${i + 1}/${parcelas.length} no banco de dados`)
 
       await query(
         `
@@ -430,11 +470,21 @@ export async function POST(request: NextRequest) {
           juros_mes_percentual || 2.0,
         ],
       )
+
+      console.log(`[v0] ✓ Parcela ${i + 1}/${parcelas.length} inserida no banco com sucesso`)
+      console.log(`[v0] ====== FIM PARCELA ${i + 1}/${parcelas.length} ======\n`)
     }
+
+    console.log(`[v0] ====== PROCESSO CONCLUÍDO ======`)
+    console.log(`[v0] Total de boletos criados: ${resultados.length}`)
+    console.log(`[v0] Sucessos: ${resultados.filter((r) => r.sucesso).length}`)
+    console.log(`[v0] Falhas: ${resultados.filter((r) => !r.sucesso).length}`)
+    console.log(`[v0] Resultados:`, JSON.stringify(resultados, null, 2))
 
     return NextResponse.json({
       success: true,
       message: `${parcelas.length} boleto(s) criado(s) com sucesso!`,
+      resultados,
     })
   } catch (error) {
     console.error("Erro ao criar boletos:", error)
