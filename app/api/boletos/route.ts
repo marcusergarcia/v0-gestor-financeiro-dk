@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
     let dataVencimento = new Date(primeiro_vencimento)
 
     for (let i = 1; i <= numero_parcelas; i++) {
-      const descricaoParcela = `NOTA FISCAL - ${numero_nota} - ${data_nota} - Parcelas ${i}/${numero_parcelas}`
+      const descricaoParcela = `NOTA FISCAL - ${numero_nota} - ${data_nota} - Parcela ${i}`
 
       parcelas.push({
         parcela: i,
@@ -281,7 +281,7 @@ export async function POST(request: NextRequest) {
           null, // link_pdf
           null, // link_impressao
           data_nota || null,
-          parcela.descricao,
+          descricao_produto,
           multa_percentual || 2.0,
           juros_mes_percentual || 2.0,
         ],
