@@ -159,7 +159,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const descricaoBoleto = boleto.descricao_produto || `Boleto ${boleto.numero}`
 
-    const boletoRequest = {
+    const dueDateFormatted = new Date(boleto.data_vencimento).toISOString().split("T")[0]
+
+    const payload = {
       reference_id: boleto.numero,
       customer: {
         name: boleto.cliente_nome,
@@ -191,7 +193,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             type: "BOLETO",
             boleto: {
               template: "COBRANCA",
-              due_date: boleto.data_vencimento,
+              due_date: dueDateFormatted, // Usando formato YYYY-MM-DD ao invés de ISO timestamp
               days_until_expiration: 30,
               instruction_lines: {
                 line_1: "Pagamento ate o vencimento",
@@ -218,9 +220,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       ],
     }
 
-    console.log("[v0] Enviando ao PagBank:", JSON.stringify(boletoRequest, null, 2))
+    console.log("[v0] Enviando ao PagBank:", JSON.stringify(payload, null, 2))
 
-    const boletoPagSeguro = await pagseguro.criarBoleto(boletoRequest)
+    const boletoPagSeguro = await pagseguro.criarBoleto(payload)
 
     console.log("[v0] Boleto criado no PagBank:", boletoPagSeguro.id)
 
