@@ -123,21 +123,44 @@ export async function POST(request: NextRequest) {
           status,
         })
 
-        const boletoExistente = await query(`SELECT id, status FROM boletos WHERE pagseguro_id = ?`, [pagseguroId])
+        let boletoExistente = await query(`SELECT id, status, numero FROM boletos WHERE pagseguro_id = ?`, [
+          pagseguroId,
+        ])
+
+        // Se não encontrar por pagseguro_id, tentar por reference_id
+        if (boletoExistente.length === 0 && reference_id) {
+          console.log("[v0][PagSeguro Webhook] Tentando buscar por reference_id:", reference_id)
+          boletoExistente = await query(`SELECT id, status, numero FROM boletos WHERE numero = ?`, [reference_id])
+        }
 
         console.log(
           "[v0][PagSeguro Webhook] Boleto encontrado:",
-          boletoExistente.length > 0 ? boletoExistente[0] : "Não encontrado",
+          boletoExistente.length > 0 ? JSON.stringify(boletoExistente[0]) : "Não encontrado",
         )
 
         if (boletoExistente.length === 0) {
-          console.log("[v0][PagSeguro Webhook] ERRO: Boleto não encontrado no banco:", pagseguroId)
+          console.log(
+            "[v0][PagSeguro Webhook] ERRO: Boleto não encontrado no banco. PagSeguro ID:",
+            pagseguroId,
+            "Reference ID:",
+            reference_id,
+          )
           continue
         }
 
+        const boletoId = boletoExistente[0].id
+        const statusAtual = boletoExistente[0].status
+
         // Atualizar boleto no banco de dados
         const statusMapeado = mapPagSeguroStatus(status)
-        console.log("[v0][PagSeguro Webhook] Status mapeado:", status, "->", statusMapeado)
+        console.log(
+          "[v0][PagSeguro Webhook] Status atual:",
+          statusAtual,
+          "| Status PagBank:",
+          status,
+          "| Status mapeado:",
+          statusMapeado,
+        )
 
         const updateResult = await query(
           `UPDATE boletos 
@@ -145,27 +168,35 @@ export async function POST(request: NextRequest) {
                pagseguro_status = ?,
                webhook_notificado = TRUE,
                updated_at = CURRENT_TIMESTAMP
-           WHERE pagseguro_id = ?`,
-          [statusMapeado, status, pagseguroId],
+           WHERE id = ?`,
+          [statusMapeado, status, boletoId],
         )
 
-        console.log("[v0][PagSeguro Webhook] UPDATE executado, linhas afetadas:", updateResult)
+        console.log("[v0][PagSeguro Webhook] UPDATE executado:", {
+          affectedRows: updateResult.affectedRows,
+          changedRows: updateResult.changedRows,
+          boletoId,
+          statusMapeado,
+        })
 
         if (status === "PAID") {
-          console.log("[v0][PagSeguro Webhook] Status PAID - atualizando data_pagamento")
+          console.log("[v0][PagSeguro Webhook] Status PAID - atualizando data_pagamento para boleto ID:", boletoId)
 
           const paymentResult = await query(
             `UPDATE boletos 
              SET data_pagamento = CURRENT_TIMESTAMP
-             WHERE pagseguro_id = ?`,
-            [pagseguroId],
+             WHERE id = ?`,
+            [boletoId],
           )
 
-          console.log("[v0][PagSeguro Webhook] Data pagamento atualizada, linhas afetadas:", paymentResult)
+          console.log("[v0][PagSeguro Webhook] Data pagamento atualizada:", {
+            affectedRows: paymentResult.affectedRows,
+            changedRows: paymentResult.changedRows,
+          })
 
           // Processar cashback se configurado
           console.log("[v0][PagSeguro Webhook] Processando cashback...")
-          await processarCashback(pagseguroId)
+          await processarCashback(boletoId)
         }
       }
     } else {
@@ -192,15 +223,15 @@ function mapPagSeguroStatus(pagseguroStatus: string): string {
   return statusMap[pagseguroStatus] || "pendente"
 }
 
-async function processarCashback(pagseguroId: string) {
+async function processarCashback(boletoId: string) {
   try {
     // Buscar boleto e cliente
     const boletos = await query(
       `SELECT b.*, c.telefone, c.id as cliente_id
        FROM boletos b
        JOIN clientes c ON b.cliente_id = c.id
-       WHERE b.pagseguro_id = ?`,
-      [pagseguroId],
+       WHERE b.id = ?`,
+      [boletoId],
     )
 
     if (boletos.length === 0) return
@@ -226,7 +257,7 @@ async function processarCashback(pagseguroId: string) {
       `INSERT INTO cashback 
        (cliente_id, telefone, valor_compra, percentual_cashback, valor_cashback, status, boleto_id, data_compra)
        VALUES (?, ?, ?, ?, ?, 'disponivel', ?, CURRENT_TIMESTAMP)`,
-      [boleto.cliente_id, boleto.telefone, boleto.valor, percentual, valorCashback, boleto.id],
+      [boleto.cliente_id, boleto.telefone, boleto.valor, percentual, valorCashback, boletoId],
     )
 
     console.log(`[Cashback] Registrado R$ ${valorCashback} para cliente ${boleto.cliente_id}`)
