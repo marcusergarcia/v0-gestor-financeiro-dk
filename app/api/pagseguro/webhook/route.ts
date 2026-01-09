@@ -31,13 +31,13 @@ export async function POST(request: NextRequest) {
       const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
       const baseUrl = environment === "production" ? "https://api.pagseguro.com" : "https://sandbox.api.pagseguro.com"
 
-      const url = `${baseUrl}/charges/notifications/${notificationCode}`
-      console.log("[v0][PagSeguro Webhook] URL da consulta:", url)
+      const url = `${baseUrl}/v3/transactions/notifications/${notificationCode}?email=${process.env.PAGSEGURO_EMAIL}&token=${token}`
+      console.log("[v0][PagSeguro Webhook] URL da consulta:", url.replace(token!, "TOKEN_HIDDEN"))
 
       const response = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
       })
 
