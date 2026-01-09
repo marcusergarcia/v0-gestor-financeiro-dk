@@ -24,6 +24,7 @@ import {
   XCircle,
   AlertCircle,
   Printer,
+  Send,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -57,9 +58,9 @@ interface Boleto {
   total_parcelas: number
   observacoes?: string
   created_at: string
-  // Adicionando campos para links de PDF/Impressão
   link_pdf?: string
   link_impressao?: string
+  pagseguro_id?: string | null // Added field to check if sent to PagBank
 }
 
 interface Recibo {
@@ -103,6 +104,7 @@ export default function FinanceiroPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [boletoParaExcluir, setBoletoParaExcluir] = useState<Boleto | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [enviandoParaPagbank, setEnviandoParaPagbank] = useState<number | null>(null) // State to control loading of PagBank submission
   const [valoresOcultos, setValoresOcultos] = useState(false)
   const { toast } = useToast()
 
@@ -238,6 +240,48 @@ export default function FinanceiroPage() {
         description: "Erro ao marcar boleto como pago",
         variant: "destructive",
       })
+    }
+  }
+
+  // NEW FUNCTION: Handle sending boleto to PagBank
+  const handleEnviarPagBank = async (boleto: Boleto) => {
+    if (
+      !confirm(`Enviar boleto ${boleto.numero} para o PagBank?\n\nIsso irá gerar o código de barras e linha digitável.`)
+    ) {
+      return
+    }
+
+    try {
+      setEnviandoParaPagbank(boleto.id)
+
+      const response = await fetch(`/api/boletos/${boleto.id}/enviar-pagbank`, {
+        method: "POST",
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "Sucesso!",
+          description: `Boleto ${boleto.numero} enviado ao PagBank com sucesso!`,
+        })
+        await loadData()
+      } else {
+        toast({
+          title: "Erro",
+          description: result.message || "Erro ao enviar boleto ao PagBank",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao enviar boleto ao PagBank:", error)
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar boleto ao PagBank",
+        variant: "destructive",
+      })
+    } finally {
+      setEnviandoParaPagbank(null)
     }
   }
 
@@ -800,16 +844,37 @@ export default function FinanceiroPage() {
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
-                                {(boleto.link_pdf || boleto.link_impressao) && (
+
+                                {/* CONDITIONAL BUTTON: If not sent to PagBank, show "Send", if sent, show "Print" */}
+                                {!boleto.pagseguro_id ? (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleImprimirBoleto(boleto)}
-                                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                    onClick={() => handleEnviarPagBank(boleto)}
+                                    disabled={enviandoParaPagbank === boleto.id}
+                                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                    title="Enviar para PagBank"
                                   >
-                                    <Printer className="h-4 w-4" />
+                                    {enviandoParaPagbank === boleto.id ? (
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
+                                    ) : (
+                                      <Send className="h-4 w-4" />
+                                    )}
                                   </Button>
+                                ) : (
+                                  (boleto.link_pdf || boleto.link_impressao) && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleImprimirBoleto(boleto)}
+                                      className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                      title="Imprimir boleto"
+                                    >
+                                      <Printer className="h-4 w-4" />
+                                    </Button>
+                                  )
                                 )}
+
                                 {boleto.status === "pendente" && (
                                   <Button
                                     size="sm"
@@ -832,9 +897,13 @@ export default function FinanceiroPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleExcluirBoleto(boleto)}
+                                  onClick={() => {
+                                    console.log("[v0] Clicou para excluir boleto:", boleto.id, boleto.status)
+                                    handleExcluirBoleto(boleto)
+                                  }}
                                   disabled={deletingId === boleto.id}
                                   className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                  title="Excluir boleto"
                                 >
                                   {deletingId === boleto.id ? (
                                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>

@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
       desconto = 0,
       instrucao_linha1 = "Pagamento ate o vencimento",
       instrucao_linha2 = "Apos vencimento cobrar multa e juros",
+      enviar_pagbank = false, // Nova opção para controlar envio ao PagBank
     } = body
 
     if (!cliente_id || !numero_nota || !valor_total || !primeiro_vencimento || !numero_parcelas) {
@@ -227,171 +228,17 @@ export async function POST(request: NextRequest) {
     const pagseguroToken = process.env.PAGSEGURO_TOKEN
     const pagseguroHabilitado = pagseguroToken && pagseguroToken !== "test_token_temporario"
 
-    // Inserir cada parcela como um boleto separado
     for (let i = 0; i < parcelas.length; i++) {
       const parcela = parcelas[i]
       const numeroBoleto =
         parcelas.length > 1 ? `${numero_nota}-${String(parcela.parcela).padStart(2, "0")}` : numero_nota
 
-      console.log(`[v0] Criando parcela ${i + 1}/${parcelas.length} - Boleto: ${numeroBoleto}`)
+      console.log(`[v0] Criando parcela ${i + 1}/${parcelas.length} localmente - Boleto: ${numeroBoleto}`)
 
       const dataVencimentoAjustada = adjustToBusinessDay(parcela.dataVencimento)
       const status = calcularStatus(dataVencimentoAjustada)
 
-      let pagseguroData = null
-
-      if (pagseguroHabilitado) {
-        try {
-          const { getPagSeguroAPI } = await import("@/lib/pagseguro")
-          const pagseguro = getPagSeguroAPI()
-
-          const ufNormalizada = normalizarEstado(cliente.estado)
-          const nomeEstado = obterNomeEstado(ufNormalizada)
-
-          const telefoneLimpo = (cliente.telefone || "11999999999").replace(/\D/g, "")
-          const telefoneCompleto = telefoneLimpo.length >= 10 ? telefoneLimpo : "11999999999"
-          const ddd = typeof telefoneCompleto === "string" ? telefoneCompleto.substring(0, 2) : "11"
-          const numeroTelefone = typeof telefoneCompleto === "string" ? telefoneCompleto.substring(2) : "999999999"
-
-          const dataVenc = new Date(dataVencimentoAjustada)
-          const dataMultaJuros = new Date(dataVenc)
-          dataMultaJuros.setDate(dataMultaJuros.getDate() + 1)
-          const dataMultaJurosStr = dataMultaJuros.toISOString().split("T")[0]
-
-          const taxId = (cliente.cnpj || cliente.cpf || "").replace(/\D/g, "")
-          const taxIdValido = taxId.length >= 11 ? taxId : "00000000000"
-          const emailValido =
-            cliente.email && cliente.email.includes("@") ? cliente.email : `cliente${cliente_id}@sistema.com`
-          const cepValido = (cliente.cep || "").replace(/\D/g, "")
-          const cepCompleto = cepValido.length === 8 ? cepValido : "01310100"
-
-          const enderecoValido =
-            typeof cliente.endereco === "string" ? cliente.endereco.substring(0, 160) : "Rua Principal"
-          const bairroValido = typeof cliente.bairro === "string" ? cliente.bairro.substring(0, 60) : "Centro"
-          const cidadeValida = typeof cliente.cidade === "string" ? cliente.cidade.substring(0, 90) : "São Paulo"
-          const numeroEndereco = cliente.numero || "S/N"
-
-          const valorMinimo = 0.2
-          const valorParcela = parcela.valor < valorMinimo ? valorMinimo : parcela.valor
-
-          const descricaoParcela = parcela.descricao || descricao_produto || `Boleto ${numeroBoleto}`
-
-          const multaPercentual = multa_percentual || 2.0
-          const jurosMesPercentual = juros_mes_percentual || 2.0
-
-          // PagBank espera: multa e juros como percentual × 100
-          // Exemplo: 2% = 200 (tanto para multa quanto para juros)
-          const multaValor = Math.round(multaPercentual * 100) // 2% -> 200
-          const jurosValor = Math.round(jurosMesPercentual * 100) // 2% -> 200
-
-          // Validando limites do PagBank: fine (1-9999), interest (1-5999)
-          const multaValorFinal = Math.max(1, Math.min(9999, multaValor))
-          const jurosValorFinal = Math.max(1, Math.min(5999, jurosValor))
-
-          const boletoRequest = {
-            reference_id: numeroBoleto,
-            customer: {
-              name: cliente.nome,
-              email: emailValido,
-              tax_id: taxIdValido,
-            },
-            items: [
-              {
-                name:
-                  typeof descricaoParcela === "string"
-                    ? descricaoParcela.substring(0, 255)
-                    : `Boleto ${numeroBoleto}`.substring(0, 255),
-                quantity: 1,
-                unit_amount: Math.round(valorParcela * 100),
-              },
-            ],
-            charges: [
-              {
-                reference_id: numeroBoleto,
-                description:
-                  typeof descricaoParcela === "string" && descricaoParcela.length > 0
-                    ? descricaoParcela.substring(0, 64)
-                    : `Boleto ${numeroBoleto}`.substring(0, 64),
-                amount: {
-                  value: Math.round(valorParcela * 100),
-                  currency: "BRL",
-                },
-                payment_method: {
-                  type: "BOLETO",
-                  boleto: {
-                    template: "COBRANCA",
-                    due_date: dataVencimentoAjustada,
-                    days_until_expiration: 30, // mudado de "45" (string) para 30 (número) conforme REQUEST aprovado
-                    instruction_lines: {
-                      line_1: instrucao_linha1 || "Pagamento ate o vencimento",
-                      line_2: instrucao_linha2 || "Apos vencimento cobrar multa e juros",
-                    },
-                    holder: {
-                      name: cliente.nome,
-                      tax_id: taxIdValido,
-                      email: emailValido,
-                      address: {
-                        street: enderecoValido,
-                        number: numeroEndereco,
-                        postal_code: cepCompleto,
-                        locality: bairroValido,
-                        city: cidadeValida,
-                        region: nomeEstado,
-                        region_code: ufNormalizada,
-                        country: "BRA", // mudado de "Brasil" para "BRA" conforme REQUEST aprovado
-                      },
-                    },
-                  },
-                },
-              },
-            ],
-          }
-
-          console.log(`[v0] Enviando parcela ${i + 1}/${parcelas.length} ao PagBank:`, numeroBoleto)
-          console.log("[v0] Payload enviado ao PagBank:", JSON.stringify(boletoRequest, null, 2))
-
-          const boletoPagSeguro = await pagseguro.criarBoleto(boletoRequest)
-
-          console.log(`[v0] Parcela ${i + 1}/${parcelas.length} criada com sucesso no PagBank:`, boletoPagSeguro.id)
-          console.log("[v0] Resposta do PagBank:", JSON.stringify(boletoPagSeguro, null, 2))
-
-          pagseguroData = boletoPagSeguro
-        } catch (error) {
-          console.error(`[v0] ERRO ao criar parcela ${i + 1}/${parcelas.length} no PagSeguro:`, error)
-          console.error(`[v0] Boleto que falhou: ${numeroBoleto}`)
-
-          let mensagemErro = "Erro ao criar boleto no PagSeguro. Verifique os dados do cliente e tente novamente."
-
-          if (error instanceof Error && error.message.includes("ACCESS_DENIED")) {
-            mensagemErro =
-              "⚠️ Acesso negado pelo PagSeguro. O IP/domínio do servidor não está na whitelist da sua conta PagSeguro. Entre em contato com o suporte do PagSeguro para liberar o acesso da API."
-          } else if (error instanceof Error && error.message.includes("403")) {
-            mensagemErro =
-              "⚠️ Acesso negado pelo PagSeguro (403). Verifique se sua conta tem permissão para criar boletos ou se o domínio está na whitelist."
-          } else if (error instanceof Error && error.message.includes("401")) {
-            mensagemErro = "⚠️ Token de autenticação inválido. Verifique o PAGSEGURO_TOKEN nas variáveis de ambiente."
-          }
-
-          return NextResponse.json(
-            {
-              success: false,
-              message: mensagemErro,
-              error: error instanceof Error ? error.message : "Erro desconhecido",
-              details: "Consulte os logs do servidor para mais informações.",
-              parcelaFalhou: i + 1,
-              totalParcelas: parcelas.length,
-            },
-            { status: 400 },
-          )
-        }
-      }
-
-      const charge = pagseguroData?.charges?.[0]
-      const boletoInfo = charge?.payment_method?.boleto
-      const linkPDF = charge?.links?.find((l: any) => l.media === "application/pdf")?.href
-      const linkPNG = charge?.links?.find((l: any) => l.media === "image/png")?.href
-
-      console.log(`[v0] Inserindo parcela ${i + 1}/${parcelas.length} no banco de dados`)
+      console.log(`[v0] Inserindo parcela ${i + 1}/${parcelas.length} no banco de dados (apenas local)`)
 
       await query(
         `
@@ -428,11 +275,11 @@ export async function POST(request: NextRequest) {
           parcelas.length,
           null,
           forma_pagamento || "boleto",
-          charge?.id || null,
-          boletoInfo?.formatted_barcode || null,
-          boletoInfo?.barcode || null,
-          linkPDF || null,
-          linkPNG || null,
+          null, // pagseguro_id começa como null
+          null, // linha_digitavel
+          null, // codigo_barras
+          null, // link_pdf
+          null, // link_impressao
           data_nota || null,
           parcela.descricao,
           multa_percentual || 2.0,
@@ -440,14 +287,14 @@ export async function POST(request: NextRequest) {
         ],
       )
 
-      console.log(`[v0] Parcela ${i + 1}/${parcelas.length} inserida com sucesso no banco`)
+      console.log(`[v0] Parcela ${i + 1}/${parcelas.length} inserida com sucesso no banco (apenas local)`)
     }
 
-    console.log(`[v0] Processo concluído: ${parcelas.length} boletos criados`)
+    console.log(`[v0] Processo concluído: ${parcelas.length} boletos criados localmente`)
 
     return NextResponse.json({
       success: true,
-      message: `${parcelas.length} boleto(s) criado(s) com sucesso!`,
+      message: `${parcelas.length} boleto(s) criado(s) localmente! Use o botão "Enviar para PagBank" para enviar individualmente.`,
     })
   } catch (error) {
     console.error("Erro ao criar boletos:", error)
