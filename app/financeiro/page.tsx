@@ -206,6 +206,39 @@ export default function FinanceiroPage() {
     setShowDeleteDialog(true)
   }
 
+  const handleMarcarPago = async (boleto: Boleto) => {
+    if (!confirm(`⚠️ TESTE: Marcar o boleto ${boleto.numero} como PAGO manualmente?`)) return
+
+    try {
+      const response = await fetch(`/api/boletos/${boleto.id}/marcar-pago`, {
+        method: "POST",
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "Sucesso (TESTE)",
+          description: `Boleto ${result.data.numero_boleto} marcado como pago`,
+        })
+        await loadData()
+      } else {
+        toast({
+          title: "Erro",
+          description: result.message || "Erro ao marcar boleto como pago",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao marcar boleto como pago:", error)
+      toast({
+        title: "Erro",
+        description: "Erro ao marcar boleto como pago",
+        variant: "destructive",
+      })
+    }
+  }
+
   const confirmarExclusao = async () => {
     if (!boletoParaExcluir) return
 
@@ -773,6 +806,17 @@ export default function FinanceiroPage() {
                                     className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
                                   >
                                     <Printer className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {boleto.status === "pendente" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleMarcarPago(boleto)}
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                    title="Marcar como Pago (TESTE)"
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
                                   </Button>
                                 )}
                                 <Button
