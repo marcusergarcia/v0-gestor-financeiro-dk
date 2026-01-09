@@ -76,7 +76,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   try {
     const { id } = params
 
-    console.log("[v0] Enviando boleto para PagBank:", id)
+    const { searchParams } = new URL(request.url)
+    const force = searchParams.get("force") === "true"
+
+    console.log("[v0] Enviando boleto para PagBank:", id, "Force:", force)
 
     // Buscar boleto com dados do cliente
     const boletos = await query(
@@ -107,8 +110,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const boleto = boletos[0]
 
-    // Verificar se já foi enviado ao PagBank
-    if (boleto.pagseguro_id) {
+    if (boleto.pagseguro_id && !force) {
       return NextResponse.json(
         {
           success: false,

@@ -25,6 +25,8 @@ import {
   AlertCircle,
   Printer,
   Send,
+  Loader2,
+  RefreshCw,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -61,6 +63,7 @@ interface Boleto {
   link_pdf?: string
   link_impressao?: string
   pagseguro_id?: string | null // Added field to check if sent to PagBank
+  linha_digitavel?: string | null // Added field to check if line is generated
 }
 
 interface Recibo {
@@ -278,6 +281,51 @@ export default function FinanceiroPage() {
       toast({
         title: "Erro",
         description: "Erro ao enviar boleto ao PagBank",
+        variant: "destructive",
+      })
+    } finally {
+      setEnviandoParaPagbank(null)
+    }
+  }
+
+  const handleReenviarPagBank = async (boleto: Boleto) => {
+    if (
+      !confirm(
+        `⚠️ ATENÇÃO: Reenviar boleto ${boleto.numero} para o PagBank?\n\n` +
+          `Este boleto JÁ tem um ID do PagBank mas pode não estar registrado corretamente.\n` +
+          `Isso irá SOBRESCREVER os dados existentes.`,
+      )
+    ) {
+      return
+    }
+
+    try {
+      setEnviandoParaPagbank(boleto.id)
+
+      const response = await fetch(`/api/boletos/${boleto.id}/enviar-pagbank?force=true`, {
+        method: "POST",
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "Sucesso!",
+          description: `Boleto ${boleto.numero} reenviado ao PagBank com sucesso!`,
+        })
+        await loadData()
+      } else {
+        toast({
+          title: "Erro",
+          description: result.message || "Erro ao reenviar boleto ao PagBank",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao reenviar boleto ao PagBank:", error)
+      toast({
+        title: "Erro",
+        description: "Erro ao reenviar boleto ao PagBank",
         variant: "destructive",
       })
     } finally {
@@ -845,34 +893,54 @@ export default function FinanceiroPage() {
                                   <Eye className="h-4 w-4" />
                                 </Button>
 
-                                {/* CONDITIONAL BUTTON: If not sent to PagBank, show "Send", if sent, show "Print" */}
-                                {!boleto.pagseguro_id ? (
+                                {boleto.pagseguro_id && !boleto.linha_digitavel && (
                                   <Button
-                                    size="sm"
                                     variant="outline"
+                                    size="sm"
+                                    onClick={() => handleReenviarPagBank(boleto)}
+                                    disabled={enviandoParaPagbank === boleto.id}
+                                    className="border-amber-500 text-amber-600 hover:bg-amber-50 h-9 lg:h-12 text-sm lg:text-base"
+                                    title="Reenviar para PagBank (forçar)"
+                                  >
+                                    {enviandoParaPagbank === boleto.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
+
+                                {/* Botão Enviar para PagBank - só aparece quando NÃO tem pagseguro_id */}
+                                {!boleto.pagseguro_id && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => handleEnviarPagBank(boleto)}
                                     disabled={enviandoParaPagbank === boleto.id}
-                                    className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 border-orange-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                    className="border-orange-500 text-orange-600 hover:bg-orange-50 h-9 lg:h-12 text-sm lg:text-base"
                                     title="Enviar para PagBank"
                                   >
                                     {enviandoParaPagbank === boleto.id ? (
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
+                                      <Loader2 className="h-4 w-4 animate-spin" />
                                     ) : (
                                       <Send className="h-4 w-4" />
                                     )}
                                   </Button>
-                                ) : (
-                                  (boleto.link_pdf || boleto.link_impressao) && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleImprimirBoleto(boleto)}
-                                      className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
-                                      title="Imprimir boleto"
-                                    >
-                                      <Printer className="h-4 w-4" />
-                                    </Button>
-                                  )
+                                )}
+
+                                {/* Botão Imprimir - só aparece quando tem linha digitável */}
+                                {boleto.linha_digitavel && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      window.open(boleto.link_pdf || boleto.link_impressao || "#", "_blank")
+                                    }
+                                    className="border-purple-500 text-purple-600 hover:bg-purple-50 h-9 lg:h-12 text-sm lg:text-base"
+                                    title="Imprimir boleto"
+                                  >
+                                    <Printer className="h-4 w-4" />
+                                  </Button>
                                 )}
 
                                 {boleto.status === "pendente" && (
