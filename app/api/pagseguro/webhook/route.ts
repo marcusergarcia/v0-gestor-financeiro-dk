@@ -29,15 +29,17 @@ export async function POST(request: NextRequest) {
       console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação via API...")
       const token = process.env.PAGSEGURO_TOKEN
       const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
-      const baseUrl = environment === "production" ? "https://api.pagseguro.com" : "https://sandbox.api.pagseguro.com"
 
-      const url = `${baseUrl}/v3/transactions/notifications/${notificationCode}?email=${process.env.PAGSEGURO_EMAIL}&token=${token}`
+      // API v3 antiga do PagSeguro (retorna XML)
+      const baseUrl =
+        environment === "production" ? "https://ws.pagseguro.uol.com.br" : "https://ws.sandbox.pagseguro.uol.com.br"
+
+      const url = `${baseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
       console.log("[v0][PagSeguro Webhook] URL da consulta:", url.replace(token!, "TOKEN_HIDDEN"))
 
       const response = await fetch(url, {
         headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
+          Accept: "application/xml",
         },
       })
 
@@ -49,8 +51,45 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "Erro ao consultar transação" }, { status: 500 })
       }
 
-      data = await response.json()
-      console.log("[v0][PagSeguro Webhook] Dados da transação obtidos:", JSON.stringify(data, null, 2))
+      const xmlText = await response.text()
+      console.log("[v0][PagSeguro Webhook] XML recebido:", xmlText.substring(0, 500))
+
+      // Parsear XML simples (extrair valores necessários)
+      const referenceMatch = xmlText.match(/<reference>(.*?)<\/reference>/)
+      const statusMatch = xmlText.match(/<status>(\d+)<\/status>/)
+      const codeMatch = xmlText.match(/<code>(.*?)<\/code>/)
+
+      const referenceId = referenceMatch ? referenceMatch[1] : null
+      const statusCode = statusMatch ? Number.parseInt(statusMatch[1]) : null
+      const transactionCode = codeMatch ? codeMatch[1] : null
+
+      console.log("[v0][PagSeguro Webhook] Dados parseados:", { referenceId, statusCode, transactionCode })
+
+      // Mapear status numérico da API v3 para string
+      const statusV3Map: Record<number, string> = {
+        1: "WAITING", // Aguardando pagamento
+        2: "ANALYZING", // Em análise
+        3: "PAID", // Paga
+        4: "AVAILABLE", // Disponível
+        5: "DISPUTED", // Em disputa
+        6: "REFUNDED", // Devolvida
+        7: "CANCELED", // Cancelada
+      }
+
+      const pagseguroStatus = statusCode ? statusV3Map[statusCode] : "WAITING"
+
+      // Converter para formato esperado pelo código
+      data = {
+        charges: [
+          {
+            id: transactionCode,
+            reference_id: referenceId,
+            status: pagseguroStatus,
+          },
+        ],
+      }
+
+      console.log("[v0][PagSeguro Webhook] Dados convertidos para formato interno:", JSON.stringify(data, null, 2))
     } else {
       // Eventos transacionais: JSON completo
       console.log("[v0][PagSeguro Webhook] Processando como JSON")
