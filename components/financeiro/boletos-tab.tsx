@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { Eye, Edit, Trash2, Plus, Search, Filter } from "lucide-react"
+import { Eye, Edit, Trash2, Plus, Search, Filter, CheckCircle } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { NovoBoletoDiaolog } from "./novo-boleto-dialog"
 import { EditarBoletoDialog } from "./editar-boleto-dialog"
@@ -84,6 +84,34 @@ export function BoletosTab() {
       toast({
         title: "Erro",
         description: "Erro ao excluir boleto",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleMarcarPago = async (id: number) => {
+    if (!confirm("⚠️ TESTE: Marcar este boleto como PAGO manualmente?")) return
+
+    try {
+      const response = await fetch(`/api/boletos/${id}/marcar-pago`, {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast({
+          title: "Sucesso (TESTE)",
+          description: `Boleto ${data.numero_boleto} marcado como pago`,
+        })
+        fetchBoletos()
+      } else {
+        throw new Error("Erro ao marcar boleto como pago")
+      }
+    } catch (error) {
+      console.error("Erro ao marcar boleto como pago:", error)
+      toast({
+        title: "Erro",
+        description: "Erro ao marcar boleto como pago",
         variant: "destructive",
       })
     }
@@ -202,6 +230,17 @@ export function BoletosTab() {
                         <Button variant="ghost" size="sm" onClick={() => setEditarBoleto(boleto)} title="Editar">
                           <Edit className="h-4 w-4" />
                         </Button>
+                        {boleto.status === "pendente" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleMarcarPago(boleto.id)}
+                            title="Marcar como Pago (TESTE)"
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button variant="ghost" size="sm" onClick={() => handleDeleteBoleto(boleto.id)} title="Excluir">
                           <Trash2 className="h-4 w-4" />
                         </Button>

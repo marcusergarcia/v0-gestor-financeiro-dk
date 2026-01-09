@@ -48,6 +48,8 @@ export async function createConnection() {
   return await pool.getConnection()
 }
 
+export const getConnection = createConnection
+
 export async function query(sql: string, params?: any[]) {
   let connection
   try {
