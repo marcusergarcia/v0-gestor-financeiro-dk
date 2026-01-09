@@ -835,7 +835,6 @@ export default function FinanceiroPage() {
                               {boleto.numero_parcela}/{boleto.total_parcelas}
                             </TableCell>
                             <TableCell>
-                              {console.log(`[v0] Boleto ${boleto.numero}: pagseguro_id = ${boleto.pagseguro_id}`)}
                               <div className="flex gap-2">
                                 <Button
                                   size="sm"
