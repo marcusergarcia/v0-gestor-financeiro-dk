@@ -1,6 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 
+export async function GET(request: NextRequest) {
+  return NextResponse.json({
+    status: "online",
+    timestamp: new Date().toISOString(),
+    environment: process.env.PAGSEGURO_ENVIRONMENT || "sandbox",
+    message: "Webhook PagBank está ativo e pronto para receber notificações",
+  })
+}
+
 export async function POST(request: NextRequest) {
   console.log("[v0][PagSeguro Webhook] ===== WEBHOOK RECEBIDO =====")
   console.log("[v0][PagSeguro Webhook] Timestamp:", new Date().toISOString())
