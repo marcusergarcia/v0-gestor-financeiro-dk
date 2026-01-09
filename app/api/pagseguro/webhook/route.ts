@@ -28,18 +28,29 @@ export async function POST(request: NextRequest) {
       // Buscar detalhes da transação na API do PagSeguro
       console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação via API...")
       const token = process.env.PAGSEGURO_TOKEN
+      const email = process.env.PAGSEGURO_EMAIL
       const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
+
+      if (!email) {
+        console.log("[v0][PagSeguro Webhook] ERRO: PAGSEGURO_EMAIL não configurado")
+        return NextResponse.json({ success: false, error: "Email PagSeguro não configurado" }, { status: 500 })
+      }
 
       // API v3 antiga do PagSeguro (retorna XML)
       const baseUrl =
         environment === "production" ? "https://ws.pagseguro.uol.com.br" : "https://ws.sandbox.pagseguro.uol.com.br"
 
-      const url = `${baseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
-      console.log("[v0][PagSeguro Webhook] URL da consulta:", url.replace(token!, "TOKEN_HIDDEN"))
+      const url = `${baseUrl}/v3/transactions/notifications/${notificationCode}?email=${encodeURIComponent(email)}&token=${token}`
+      console.log(
+        "[v0][PagSeguro Webhook] URL da consulta:",
+        url.replace(token!, "TOKEN_HIDDEN").replace(email, "EMAIL_HIDDEN"),
+      )
 
       const response = await fetch(url, {
+        method: "GET",
         headers: {
           Accept: "application/xml",
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         },
       })
 
