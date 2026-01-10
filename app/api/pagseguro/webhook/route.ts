@@ -22,95 +22,18 @@ export async function POST(request: NextRequest) {
     let data: any
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
-      console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded")
+      console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded (evento pós-transacional)")
       const formData = await request.formData()
       const notificationCode = formData.get("notificationCode") as string
       const notificationType = formData.get("notificationType") as string
 
       console.log("[v0][PagSeguro Webhook] Form data recebido:", { notificationCode, notificationType })
 
-      if (!notificationCode) {
-        console.log("[v0][PagSeguro Webhook] ERRO: notificationCode não fornecido")
-        return NextResponse.json({ success: false, error: "notificationCode não fornecido" }, { status: 400 })
-      }
-
-      console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação via API v3...")
-      const token = process.env.PAGSEGURO_TOKEN
-      const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
-
-      if (!token) {
-        console.log("[v0][PagSeguro Webhook] ERRO: PAGSEGURO_TOKEN não configurado")
-        return NextResponse.json({ success: false, error: "Token PagBank não configurado" }, { status: 500 })
-      }
-
-      // API v3 do PagSeguro (antiga, retorna XML)
-      const baseUrl =
-        environment === "production" ? "https://ws.pagseguro.uol.com.br" : "https://ws.sandbox.pagseguro.uol.com.br"
-
-      // Endpoint correto para notificações - usar apenas token sem email
-      const url = `${baseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
-      console.log("[v0][PagSeguro Webhook] URL da consulta:", url.replace(token, "***"))
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Accept: "application/xml",
-        },
-      })
-
-      console.log("[v0][PagSeguro Webhook] Status da consulta:", response.status)
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.log("[v0][PagSeguro Webhook] ERRO na consulta:", errorText)
-        return NextResponse.json({ success: false, error: "Erro ao consultar transação" }, { status: response.status })
-      }
-
-      const xmlText = await response.text()
-      console.log("[v0][PagSeguro Webhook] XML recebido (primeiros 500 chars):", xmlText.substring(0, 500))
-
-      // Parse XML simples para extrair os dados necessários
-      const referenceMatch = xmlText.match(/<reference>(.*?)<\/reference>/)
-      const statusMatch = xmlText.match(/<status>(.*?)<\/status>/)
-      const codeMatch = xmlText.match(/<code>(.*?)<\/code>/)
-
-      const reference_id = referenceMatch ? referenceMatch[1] : null
-      const statusCode = statusMatch ? statusMatch[1] : null
-      const transactionCode = codeMatch ? codeMatch[1] : null
-
-      console.log("[v0][PagSeguro Webhook] Dados extraídos do XML:", {
-        reference_id,
-        statusCode,
-        transactionCode,
-      })
-
-      // Mapear código de status numérico da API v3 para string
-      const statusMap: Record<string, string> = {
-        "1": "WAITING", // Aguardando pagamento
-        "2": "WAITING", // Em análise
-        "3": "PAID", // Paga
-        "4": "PAID", // Disponível
-        "5": "CANCELED", // Em disputa
-        "6": "CANCELED", // Devolvida
-        "7": "CANCELED", // Cancelada
-      }
-
-      const status = statusCode && statusMap[statusCode] ? statusMap[statusCode] : "WAITING"
-
-      // Converter para formato esperado pelo código
-      data = {
-        charges: [
-          {
-            id: transactionCode,
-            reference_id: reference_id,
-            status: status,
-          },
-        ],
-      }
-
-      console.log("[v0][PagSeguro Webhook] Dados convertidos para formato interno:", JSON.stringify(data, null, 2))
+      // Evento pós-transacional ignorado (disponibilização, chargeback, etc)
+      console.log("[v0][PagSeguro Webhook] Evento pós-transacional ignorado (disponibilização, chargeback, etc)")
+      return NextResponse.json({ success: true, message: "Evento pós-transacional recebido" })
     } else {
-      console.log("[v0][PagSeguro Webhook] Processando como JSON")
+      console.log("[v0][PagSeguro Webhook] Processando como JSON (evento transacional)")
       data = await request.json()
       console.log("[v0][PagSeguro Webhook] JSON recebido:", JSON.stringify(data, null, 2))
     }

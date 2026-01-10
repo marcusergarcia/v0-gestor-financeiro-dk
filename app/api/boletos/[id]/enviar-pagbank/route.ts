@@ -161,6 +161,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const dueDateFormatted = new Date(boleto.data_vencimento).toISOString().split("T")[0]
 
+    const webhookUrl = process.env.NEXT_PUBLIC_APP_URL
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/api/pagseguro/webhook`
+      : "https://gestor9.vercel.app/api/pagseguro/webhook"
+
     const payload = {
       reference_id: boleto.numero,
       customer: {
@@ -168,6 +172,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         email: emailValido,
         tax_id: taxIdValido,
       },
+      notification_urls: [webhookUrl],
       items: [
         {
           name:
