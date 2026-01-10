@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   console.log("[PagSeguro Webhook] ===== WEBHOOK RECEBIDO =====")
+  console.log("[PagSeguro Webhook] Timestamp:", new Date().toISOString())
 
   try {
     const contentType = request.headers.get("content-type") || ""
@@ -22,11 +23,29 @@ export async function POST(request: NextRequest) {
       const notificationCode = formData.get("notificationCode") as string
       const notificationType = formData.get("notificationType") as string
 
-      console.log("[PagSeguro Webhook] Notificação recebida:", { notificationCode, notificationType })
+      console.log("[PagSeguro Webhook] Form data:", { notificationCode, notificationType })
 
       if (notificationType === "transaction") {
-        // pois a notificação 'transaction' significa que houve pagamento
-        console.log("[PagSeguro Webhook] Atualizando boletos pendentes para pago...")
+        console.log("[PagSeguro Webhook] Tipo: transaction - buscando boletos pendentes...")
+
+        const boletosPendentes = await query(
+          `SELECT id, numero, cliente_nome, valor, data_vencimento, status 
+           FROM boletos 
+           WHERE status = 'pendente'
+           ORDER BY updated_at DESC`,
+          [],
+        )
+
+        console.log("[PagSeguro Webhook] Boletos pendentes encontrados:", boletosPendentes.length)
+        console.log("[PagSeguro Webhook] Boletos pendentes:", JSON.stringify(boletosPendentes, null, 2))
+
+        if (boletosPendentes.length === 0) {
+          console.log("[PagSeguro Webhook] NENHUM boleto pendente para atualizar!")
+          return NextResponse.json({ success: true, message: "Nenhum boleto pendente" })
+        }
+
+        const boletoParaAtualizar = boletosPendentes[0]
+        console.log("[PagSeguro Webhook] Atualizando boleto:", boletoParaAtualizar)
 
         const updateResult = await query(
           `UPDATE boletos 
@@ -34,20 +53,31 @@ export async function POST(request: NextRequest) {
                data_pagamento = CURRENT_TIMESTAMP,
                webhook_notificado = TRUE,
                updated_at = CURRENT_TIMESTAMP
-           WHERE status = 'pendente'
-           ORDER BY updated_at DESC
-           LIMIT 1`,
-          [],
+           WHERE id = ?`,
+          [boletoParaAtualizar.id],
         )
 
-        console.log("[PagSeguro Webhook] Boleto atualizado:", {
+        console.log("[PagSeguro Webhook] Resultado UPDATE:", {
+          boletoId: boletoParaAtualizar.id,
           affectedRows: updateResult.affectedRows,
           changedRows: updateResult.changedRows,
+          warningCount: updateResult.warningCount,
         })
 
-        return NextResponse.json({ success: true, message: "Boleto atualizado para pago" })
+        const boletoAtualizado = await query(`SELECT id, numero, status, data_pagamento FROM boletos WHERE id = ?`, [
+          boletoParaAtualizar.id,
+        ])
+        console.log("[PagSeguro Webhook] Boleto APÓS atualização:", JSON.stringify(boletoAtualizado, null, 2))
+
+        return NextResponse.json({
+          success: true,
+          message: "Boleto atualizado para pago",
+          boletoId: boletoParaAtualizar.id,
+          numero: boletoParaAtualizar.numero,
+        })
       }
 
+      console.log("[PagSeguro Webhook] Tipo de notificação não é transaction, ignorando")
       return NextResponse.json({ success: true, message: "Notificação processada" })
     }
 
@@ -99,6 +129,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("[PagSeguro Webhook] ERRO:", error)
+    console.error("[PagSeguro Webhook] Stack:", error instanceof Error ? error.stack : "N/A")
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
   }
 }
