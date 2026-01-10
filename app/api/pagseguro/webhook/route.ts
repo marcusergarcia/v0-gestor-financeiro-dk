@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
+import { parse } from "xml2js"
 
 export async function GET(request: NextRequest) {
   return NextResponse.json({
@@ -22,16 +23,119 @@ export async function POST(request: NextRequest) {
     let data: any
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
-      console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded (evento pós-transacional)")
+      console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded (notificationCode)")
       const formData = await request.formData()
       const notificationCode = formData.get("notificationCode") as string
       const notificationType = formData.get("notificationType") as string
 
       console.log("[v0][PagSeguro Webhook] Form data recebido:", { notificationCode, notificationType })
 
-      // Evento pós-transacional ignorado (disponibilização, chargeback, etc)
-      console.log("[v0][PagSeguro Webhook] Evento pós-transacional ignorado (disponibilização, chargeback, etc)")
-      return NextResponse.json({ success: true, message: "Evento pós-transacional recebido" })
+      if (!notificationCode) {
+        console.log("[v0][PagSeguro Webhook] Erro: notificationCode não fornecido")
+        return NextResponse.json({ success: false, error: "notificationCode não fornecido" }, { status: 400 })
+      }
+
+      // Buscar detalhes da transação usando o notificationCode
+      const token = process.env.PAGSEGURO_TOKEN
+      const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
+      const baseUrl =
+        environment === "production" ? "https://ws.pagseguro.uol.com.br" : "https://ws.sandbox.pagseguro.uol.com.br"
+
+      console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação:", {
+        notificationCode,
+        environment,
+        baseUrl,
+      })
+
+      try {
+        const transactionUrl = `${baseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
+        const response = await fetch(transactionUrl, {
+          method: "GET",
+          headers: {
+            Accept: "application/xml",
+            "Content-Type": "application/xml; charset=UTF-8",
+          },
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.log("[v0][PagSeguro Webhook] Erro ao buscar transação:", {
+            status: response.status,
+            statusText: response.statusText,
+            body: errorText,
+          })
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Erro ao buscar transação: ${response.status}`,
+            },
+            { status: response.status },
+          )
+        }
+
+        const xmlText = await response.text()
+        console.log("[v0][PagSeguro Webhook] XML recebido (primeiros 500 chars):", xmlText.substring(0, 500))
+
+        // Parse XML simples para extrair campos necessários
+        const parser = new parse.Parser({ explicitArray: false })
+        const result = await parser.parseStringPromise(xmlText)
+
+        const reference_id = result.transaction.reference
+        const statusCode = Number.parseInt(result.transaction.status)
+        const transactionCode = result.transaction.code
+
+        console.log("[v0][PagSeguro Webhook] Dados extraídos do XML:", {
+          reference_id,
+          statusCode,
+          transactionCode,
+        })
+
+        if (!reference_id) {
+          console.log("[v0][PagSeguro Webhook] Erro: reference_id não encontrado no XML")
+          return NextResponse.json({ success: false, error: "reference_id não encontrado" }, { status: 400 })
+        }
+
+        // Mapear status code numérico para string
+        // 1=Aguardando pagamento, 2=Em análise, 3=Paga, 4=Disponível, 5=Em disputa, 6=Devolvida, 7=Cancelada
+        const statusMap: Record<number, string> = {
+          1: "WAITING",
+          2: "WAITING",
+          3: "PAID",
+          4: "PAID",
+          5: "DECLINED",
+          6: "DECLINED",
+          7: "CANCELED",
+        }
+
+        const status = statusCode !== null ? statusMap[statusCode] || "WAITING" : "WAITING"
+
+        console.log("[v0][PagSeguro Webhook] Status mapeado:", {
+          statusCode,
+          status,
+        })
+
+        // Criar objeto charge compatível com o fluxo existente
+        data = {
+          charges: [
+            {
+              id: transactionCode,
+              reference_id: reference_id,
+              status: status,
+            },
+          ],
+        }
+
+        console.log("[v0][PagSeguro Webhook] Dados convertidos para processamento:", JSON.stringify(data, null, 2))
+      } catch (fetchError) {
+        console.error("[v0][PagSeguro Webhook] Erro ao buscar notificação:", fetchError)
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Erro ao buscar notificação: ${fetchError}`,
+          },
+          { status: 500 },
+        )
+      }
     } else {
       console.log("[v0][PagSeguro Webhook] Processando como JSON (evento transacional)")
       data = await request.json()
