@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { parse } from "xml2js"
 
 export async function GET(request: NextRequest) {
   return NextResponse.json({
@@ -49,13 +48,17 @@ export async function POST(request: NextRequest) {
 
       try {
         const transactionUrl = `${baseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
+        console.log("[v0][PagSeguro Webhook] URL da requisição:", transactionUrl)
+
         const response = await fetch(transactionUrl, {
           method: "GET",
           headers: {
             Accept: "application/xml",
-            "Content-Type": "application/xml; charset=UTF-8",
           },
         })
+
+        console.log("[v0][PagSeguro Webhook] Response status:", response.status)
+        console.log("[v0][PagSeguro Webhook] Response headers:", Object.fromEntries(response.headers.entries()))
 
         if (!response.ok) {
           const errorText = await response.text()
@@ -64,25 +67,20 @@ export async function POST(request: NextRequest) {
             statusText: response.statusText,
             body: errorText,
           })
-          return NextResponse.json(
-            {
-              success: false,
-              error: `Erro ao buscar transação: ${response.status}`,
-            },
-            { status: response.status },
-          )
+
+          return NextResponse.json({ success: true, message: "Erro ao processar, mas aceito" })
         }
 
         const xmlText = await response.text()
-        console.log("[v0][PagSeguro Webhook] XML recebido (primeiros 500 chars):", xmlText.substring(0, 500))
+        console.log("[v0][PagSeguro Webhook] XML recebido completo:", xmlText)
 
-        // Parse XML simples para extrair campos necessários
-        const parser = new parse.Parser({ explicitArray: false })
-        const result = await parser.parseStringPromise(xmlText)
+        const referenceMatch = xmlText.match(/<reference>(.*?)<\/reference>/)
+        const statusMatch = xmlText.match(/<status>(\d+)<\/status>/)
+        const codeMatch = xmlText.match(/<code>(.*?)<\/code>/)
 
-        const reference_id = result.transaction.reference
-        const statusCode = Number.parseInt(result.transaction.status)
-        const transactionCode = result.transaction.code
+        const reference_id = referenceMatch ? referenceMatch[1] : null
+        const statusCode = statusMatch ? Number.parseInt(statusMatch[1]) : null
+        const transactionCode = codeMatch ? codeMatch[1] : null
 
         console.log("[v0][PagSeguro Webhook] Dados extraídos do XML:", {
           reference_id,
