@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "notificationCode não fornecido" }, { status: 400 })
       }
 
-      console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação via API v4...")
+      console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação via API v3...")
       const token = process.env.PAGSEGURO_TOKEN
       const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
 
@@ -43,19 +43,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "Token PagBank não configurado" }, { status: 500 })
       }
 
-      // API v4 do PagBank (moderna, retorna JSON, usa Bearer token)
-      const baseUrl = environment === "production" ? "https://api.pagseguro.com" : "https://sandbox.api.pagseguro.com"
+      // API v3 do PagSeguro (antiga, retorna XML)
+      const baseUrl =
+        environment === "production" ? "https://ws.pagseguro.uol.com.br" : "https://ws.sandbox.pagseguro.uol.com.br"
 
-      // Usar o notificationCode como charge ID na API v4
-      const url = `${baseUrl}/charges/${notificationCode}`
-      console.log("[v0][PagSeguro Webhook] URL da consulta:", url)
+      // Endpoint correto para notificações - usar apenas token sem email
+      const url = `${baseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
+      console.log("[v0][PagSeguro Webhook] URL da consulta:", url.replace(token, "***"))
 
       const response = await fetch(url, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-          "Content-Type": "application/json",
+          Accept: "application/xml",
         },
       })
 
@@ -67,12 +66,46 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "Erro ao consultar transação" }, { status: response.status })
       }
 
-      const chargeData = await response.json()
-      console.log("[v0][PagSeguro Webhook] Dados da charge recebidos:", JSON.stringify(chargeData, null, 2))
+      const xmlText = await response.text()
+      console.log("[v0][PagSeguro Webhook] XML recebido (primeiros 500 chars):", xmlText.substring(0, 500))
+
+      // Parse XML simples para extrair os dados necessários
+      const referenceMatch = xmlText.match(/<reference>(.*?)<\/reference>/)
+      const statusMatch = xmlText.match(/<status>(.*?)<\/status>/)
+      const codeMatch = xmlText.match(/<code>(.*?)<\/code>/)
+
+      const reference_id = referenceMatch ? referenceMatch[1] : null
+      const statusCode = statusMatch ? statusMatch[1] : null
+      const transactionCode = codeMatch ? codeMatch[1] : null
+
+      console.log("[v0][PagSeguro Webhook] Dados extraídos do XML:", {
+        reference_id,
+        statusCode,
+        transactionCode,
+      })
+
+      // Mapear código de status numérico da API v3 para string
+      const statusMap: Record<string, string> = {
+        "1": "WAITING", // Aguardando pagamento
+        "2": "WAITING", // Em análise
+        "3": "PAID", // Paga
+        "4": "PAID", // Disponível
+        "5": "CANCELED", // Em disputa
+        "6": "CANCELED", // Devolvida
+        "7": "CANCELED", // Cancelada
+      }
+
+      const status = statusCode && statusMap[statusCode] ? statusMap[statusCode] : "WAITING"
 
       // Converter para formato esperado pelo código
       data = {
-        charges: [chargeData],
+        charges: [
+          {
+            id: transactionCode,
+            reference_id: reference_id,
+            status: status,
+          },
+        ],
       }
 
       console.log("[v0][PagSeguro Webhook] Dados convertidos para formato interno:", JSON.stringify(data, null, 2))
