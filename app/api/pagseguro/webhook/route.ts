@@ -22,16 +22,91 @@ export async function POST(request: NextRequest) {
     let data: any
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
-      console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded (evento pós-transacional)")
+      console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded")
       const formData = await request.formData()
       const notificationCode = formData.get("notificationCode") as string
       const notificationType = formData.get("notificationType") as string
 
       console.log("[v0][PagSeguro Webhook] Form data recebido:", { notificationCode, notificationType })
 
-      // Evento pós-transacional ignorado (disponibilização, chargeback, etc)
-      console.log("[v0][PagSeguro Webhook] Evento pós-transacional ignorado (disponibilização, chargeback, etc)")
-      return NextResponse.json({ success: true, message: "Evento pós-transacional recebido" })
+      if (notificationType === "transaction" && notificationCode) {
+        console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação:", notificationCode)
+
+        const token = process.env.PAGSEGURO_TOKEN
+        const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
+        const baseUrl =
+          environment === "production" ? "https://ws.pagseguro.uol.com.br" : "https://ws.sandbox.pagseguro.uol.com.br"
+
+        const transactionUrl = `${baseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
+
+        console.log("[v0][PagSeguro Webhook] URL da consulta:", transactionUrl)
+
+        const response = await fetch(transactionUrl, {
+          method: "GET",
+          headers: {
+            Accept: "application/xml",
+            "Content-Type": "application/xml; charset=UTF-8",
+          },
+        })
+
+        console.log("[v0][PagSeguro Webhook] Status da resposta:", response.status)
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error("[v0][PagSeguro Webhook] Erro ao buscar transação:", errorText)
+          return NextResponse.json({ success: false, error: "Erro ao buscar transação" }, { status: 500 })
+        }
+
+        const xmlText = await response.text()
+        console.log("[v0][PagSeguro Webhook] XML recebido:", xmlText.substring(0, 500))
+
+        // Parse XML simples para extrair dados necessários
+        const referenceMatch = xmlText.match(/<reference>(.*?)<\/reference>/)
+        const statusMatch = xmlText.match(/<status>(\d+)<\/status>/)
+        const codeMatch = xmlText.match(/<code>(.*?)<\/code>/)
+
+        const reference_id = referenceMatch ? referenceMatch[1] : null
+        const statusCode = statusMatch ? Number.parseInt(statusMatch[1]) : null
+        const transactionCode = codeMatch ? codeMatch[1] : null
+
+        console.log("[v0][PagSeguro Webhook] Dados extraídos do XML:", {
+          reference_id,
+          statusCode,
+          transactionCode,
+        })
+
+        // Mapear status numérico da API v3 para string
+        const statusMap: Record<number, string> = {
+          1: "WAITING", // Aguardando pagamento
+          2: "WAITING", // Em análise
+          3: "PAID", // Paga
+          4: "PAID", // Disponível
+          5: "WAITING", // Em disputa
+          6: "DECLINED", // Devolvida
+          7: "CANCELED", // Cancelada
+        }
+
+        const status = statusCode ? statusMap[statusCode] : "WAITING"
+
+        console.log("[v0][PagSeguro Webhook] Status mapeado:", status)
+
+        // Criar objeto data no formato esperado
+        data = {
+          charges: [
+            {
+              id: transactionCode,
+              reference_id: reference_id,
+              status: status,
+            },
+          ],
+        }
+
+        console.log("[v0][PagSeguro Webhook] Data transformado:", JSON.stringify(data, null, 2))
+      } else {
+        // Evento pós-transacional ignorado
+        console.log("[v0][PagSeguro Webhook] Evento não-transacional ignorado")
+        return NextResponse.json({ success: true, message: "Evento não-transacional recebido" })
+      }
     } else {
       console.log("[v0][PagSeguro Webhook] Processando como JSON (evento transacional)")
       data = await request.json()
