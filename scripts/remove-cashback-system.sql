@@ -1,13 +1,16 @@
--- Script para remover completamente o sistema de cashback
+-- Script para remover completamente o sistema de cashback e tabelas relacionadas
 
--- Remover constraint da tabela boletos
-ALTER TABLE boletos DROP FOREIGN KEY IF EXISTS cashback_ibfk_2;
+-- Remover foreign keys da tabela cashback
+ALTER TABLE cashback DROP FOREIGN KEY IF EXISTS cashback_ibfk_1;
+ALTER TABLE cashback DROP FOREIGN KEY IF EXISTS cashback_ibfk_2;
 
--- Remover tabela cashback
+-- Remover tabelas
 DROP TABLE IF EXISTS cashback;
-
--- Remover tabela pagamentos_payout
 DROP TABLE IF EXISTS pagamentos_payout;
 
--- Remover configurações de cashback
-DELETE FROM configuracoes_pagseguro WHERE chave IN ('cashback_percentual_padrao', 'cashback_ativo');
+-- Remover tabela de configurações do PagSeguro (se não for usada para outras coisas)
+DROP TABLE IF EXISTS configuracoes_pagseguro;
+
+-- Limpar qualquer referência em outras tabelas (se existir)
+-- Este comando não falhará se a coluna não existir
+-- ALTER TABLE boletos DROP COLUMN IF EXISTS cashback_ativo;
