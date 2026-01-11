@@ -36,9 +36,15 @@ export async function POST(request: NextRequest) {
 
       // Buscar detalhes da transação usando o notificationCode
       const token = process.env.PAGSEGURO_TOKEN
+      const email = process.env.PAGSEGURO_EMAIL
       const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
       const baseUrl =
         environment === "production" ? "https://ws.pagseguro.uol.com.br" : "https://ws.sandbox.pagseguro.uol.com.br"
+
+      if (!email) {
+        console.log("[v0][PagSeguro Webhook] ERRO: PAGSEGURO_EMAIL não configurado")
+        return NextResponse.json({ success: false, error: "PAGSEGURO_EMAIL não configurado" }, { status: 500 })
+      }
 
       console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação:", {
         notificationCode,
@@ -47,7 +53,7 @@ export async function POST(request: NextRequest) {
       })
 
       try {
-        const transactionUrl = `${baseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
+        const transactionUrl = `${baseUrl}/v3/transactions/notifications/${notificationCode}?email=${email}&token=${token}`
         console.log("[v0][PagSeguro Webhook] URL da requisição:", transactionUrl)
 
         const response = await fetch(transactionUrl, {
