@@ -26,73 +26,73 @@ export async function POST(request: NextRequest) {
     const payload = await request.json()
     console.log("[PagBank Webhook] Payload recebido:", JSON.stringify(payload, null, 2))
 
-    if (payload.type !== "CHARGE_STATUS_CHANGED") {
-      console.log("[PagBank Webhook] Ignorando: type não é CHARGE_STATUS_CHANGED")
+    const { id: order_id, reference_id, charges } = payload
+
+    if (!charges || !Array.isArray(charges) || charges.length === 0) {
+      console.log("[PagBank Webhook] ERRO: charges array está ausente ou vazio")
       return NextResponse.json({ ok: true }, { status: 200 })
     }
 
-    if (!payload.data) {
-      console.log("[PagBank Webhook] ERRO: payload.data está ausente")
-      return NextResponse.json({ ok: true }, { status: 200 })
-    }
+    for (const charge of charges) {
+      const { id: charge_id, reference_id: charge_reference_id, status, payment_method } = charge
 
-    const { order_id, charge_id, reference_id, status, amount, payment_method } = payload.data
+      console.log("[PagBank Webhook] Processando charge:")
+      console.log("[PagBank Webhook] - Order ID:", order_id)
+      console.log("[PagBank Webhook] - Charge ID:", charge_id)
+      console.log("[PagBank Webhook] - Reference ID:", charge_reference_id || reference_id)
+      console.log("[PagBank Webhook] - Status:", status)
 
-    console.log("[PagBank Webhook] Type:", payload.type)
-    console.log("[PagBank Webhook] Order ID:", order_id)
-    console.log("[PagBank Webhook] Charge ID:", charge_id)
-    console.log("[PagBank Webhook] Reference ID:", reference_id)
-    console.log("[PagBank Webhook] Status:", status)
+      if (payment_method?.type !== "BOLETO") {
+        console.log("[PagBank Webhook] Ignorando: não é boleto")
+        continue
+      }
 
-    if (payment_method?.type !== "BOLETO") {
-      console.log("[PagBank Webhook] Ignorando: não é boleto")
-      return NextResponse.json({ ok: true }, { status: 200 })
-    }
+      if (status !== "PAID") {
+        console.log("[PagBank Webhook] Status não é PAID, ignorando")
+        continue
+      }
 
-    if (status !== "PAID") {
-      console.log("[PagBank Webhook] Status não é PAID, ignorando")
-      return NextResponse.json({ ok: true }, { status: 200 })
-    }
+      console.log("[PagBank Webhook] ✓ Status PAID confirmado - iniciando atualização")
 
-    console.log("[PagBank Webhook] Status PAID confirmado - iniciando atualização")
+      let boletos = await query(`SELECT id, numero, status FROM boletos WHERE charge_id = ?`, [charge_id])
 
-    let boletos = await query(`SELECT id, numero, status FROM boletos WHERE charge_id = ?`, [charge_id])
+      if (boletos.length === 0) {
+        const ref_id = charge_reference_id || reference_id
+        console.log("[PagBank Webhook] Tentando buscar por reference_id:", ref_id)
+        boletos = await query(`SELECT id, numero, status FROM boletos WHERE numero = ?`, [ref_id])
+      }
 
-    if (boletos.length === 0 && reference_id) {
-      console.log("[PagBank Webhook] Tentando buscar por reference_id:", reference_id)
-      boletos = await query(`SELECT id, numero, status FROM boletos WHERE numero = ?`, [reference_id])
-    }
+      if (boletos.length === 0) {
+        console.log("[PagBank Webhook] AVISO: Boleto não encontrado para charge_id =", charge_id)
+        continue
+      }
 
-    if (boletos.length === 0) {
-      console.log("[PagBank Webhook] AVISO: Boleto não encontrado para charge_id =", charge_id)
-      return NextResponse.json({ ok: true }, { status: 200 })
-    }
+      const boleto = boletos[0]
+      console.log("[PagBank Webhook] ✓ Boleto encontrado:", boleto.numero)
+      console.log("[PagBank Webhook] Status atual no banco:", boleto.status)
 
-    const boleto = boletos[0]
-    console.log("[PagBank Webhook] Boleto encontrado:", boleto.numero)
-    console.log("[PagBank Webhook] Status atual no banco:", boleto.status)
+      if (boleto.status === "pago") {
+        console.log("[PagBank Webhook] ✓ Boleto já está pago, ignorando webhook duplicado")
+        continue
+      }
 
-    if (boleto.status === "pago") {
-      console.log("[PagBank Webhook] Boleto já está pago, ignorando webhook duplicado (idempotência)")
-      return NextResponse.json({ ok: true }, { status: 200 })
-    }
+      const result = await query(
+        `UPDATE boletos 
+         SET status = 'pago',
+             data_pagamento = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND status != 'pago'`,
+        [boleto.id],
+      )
 
-    const result = await query(
-      `UPDATE boletos 
-       SET status = 'pago',
-           data_pagamento = CURRENT_TIMESTAMP,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND status != 'pago'`,
-      [boleto.id],
-    )
+      console.log("[PagBank Webhook] ✓ Boleto atualizado para PAGO:", {
+        numero: boleto.numero,
+        affectedRows: result.affectedRows,
+      })
 
-    console.log("[PagBank Webhook] Boleto atualizado para PAGO:", {
-      numero: boleto.numero,
-      affectedRows: result.affectedRows,
-    })
-
-    if (result.affectedRows > 0) {
-      await processarCashback(boleto.id)
+      if (result.affectedRows > 0) {
+        await processarCashback(boleto.id)
+      }
     }
 
     console.log("[PagBank Webhook] ===== WEBHOOK PROCESSADO COM SUCESSO =====")
