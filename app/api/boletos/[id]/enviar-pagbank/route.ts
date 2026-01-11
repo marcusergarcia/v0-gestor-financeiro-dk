@@ -163,22 +163,31 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const payload = {
       reference_id: boleto.numero,
-      notification_urls: [`${process.env.NEXT_PUBLIC_APP_URL}/api/pagseguro/webhook`],
       customer: {
         name: boleto.cliente_nome,
         email: emailValido,
         tax_id: taxIdValido,
+        phones: [
+          {
+            country: "55",
+            area: telefoneCompleto.substring(0, 2),
+            number: telefoneCompleto.substring(2),
+            type: "MOBILE",
+          },
+        ],
       },
       items: [
         {
+          reference_id: boleto.numero,
           name:
-            typeof descricaoBoleto === "string"
-              ? descricaoBoleto.substring(0, 255)
-              : `Boleto ${boleto.numero}`.substring(0, 255),
+            typeof descricaoBoleto === "string" && descricaoBoleto.length > 0
+              ? descricaoBoleto.substring(0, 100)
+              : `Boleto ${boleto.numero}`.substring(0, 100),
           quantity: 1,
           unit_amount: Math.round(valorBoleto * 100),
         },
       ],
+      notification_urls: ["https://gestor9.vercel.app/api/pagbank/webhook"],
       charges: [
         {
           reference_id: boleto.numero,
@@ -194,7 +203,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             type: "BOLETO",
             boleto: {
               template: "COBRANCA",
-              due_date: dueDateFormatted, // Usando formato YYYY-MM-DD ao invés de ISO timestamp
+              due_date: dueDateFormatted,
               days_until_expiration: 30,
               instruction_lines: {
                 line_1: "Pagamento ate o vencimento",
@@ -255,7 +264,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         boletoInfo?.barcode || null,
         linkPDF || null,
         linkPNG || null,
-        `${process.env.NEXT_PUBLIC_APP_URL}/api/pagseguro/webhook`,
+        "https://gestor9.vercel.app/api/pagbank/webhook",
         id,
       ],
     )
