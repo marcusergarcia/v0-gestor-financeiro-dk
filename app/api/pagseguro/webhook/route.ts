@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     let data: any
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
-      console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded (notificationCode)")
+      console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded")
       const formData = await request.formData()
       const notificationCode = formData.get("notificationCode") as string
       const notificationType = formData.get("notificationType") as string
@@ -30,62 +30,77 @@ export async function POST(request: NextRequest) {
       console.log("[v0][PagSeguro Webhook] Form data recebido:", { notificationCode, notificationType })
 
       if (!notificationCode) {
-        console.log("[v0][PagSeguro Webhook] Erro: notificationCode não fornecido")
+        console.log("[v0][PagSeguro Webhook] ERRO: notificationCode não fornecido")
         return NextResponse.json({ success: false, error: "notificationCode não fornecido" }, { status: 400 })
       }
 
-      // Buscar detalhes da transação usando o notificationCode
+      console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação via API v3...")
       const token = process.env.PAGSEGURO_TOKEN
-      const email = process.env.PAGSEGURO_EMAIL
       const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
+
+      if (!token) {
+        console.log("[v0][PagSeguro Webhook] ERRO: PAGSEGURO_TOKEN não configurado")
+        return NextResponse.json({ success: false, error: "Token PagBank não configurado" }, { status: 500 })
+      }
+
+      // API v3 do PagSeguro (antiga, retorna XML)
       const baseUrl =
         environment === "production" ? "https://ws.pagseguro.uol.com.br" : "https://ws.sandbox.pagseguro.uol.com.br"
 
-      if (!email) {
-        console.log("[v0][PagSeguro Webhook] ERRO: PAGSEGURO_EMAIL não configurado")
-        return NextResponse.json({ success: false, error: "PAGSEGURO_EMAIL não configurado" }, { status: 500 })
-      }
+      // Endpoint correto para notificações - usar apenas token sem email
+      const url = `${baseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
+      console.log("[v0][PagSeguro Webhook] URL da consulta:", url.replace(token, "***"))
 
-      console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação:", {
-        notificationCode,
-        environment,
-        baseUrl,
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          Accept: "application/xml",
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "User-Agent": "Mozilla/5.0",
+        },
       })
 
-      try {
-        const transactionUrl = `${baseUrl}/v3/transactions/notifications/${notificationCode}?email=${email}&token=${token}`
-        console.log("[v0][PagSeguro Webhook] URL da requisição:", transactionUrl)
+      console.log("[v0][PagSeguro Webhook] Status da consulta:", response.status)
 
-        const response = await fetch(transactionUrl, {
+      if (response.status === 406) {
+        const alternativeBaseUrl =
+          environment === "production" ? "https://ws.sandbox.pagseguro.uol.com.br" : "https://ws.pagseguro.uol.com.br"
+        const alternativeUrl = `${alternativeBaseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
+        console.log("[v0][PagSeguro Webhook] Tentando ambiente alternativo:", alternativeUrl.replace(token, "***"))
+
+        const alternativeResponse = await fetch(alternativeUrl, {
           method: "GET",
           headers: {
             Accept: "application/xml",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "User-Agent": "Mozilla/5.0",
           },
         })
 
-        console.log("[v0][PagSeguro Webhook] Response status:", response.status)
-        console.log("[v0][PagSeguro Webhook] Response headers:", Object.fromEntries(response.headers.entries()))
+        console.log("[v0][PagSeguro Webhook] Status da consulta alternativa:", alternativeResponse.status)
 
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.log("[v0][PagSeguro Webhook] Erro ao buscar transação:", {
-            status: response.status,
-            statusText: response.statusText,
-            body: errorText,
-          })
-
-          return NextResponse.json({ success: true, message: "Erro ao processar, mas aceito" })
+        if (!alternativeResponse.ok) {
+          const errorText = await alternativeResponse.text()
+          console.log("[v0][PagSeguro Webhook] ERRO na consulta alternativa:", errorText)
+          return NextResponse.json(
+            { success: false, error: "Erro ao consultar transação em ambos os ambientes" },
+            { status: alternativeResponse.status },
+          )
         }
 
-        const xmlText = await response.text()
-        console.log("[v0][PagSeguro Webhook] XML recebido completo:", xmlText)
+        const xmlText = await alternativeResponse.text()
+        console.log(
+          "[v0][PagSeguro Webhook] XML recebido do ambiente alternativo (primeiros 500 chars):",
+          xmlText.substring(0, 500),
+        )
 
+        // Parse XML simples para extrair os dados necessários
         const referenceMatch = xmlText.match(/<reference>(.*?)<\/reference>/)
-        const statusMatch = xmlText.match(/<status>(\d+)<\/status>/)
+        const statusMatch = xmlText.match(/<status>(.*?)<\/status>/)
         const codeMatch = xmlText.match(/<code>(.*?)<\/code>/)
 
         const reference_id = referenceMatch ? referenceMatch[1] : null
-        const statusCode = statusMatch ? Number.parseInt(statusMatch[1]) : null
+        const statusCode = statusMatch ? statusMatch[1] : null
         const transactionCode = codeMatch ? codeMatch[1] : null
 
         console.log("[v0][PagSeguro Webhook] Dados extraídos do XML:", {
@@ -94,31 +109,20 @@ export async function POST(request: NextRequest) {
           transactionCode,
         })
 
-        if (!reference_id) {
-          console.log("[v0][PagSeguro Webhook] Erro: reference_id não encontrado no XML")
-          return NextResponse.json({ success: false, error: "reference_id não encontrado" }, { status: 400 })
+        // Mapear código de status numérico da API v3 para string
+        const statusMap: Record<string, string> = {
+          "1": "WAITING", // Aguardando pagamento
+          "2": "WAITING", // Em análise
+          "3": "PAID", // Paga
+          "4": "PAID", // Disponível
+          "5": "CANCELED", // Em disputa
+          "6": "CANCELED", // Devolvida
+          "7": "CANCELED", // Cancelada
         }
 
-        // Mapear status code numérico para string
-        // 1=Aguardando pagamento, 2=Em análise, 3=Paga, 4=Disponível, 5=Em disputa, 6=Devolvida, 7=Cancelada
-        const statusMap: Record<number, string> = {
-          1: "WAITING",
-          2: "WAITING",
-          3: "PAID",
-          4: "PAID",
-          5: "DECLINED",
-          6: "DECLINED",
-          7: "CANCELED",
-        }
+        const status = statusCode && statusMap[statusCode] ? statusMap[statusCode] : "WAITING"
 
-        const status = statusCode !== null ? statusMap[statusCode] || "WAITING" : "WAITING"
-
-        console.log("[v0][PagSeguro Webhook] Status mapeado:", {
-          statusCode,
-          status,
-        })
-
-        // Criar objeto charge compatível com o fluxo existente
+        // Converter para formato esperado pelo código
         data = {
           charges: [
             {
@@ -129,19 +133,54 @@ export async function POST(request: NextRequest) {
           ],
         }
 
-        console.log("[v0][PagSeguro Webhook] Dados convertidos para processamento:", JSON.stringify(data, null, 2))
-      } catch (fetchError) {
-        console.error("[v0][PagSeguro Webhook] Erro ao buscar notificação:", fetchError)
-        return NextResponse.json(
-          {
-            success: false,
-            error: `Erro ao buscar notificação: ${fetchError}`,
-          },
-          { status: 500 },
-        )
+        console.log("[v0][PagSeguro Webhook] Dados convertidos para formato interno:", JSON.stringify(data, null, 2))
+      } else {
+        const xmlText = await response.text()
+        console.log("[v0][PagSeguro Webhook] XML recebido (primeiros 500 chars):", xmlText.substring(0, 500))
+
+        // Parse XML simples para extrair os dados necessários
+        const referenceMatch = xmlText.match(/<reference>(.*?)<\/reference>/)
+        const statusMatch = xmlText.match(/<status>(.*?)<\/status>/)
+        const codeMatch = xmlText.match(/<code>(.*?)<\/code>/)
+
+        const reference_id = referenceMatch ? referenceMatch[1] : null
+        const statusCode = statusMatch ? statusMatch[1] : null
+        const transactionCode = codeMatch ? codeMatch[1] : null
+
+        console.log("[v0][PagSeguro Webhook] Dados extraídos do XML:", {
+          reference_id,
+          statusCode,
+          transactionCode,
+        })
+
+        // Mapear código de status numérico da API v3 para string
+        const statusMap: Record<string, string> = {
+          "1": "WAITING", // Aguardando pagamento
+          "2": "WAITING", // Em análise
+          "3": "PAID", // Paga
+          "4": "PAID", // Disponível
+          "5": "CANCELED", // Em disputa
+          "6": "CANCELED", // Devolvida
+          "7": "CANCELED", // Cancelada
+        }
+
+        const status = statusCode && statusMap[statusCode] ? statusMap[statusCode] : "WAITING"
+
+        // Converter para formato esperado pelo código
+        data = {
+          charges: [
+            {
+              id: transactionCode,
+              reference_id: reference_id,
+              status: status,
+            },
+          ],
+        }
+
+        console.log("[v0][PagSeguro Webhook] Dados convertidos para formato interno:", JSON.stringify(data, null, 2))
       }
     } else {
-      console.log("[v0][PagSeguro Webhook] Processando como JSON (evento transacional)")
+      console.log("[v0][PagSeguro Webhook] Processando como JSON")
       data = await request.json()
       console.log("[v0][PagSeguro Webhook] JSON recebido:", JSON.stringify(data, null, 2))
     }
