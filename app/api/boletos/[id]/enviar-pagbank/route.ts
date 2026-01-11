@@ -187,7 +187,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           unit_amount: Math.round(valorBoleto * 100),
         },
       ],
-      notification_urls: ["https://gestor9.vercel.app/api/pagbank/webhook"],
       charges: [
         {
           reference_id: boleto.numero,
@@ -228,6 +227,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           },
         },
       ],
+      notification_urls: ["https://gestor9.vercel.app/api/pagbank/webhook"],
     }
 
     console.log("[v0] Enviando ao PagBank:", JSON.stringify(payload, null, 2))
