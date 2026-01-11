@@ -23,10 +23,66 @@ export async function POST(request: NextRequest) {
     if (contentType.includes("application/x-www-form-urlencoded")) {
       console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded")
       const formData = await request.formData()
+
+      const allFields: Record<string, any> = {}
+      formData.forEach((value, key) => {
+        allFields[key] = value
+      })
+
+      console.log("[v0][PagSeguro Webhook] ===== TODOS OS CAMPOS DO FORM-DATA =====")
+      console.log(JSON.stringify(allFields, null, 2))
+      console.log("[v0][PagSeguro Webhook] ===== FIM DOS CAMPOS =====")
+
       const notificationCode = formData.get("notificationCode") as string
       const notificationType = formData.get("notificationType") as string
 
-      console.log("[v0][PagSeguro Webhook] Form data recebido:", { notificationCode, notificationType })
+      const referenceIdDireto = formData.get("reference_id") as string
+      const barcodeDireto = formData.get("barcode") as string
+      const formattedBarcode = formData.get("formatted_barcode") as string
+
+      console.log("[v0][PagSeguro Webhook] Campos principais:", {
+        notificationCode,
+        notificationType,
+        referenceIdDireto,
+        barcodeDireto,
+        formattedBarcode,
+      })
+
+      if (referenceIdDireto) {
+        console.log("[v0][PagSeguro Webhook] ENCONTRADO reference_id DIRETO no webhook:", referenceIdDireto)
+        console.log("[v0][PagSeguro Webhook] Buscando boleto pelo numero =", referenceIdDireto)
+
+        const boletosEncontrados = await query(`SELECT id, numero, status FROM boletos WHERE numero = ?`, [
+          referenceIdDireto,
+        ])
+
+        if (boletosEncontrados.length > 0) {
+          console.log("[v0][PagSeguro Webhook] Boleto encontrado! Atualizando para pago...")
+
+          for (const boleto of boletosEncontrados) {
+            const updateResult = await query(
+              `UPDATE boletos 
+               SET status = 'pago',
+                   data_pagamento = CURRENT_TIMESTAMP,
+                   webhook_notificado = TRUE,
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE id = ?`,
+              [boleto.id],
+            )
+
+            console.log("[v0][PagSeguro Webhook] Boleto atualizado:", {
+              boletoId: boleto.id,
+              affectedRows: updateResult.affectedRows,
+            })
+
+            await processarCashback(boleto.id)
+          }
+
+          return NextResponse.json({ success: true, message: "Boleto atualizado com sucesso via reference_id direto" })
+        } else {
+          console.log("[v0][PagSeguro Webhook] ERRO: Boleto não encontrado com numero =", referenceIdDireto)
+        }
+      }
 
       if (!notificationCode) {
         console.log("[v0][PagSeguro Webhook] ERRO: notificationCode não fornecido")
