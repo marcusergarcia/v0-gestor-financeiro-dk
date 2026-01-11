@@ -34,150 +34,44 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "notificationCode não fornecido" }, { status: 400 })
       }
 
-      console.log("[v0][PagSeguro Webhook] Buscando detalhes da transação via API v3...")
-      const token = process.env.PAGSEGURO_TOKEN
-      const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
+      console.log("[v0][PagSeguro Webhook] Buscando boleto com pagseguro_id =", notificationCode)
 
-      if (!token) {
-        console.log("[v0][PagSeguro Webhook] ERRO: PAGSEGURO_TOKEN não configurado")
-        return NextResponse.json({ success: false, error: "Token PagBank não configurado" }, { status: 500 })
-      }
+      const boletosEncontrados = await query(`SELECT id, numero, status FROM boletos WHERE pagseguro_id = ?`, [
+        notificationCode,
+      ])
 
-      // API v3 do PagSeguro (antiga, retorna XML)
-      const baseUrl =
-        environment === "production" ? "https://ws.pagseguro.uol.com.br" : "https://ws.sandbox.pagseguro.uol.com.br"
+      console.log("[v0][PagSeguro Webhook] Boletos encontrados:", boletosEncontrados.length)
 
-      // Endpoint correto para notificações - usar apenas token sem email
-      const url = `${baseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
-      console.log("[v0][PagSeguro Webhook] URL da consulta:", url.replace(token, "***"))
+      if (boletosEncontrados.length > 0) {
+        for (const boleto of boletosEncontrados) {
+          console.log("[v0][PagSeguro Webhook] Atualizando boleto ID:", boleto.id, "| Número:", boleto.numero)
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Accept: "application/xml",
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          "User-Agent": "Mozilla/5.0",
-        },
-      })
-
-      console.log("[v0][PagSeguro Webhook] Status da consulta:", response.status)
-
-      if (response.status === 406) {
-        const alternativeBaseUrl =
-          environment === "production" ? "https://ws.sandbox.pagseguro.uol.com.br" : "https://ws.pagseguro.uol.com.br"
-        const alternativeUrl = `${alternativeBaseUrl}/v3/transactions/notifications/${notificationCode}?token=${token}`
-        console.log("[v0][PagSeguro Webhook] Tentando ambiente alternativo:", alternativeUrl.replace(token, "***"))
-
-        const alternativeResponse = await fetch(alternativeUrl, {
-          method: "GET",
-          headers: {
-            Accept: "application/xml",
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "User-Agent": "Mozilla/5.0",
-          },
-        })
-
-        console.log("[v0][PagSeguro Webhook] Status da consulta alternativa:", alternativeResponse.status)
-
-        if (!alternativeResponse.ok) {
-          const errorText = await alternativeResponse.text()
-          console.log("[v0][PagSeguro Webhook] ERRO na consulta alternativa:", errorText)
-          return NextResponse.json(
-            { success: false, error: "Erro ao consultar transação em ambos os ambientes" },
-            { status: alternativeResponse.status },
+          // Atualizar para pago
+          const updateResult = await query(
+            `UPDATE boletos 
+             SET status = 'pago',
+                 data_pagamento = CURRENT_TIMESTAMP,
+                 webhook_notificado = TRUE,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [boleto.id],
           )
+
+          console.log("[v0][PagSeguro Webhook] Boleto atualizado:", {
+            boletoId: boleto.id,
+            affectedRows: updateResult.affectedRows,
+            changedRows: updateResult.changedRows,
+          })
+
+          // Processar cashback
+          await processarCashback(boleto.id)
         }
 
-        const xmlText = await alternativeResponse.text()
-        console.log(
-          "[v0][PagSeguro Webhook] XML recebido do ambiente alternativo (primeiros 500 chars):",
-          xmlText.substring(0, 500),
-        )
-
-        // Parse XML simples para extrair os dados necessários
-        const referenceMatch = xmlText.match(/<reference>(.*?)<\/reference>/)
-        const statusMatch = xmlText.match(/<status>(.*?)<\/status>/)
-        const codeMatch = xmlText.match(/<code>(.*?)<\/code>/)
-
-        const reference_id = referenceMatch ? referenceMatch[1] : null
-        const statusCode = statusMatch ? statusMatch[1] : null
-        const transactionCode = codeMatch ? codeMatch[1] : null
-
-        console.log("[v0][PagSeguro Webhook] Dados extraídos do XML:", {
-          reference_id,
-          statusCode,
-          transactionCode,
-        })
-
-        // Mapear código de status numérico da API v3 para string
-        const statusMap: Record<string, string> = {
-          "1": "WAITING", // Aguardando pagamento
-          "2": "WAITING", // Em análise
-          "3": "PAID", // Paga
-          "4": "PAID", // Disponível
-          "5": "CANCELED", // Em disputa
-          "6": "CANCELED", // Devolvida
-          "7": "CANCELED", // Cancelada
-        }
-
-        const status = statusCode && statusMap[statusCode] ? statusMap[statusCode] : "WAITING"
-
-        // Converter para formato esperado pelo código
-        data = {
-          charges: [
-            {
-              id: transactionCode,
-              reference_id: reference_id,
-              status: status,
-            },
-          ],
-        }
-
-        console.log("[v0][PagSeguro Webhook] Dados convertidos para formato interno:", JSON.stringify(data, null, 2))
+        console.log("[v0][PagSeguro Webhook] ===== PROCESSAMENTO CONCLUÍDO =====")
+        return NextResponse.json({ success: true, message: `${boletosEncontrados.length} boleto(s) atualizado(s)` })
       } else {
-        const xmlText = await response.text()
-        console.log("[v0][PagSeguro Webhook] XML recebido (primeiros 500 chars):", xmlText.substring(0, 500))
-
-        // Parse XML simples para extrair os dados necessários
-        const referenceMatch = xmlText.match(/<reference>(.*?)<\/reference>/)
-        const statusMatch = xmlText.match(/<status>(.*?)<\/status>/)
-        const codeMatch = xmlText.match(/<code>(.*?)<\/code>/)
-
-        const reference_id = referenceMatch ? referenceMatch[1] : null
-        const statusCode = statusMatch ? statusMatch[1] : null
-        const transactionCode = codeMatch ? codeMatch[1] : null
-
-        console.log("[v0][PagSeguro Webhook] Dados extraídos do XML:", {
-          reference_id,
-          statusCode,
-          transactionCode,
-        })
-
-        // Mapear código de status numérico da API v3 para string
-        const statusMap: Record<string, string> = {
-          "1": "WAITING", // Aguardando pagamento
-          "2": "WAITING", // Em análise
-          "3": "PAID", // Paga
-          "4": "PAID", // Disponível
-          "5": "CANCELED", // Em disputa
-          "6": "CANCELED", // Devolvida
-          "7": "CANCELED", // Cancelada
-        }
-
-        const status = statusCode && statusMap[statusCode] ? statusMap[statusCode] : "WAITING"
-
-        // Converter para formato esperado pelo código
-        data = {
-          charges: [
-            {
-              id: transactionCode,
-              reference_id: reference_id,
-              status: status,
-            },
-          ],
-        }
-
-        console.log("[v0][PagSeguro Webhook] Dados convertidos para formato interno:", JSON.stringify(data, null, 2))
+        console.log("[v0][PagSeguro Webhook] AVISO: Nenhum boleto encontrado com pagseguro_id =", notificationCode)
+        return NextResponse.json({ success: true, message: "Boleto não encontrado, mas notificação aceita" })
       }
     } else {
       console.log("[v0][PagSeguro Webhook] Processando como JSON")
