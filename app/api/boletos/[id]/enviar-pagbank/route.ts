@@ -109,7 +109,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const boleto = boletos[0]
 
-    if (boleto.pagseguro_id && !force) {
+    if (boleto.charge_id && !force) {
       return NextResponse.json(
         {
           success: false,
@@ -227,17 +227,19 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     console.log("[v0] Boleto criado no PagBank:", boletoPagSeguro.id)
 
+    const orderId = boletoPagSeguro.id // ORDE_XXXX
     const charge = boletoPagSeguro?.charges?.[0]
+    const chargeId = charge?.id // CHAR_XXXX
     const boletoInfo = charge?.payment_method?.boleto
     const linkPDF = charge?.links?.find((l: any) => l.media === "application/pdf")?.href
     const linkPNG = charge?.links?.find((l: any) => l.media === "image/png")?.href
 
-    // Atualizar boleto no banco
     await query(
       `
       UPDATE boletos 
       SET 
-        pagseguro_id = ?,
+        order_id = ?,
+        charge_id = ?,
         linha_digitavel = ?,
         codigo_barras = ?,
         link_pdf = ?,
@@ -247,7 +249,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       WHERE id = ?
     `,
       [
-        charge?.id || null,
+        orderId || null,
+        chargeId || null,
         boletoInfo?.formatted_barcode || null,
         boletoInfo?.barcode || null,
         linkPDF || null,
@@ -257,13 +260,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       ],
     )
 
-    console.log("[v0] Boleto atualizado no banco com sucesso")
+    console.log("[v0] Boleto atualizado no banco com order_id e charge_id")
 
     return NextResponse.json({
       success: true,
       message: "Boleto enviado ao PagBank com sucesso!",
       data: {
-        pagseguro_id: charge?.id,
+        order_id: orderId,
+        charge_id: chargeId,
         linha_digitavel: boletoInfo?.formatted_barcode,
         codigo_barras: boletoInfo?.barcode,
         link_pdf: linkPDF,

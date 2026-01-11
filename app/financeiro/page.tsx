@@ -62,8 +62,8 @@ interface Boleto {
   created_at: string
   link_pdf?: string
   link_impressao?: string
-  pagseguro_id?: string | null // Added field to check if sent to PagBank
-  linha_digitavel?: string | null // Added field to check if line is generated
+  charge_id?: string | null // Renomeado de pagseguro_id para charge_id
+  linha_digitavel?: string | null
 }
 
 interface Recibo {
@@ -893,7 +893,7 @@ export default function FinanceiroPage() {
                                   <Eye className="h-4 w-4" />
                                 </Button>
 
-                                {boleto.pagseguro_id && !boleto.linha_digitavel && (
+                                {boleto.charge_id && !boleto.linha_digitavel && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -910,8 +910,8 @@ export default function FinanceiroPage() {
                                   </Button>
                                 )}
 
-                                {/* Botão Enviar para PagBank - só aparece quando NÃO tem pagseguro_id */}
-                                {!boleto.pagseguro_id && (
+                                {/* Botão Enviar para PagBank - só aparece quando NÃO tem charge_id */}
+                                {!boleto.charge_id && (
                                   <Button
                                     variant="outline"
                                     size="sm"

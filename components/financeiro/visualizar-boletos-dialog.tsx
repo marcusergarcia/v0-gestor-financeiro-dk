@@ -34,7 +34,7 @@ interface Boleto {
   total_parcelas: number
   observacoes?: string
   created_at: string
-  pagseguro_id?: string
+  charge_id?: string // Renomeado de pagseguro_id para charge_id
   linha_digitavel?: string
   codigo_barras?: string
   link_pdf?: string
@@ -381,7 +381,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                               <Badge variant="outline" className="font-mono">
                                 {boleto.numero}
                               </Badge>
-                              {boleto.pagseguro_id && (
+                              {boleto.charge_id && (
                                 <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">
                                   <CreditCard className="h-3 w-3 mr-1" />
                                   PagSeguro
@@ -448,7 +448,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                                     Imprimir Boleto
                                   </Button>
                                 )}
-                                {!boleto.pagseguro_id && <span className="text-xs text-gray-500">Boleto interno</span>}
+                                {!boleto.charge_id && <span className="text-xs text-gray-500">Boleto interno</span>}
                               </div>
                             </TableCell>
                           </TableRow>

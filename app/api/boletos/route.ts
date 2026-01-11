@@ -252,7 +252,7 @@ export async function POST(request: NextRequest) {
           total_parcelas, 
           observacoes,
           forma_pagamento,
-          pagseguro_id,
+          charge_id,
           linha_digitavel,
           codigo_barras,
           link_pdf,
@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
           parcelas.length,
           null,
           forma_pagamento || "boleto",
-          null, // pagseguro_id começa como null
+          null, // charge_id começa como null
           null, // linha_digitavel
           null, // codigo_barras
           null, // link_pdf
