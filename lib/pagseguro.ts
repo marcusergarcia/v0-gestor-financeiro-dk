@@ -78,6 +78,7 @@ interface BoletoData {
       }>
     }
   }[]
+  notification_urls?: string[]
 }
 
 interface PayoutData {
@@ -213,6 +214,7 @@ export class PagSeguroAPI {
       },
       items: data.items,
       charges: data.charges,
+      ...(data.notification_urls && { notification_urls: data.notification_urls }),
     }
 
     console.log("[PagSeguro] Criando pedido com boleto:", JSON.stringify(payload, null, 2))
