@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   console.log("[v0][PagSeguro Webhook] ===== WEBHOOK RECEBIDO =====")
   console.log("[v0][PagSeguro Webhook] Timestamp:", new Date().toISOString())
-  console.log("[v0][PagSeguro Webhook] Headers:", Object.fromEntries(request.headers.entries()))
 
   try {
     const contentType = request.headers.get("content-type") || ""
@@ -22,208 +21,119 @@ export async function POST(request: NextRequest) {
     let data: any
 
     if (contentType.includes("application/x-www-form-urlencoded")) {
-      console.log("[v0][PagSeguro Webhook] Processando como form-urlencoded")
+      console.log("[v0][PagSeguro Webhook] ⚠️  FORMATO ANTIGO DETECTADO (API v3)")
+      console.log("[v0][PagSeguro Webhook] ⚠️  Configure o webhook no PagBank para enviar JSON (API v4)")
+      console.log(
+        "[v0][PagSeguro Webhook] ⚠️  Acesse: https://minhaconta.pagseguro.uol.com.br/preferencias/integracoes.jhtml",
+      )
+
       const formData = await request.formData()
       const notificationCode = formData.get("notificationCode") as string
-      const notificationType = formData.get("notificationType") as string
 
-      console.log("[v0][PagSeguro Webhook] Form data recebido:", { notificationCode, notificationType })
+      console.log("[v0][PagSeguro Webhook] notificationCode recebido:", notificationCode)
+      console.log("[v0][PagSeguro Webhook] ❌ Não é possível processar - precisa de formato JSON (API v4)")
 
-      if (!notificationCode) {
-        console.log("[v0][PagSeguro Webhook] ERRO: notificationCode não fornecido")
-        return NextResponse.json({ success: false, error: "notificationCode não fornecido" }, { status: 400 })
-      }
-
-      console.log("[v0][PagSeguro Webhook] Consultando API PagBank com notificationCode:", notificationCode)
-
-      const token = process.env.PAGSEGURO_TOKEN
-      const environment = process.env.PAGSEGURO_ENVIRONMENT || "sandbox"
-      const baseUrl = environment === "production" ? "https://api.pagseguro.com" : "https://sandbox.api.pagseguro.com"
-
-      try {
-        // Tentar consultar via API v4 (moderna)
-        const chargeResponse = await fetch(`${baseUrl}/charges/${notificationCode}`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        console.log("[v0][PagSeguro Webhook] Resposta API PagBank:", chargeResponse.status)
-
-        if (chargeResponse.ok) {
-          const chargeData = await chargeResponse.json()
-          console.log("[v0][PagSeguro Webhook] Dados da charge:", JSON.stringify(chargeData, null, 2))
-
-          const referenceId = chargeData.reference_id
-          const status = chargeData.status
-
-          console.log("[v0][PagSeguro Webhook] Reference ID (número boleto):", referenceId)
-          console.log("[v0][PagSeguro Webhook] Status:", status)
-
-          if (!referenceId) {
-            console.log("[v0][PagSeguro Webhook] ERRO: reference_id não retornado pela API")
-            return NextResponse.json({ success: true, message: "reference_id não encontrado" })
-          }
-
-          // Buscar boleto pelo número (reference_id)
-          const boletosEncontrados = await query(`SELECT id, numero, status FROM boletos WHERE numero = ?`, [
-            referenceId,
-          ])
-
-          console.log("[v0][PagSeguro Webhook] Boletos encontrados:", boletosEncontrados.length)
-
-          if (boletosEncontrados.length > 0) {
-            for (const boleto of boletosEncontrados) {
-              console.log("[v0][PagSeguro Webhook] Atualizando boleto ID:", boleto.id, "| Número:", boleto.numero)
-
-              // Atualizar para pago se status for PAID
-              const statusMapeado = status === "PAID" ? "pago" : mapPagSeguroStatus(status)
-
-              const updateResult = await query(
-                `UPDATE boletos 
-                 SET status = ?,
-                     data_pagamento = ${status === "PAID" ? "CURRENT_TIMESTAMP" : "data_pagamento"},
-                     webhook_notificado = TRUE,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = ?`,
-                [statusMapeado, boleto.id],
-              )
-
-              console.log("[v0][PagSeguro Webhook] Boleto atualizado:", {
-                boletoId: boleto.id,
-                statusMapeado,
-                affectedRows: updateResult.affectedRows,
-                changedRows: updateResult.changedRows,
-              })
-
-              // Processar cashback se pago
-              if (status === "PAID") {
-                await processarCashback(boleto.id)
-              }
-            }
-
-            console.log("[v0][PagSeguro Webhook] ===== PROCESSAMENTO CONCLUÍDO =====")
-            return NextResponse.json({ success: true, message: `${boletosEncontrados.length} boleto(s) atualizado(s)` })
-          } else {
-            console.log("[v0][PagSeguro Webhook] AVISO: Nenhum boleto encontrado com numero =", referenceId)
-            return NextResponse.json({ success: true, message: "Boleto não encontrado, mas notificação aceita" })
-          }
-        } else {
-          const errorText = await chargeResponse.text()
-          console.log("[v0][PagSeguro Webhook] ERRO na API PagBank:", chargeResponse.status, errorText)
-          return NextResponse.json({ success: true, message: "Erro ao consultar API PagBank, mas notificação aceita" })
-        }
-      } catch (apiError) {
-        console.error("[v0][PagSeguro Webhook] ERRO ao consultar API:", apiError)
-        return NextResponse.json({ success: true, message: "Erro de conexão com API, mas notificação aceita" })
-      }
-    } else {
-      console.log("[v0][PagSeguro Webhook] Processando como JSON")
-      data = await request.json()
-      console.log("[v0][PagSeguro Webhook] JSON recebido:", JSON.stringify(data, null, 2))
+      // Retornar sucesso para não ficar recebendo tentativas infinitas
+      return NextResponse.json({
+        success: true,
+        message: "Webhook configurado incorretamente. Use formato JSON da API v4",
+      })
     }
 
-    const { charges } = data
+    console.log("[v0][PagSeguro Webhook] ✅ Formato correto detectado (JSON - API v4)")
+    data = await request.json()
+    console.log("[v0][PagSeguro Webhook] Payload completo:", JSON.stringify(data, null, 2))
 
-    // Processar eventos transacionais (PAID, WAITING, etc)
+    const { charges, reference_id: orderReferenceId } = data
+
+    console.log("[v0][PagSeguro Webhook] reference_id do pedido:", orderReferenceId || "NÃO ENCONTRADO")
     console.log("[v0][PagSeguro Webhook] Charges encontradas:", charges?.length || 0)
 
-    if (charges && charges.length > 0) {
-      for (const charge of charges) {
-        const { id: pagseguroId, reference_id, status } = charge
+    if (!charges || charges.length === 0) {
+      console.log("[v0][PagSeguro Webhook] ⚠️  Nenhuma charge no payload")
+      return NextResponse.json({ success: true, message: "Nenhuma charge para processar" })
+    }
 
-        console.log("[v0][PagSeguro Webhook] Processando charge:", {
-          pagseguroId,
-          reference_id,
-          status,
-        })
+    for (const charge of charges) {
+      const { id: chargeId, reference_id, status, payment_method } = charge
 
-        let boletoExistente = await query(`SELECT id, status, numero FROM boletos WHERE pagseguro_id = ?`, [
-          pagseguroId,
-        ])
+      console.log("[v0][PagSeguro Webhook] ===== PROCESSANDO CHARGE =====")
+      console.log("[v0][PagSeguro Webhook] Charge ID:", chargeId)
+      console.log("[v0][PagSeguro Webhook] Reference ID:", reference_id)
+      console.log("[v0][PagSeguro Webhook] Status:", status)
 
-        // Se não encontrar por pagseguro_id, tentar por reference_id
-        if (boletoExistente.length === 0 && reference_id) {
-          console.log("[v0][PagSeguro Webhook] Tentando buscar por reference_id:", reference_id)
-          boletoExistente = await query(`SELECT id, status, numero FROM boletos WHERE numero = ?`, [reference_id])
-        }
+      if (!reference_id) {
+        console.log("[v0][PagSeguro Webhook] ❌ reference_id não encontrado nesta charge")
+        continue
+      }
 
-        console.log(
-          "[v0][PagSeguro Webhook] Boleto encontrado:",
-          boletoExistente.length > 0 ? JSON.stringify(boletoExistente[0]) : "Não encontrado",
-        )
+      console.log("[v0][PagSeguro Webhook] 🔍 Buscando boleto com numero =", reference_id)
 
-        if (boletoExistente.length === 0) {
-          console.log(
-            "[v0][PagSeguro Webhook] ERRO: Boleto não encontrado no banco. PagSeguro ID:",
-            pagseguroId,
-            "Reference ID:",
-            reference_id,
-          )
-          continue
-        }
+      const boletosEncontrados = await query(
+        `SELECT id, numero, status, valor, cliente_id FROM boletos WHERE numero = ?`,
+        [reference_id],
+      )
 
-        const boletoId = boletoExistente[0].id
-        const statusAtual = boletoExistente[0].status
+      console.log("[v0][PagSeguro Webhook] Boletos encontrados:", boletosEncontrados.length)
 
-        // Atualizar boleto no banco de dados
-        const statusMapeado = mapPagSeguroStatus(status)
-        console.log(
-          "[v0][PagSeguro Webhook] Status atual:",
-          statusAtual,
-          "| Status PagBank:",
-          status,
-          "| Status mapeado:",
-          statusMapeado,
-        )
+      if (boletosEncontrados.length === 0) {
+        console.log("[v0][PagSeguro Webhook] ❌ Boleto NÃO ENCONTRADO no banco com numero:", reference_id)
+        continue
+      }
+
+      const boleto = boletosEncontrados[0]
+      console.log("[v0][PagSeguro Webhook] ✅ Boleto encontrado:")
+      console.log("[v0][PagSeguro Webhook]   - ID:", boleto.id)
+      console.log("[v0][PagSeguro Webhook]   - Número:", boleto.numero)
+      console.log("[v0][PagSeguro Webhook]   - Status atual:", boleto.status)
+      console.log("[v0][PagSeguro Webhook]   - Valor:", boleto.valor)
+
+      const statusMapeado = mapPagSeguroStatus(status)
+      console.log("[v0][PagSeguro Webhook] Status PagBank:", status, "-> Status local:", statusMapeado)
+
+      if (status === "PAID") {
+        console.log("[v0][PagSeguro Webhook] 💰 STATUS PAGO - Atualizando boleto...")
 
         const updateResult = await query(
           `UPDATE boletos 
-           SET status = ?, 
+           SET status = 'pago',
+               data_pagamento = CURRENT_TIMESTAMP,
                pagseguro_status = ?,
                webhook_notificado = TRUE,
                updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`,
-          [statusMapeado, status, boletoId],
+          [status, boleto.id],
         )
 
-        console.log("[v0][PagSeguro Webhook] UPDATE executado:", {
-          affectedRows: updateResult.affectedRows,
-          changedRows: updateResult.changedRows,
-          boletoId,
-          statusMapeado,
-        })
+        console.log("[v0][PagSeguro Webhook] ✅ Boleto atualizado para PAGO")
+        console.log("[v0][PagSeguro Webhook]   - Linhas afetadas:", updateResult.affectedRows)
+        console.log("[v0][PagSeguro Webhook]   - Linhas modificadas:", updateResult.changedRows)
 
-        if (status === "PAID") {
-          console.log("[v0][PagSeguro Webhook] Status PAID - atualizando data_pagamento para boleto ID:", boletoId)
+        // Processar cashback
+        await processarCashback(boleto.id)
+      } else {
+        console.log("[v0][PagSeguro Webhook] Atualizando status do boleto...")
 
-          const paymentResult = await query(
-            `UPDATE boletos 
-             SET data_pagamento = CURRENT_TIMESTAMP
-             WHERE id = ?`,
-            [boletoId],
-          )
+        const updateResult = await query(
+          `UPDATE boletos 
+           SET status = ?,
+               pagseguro_status = ?,
+               webhook_notificado = TRUE,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [statusMapeado, status, boleto.id],
+        )
 
-          console.log("[v0][PagSeguro Webhook] Data pagamento atualizada:", {
-            affectedRows: paymentResult.affectedRows,
-            changedRows: paymentResult.changedRows,
-          })
-
-          // Processar cashback se configurado
-          console.log("[v0][PagSeguro Webhook] Processando cashback...")
-          await processarCashback(boletoId)
-        }
+        console.log("[v0][PagSeguro Webhook] ✅ Boleto atualizado")
+        console.log("[v0][PagSeguro Webhook]   - Novo status:", statusMapeado)
+        console.log("[v0][PagSeguro Webhook]   - Linhas afetadas:", updateResult.affectedRows)
       }
-    } else {
-      console.log("[v0][PagSeguro Webhook] AVISO: Nenhuma charge encontrada no payload")
     }
 
     console.log("[v0][PagSeguro Webhook] ===== PROCESSAMENTO CONCLUÍDO =====")
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, message: "Webhook processado com sucesso" })
   } catch (error) {
-    console.error("[v0][PagSeguro Webhook] ERRO FATAL:", error)
+    console.error("[v0][PagSeguro Webhook] ❌ ERRO FATAL:", error)
     console.error("[v0][PagSeguro Webhook] Stack:", error instanceof Error ? error.stack : "N/A")
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
   }
@@ -242,7 +152,6 @@ function mapPagSeguroStatus(pagseguroStatus: string): string {
 
 async function processarCashback(boletoId: string) {
   try {
-    // Buscar boleto e cliente
     const boletos = await query(
       `SELECT b.*, c.telefone, c.id as cliente_id
        FROM boletos b
@@ -255,21 +164,16 @@ async function processarCashback(boletoId: string) {
 
     const boleto = boletos[0]
 
-    // Verificar se cashback está ativo
     const configs = await query(`SELECT valor FROM configuracoes_pagseguro WHERE chave = 'cashback_ativo'`)
-
     if (configs.length === 0 || configs[0].valor !== "true") return
 
-    // Buscar percentual de cashback
     const percentualConfigs = await query(
       `SELECT valor FROM configuracoes_pagseguro WHERE chave = 'cashback_percentual_padrao'`,
     )
 
     const percentual = percentualConfigs.length > 0 ? Number.parseFloat(percentualConfigs[0].valor) : 2.0
-
     const valorCashback = (boleto.valor * percentual) / 100
 
-    // Registrar cashback
     await query(
       `INSERT INTO cashback 
        (cliente_id, telefone, valor_compra, percentual_cashback, valor_cashback, status, boleto_id, data_compra)
@@ -277,8 +181,8 @@ async function processarCashback(boletoId: string) {
       [boleto.cliente_id, boleto.telefone, boleto.valor, percentual, valorCashback, boletoId],
     )
 
-    console.log(`[Cashback] Registrado R$ ${valorCashback} para cliente ${boleto.cliente_id}`)
+    console.log(`[v0][Cashback] ✅ Registrado R$ ${valorCashback} para cliente ${boleto.cliente_id}`)
   } catch (error) {
-    console.error("[Cashback] Erro ao processar:", error)
+    console.error("[v0][Cashback] ❌ Erro ao processar:", error)
   }
 }
