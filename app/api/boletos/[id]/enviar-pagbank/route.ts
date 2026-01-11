@@ -163,6 +163,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const payload = {
       reference_id: boleto.numero,
+      notification_urls: [`${process.env.NEXT_PUBLIC_APP_URL}/api/pagseguro/webhook`],
       customer: {
         name: boleto.cliente_nome,
         email: emailValido,
@@ -241,6 +242,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         codigo_barras = ?,
         link_pdf = ?,
         link_impressao = ?,
+        notification_urls = ?,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `,
@@ -250,6 +252,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         boletoInfo?.barcode || null,
         linkPDF || null,
         linkPNG || null,
+        `${process.env.NEXT_PUBLIC_APP_URL}/api/pagseguro/webhook`,
         id,
       ],
     )
