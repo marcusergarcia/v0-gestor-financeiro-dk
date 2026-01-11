@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     if (!contentType.includes("application/json")) {
       console.log("[PagBank Webhook] Ignorando webhook não-JSON (API v3 antiga)")
-      return NextResponse.json({ ok: true }, { status: 200 })
+      return NextResponse.json({ success: true }, { status: 200 })
     }
 
     const payload = await request.json()
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     if (!charges || !Array.isArray(charges) || charges.length === 0) {
       console.log("[PagBank Webhook] ERRO: charges array está ausente ou vazio")
-      return NextResponse.json({ ok: true }, { status: 200 })
+      return NextResponse.json({ success: true }, { status: 200 })
     }
 
     for (const charge of charges) {
@@ -87,58 +87,55 @@ export async function POST(request: NextRequest) {
 
       console.log("[PagBank Webhook] ✓ Boleto atualizado para PAGO:", {
         numero: boleto.numero,
-        affectedRows: result.affectedRows,
+        charge_id: charge_id,
+        rowsAffected: result.affectedRows,
       })
-
-      if (result.affectedRows > 0) {
-        await processarCashback(boleto.id)
-      }
     }
 
     console.log("[PagBank Webhook] ===== WEBHOOK PROCESSADO COM SUCESSO =====")
-    return NextResponse.json({ ok: true }, { status: 200 })
+    return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
     console.error("[PagBank Webhook] ERRO:", error)
-    return NextResponse.json({ ok: true }, { status: 200 })
+    return NextResponse.json({ success: true }, { status: 200 })
   }
 }
 
-async function processarCashback(boletoId: number) {
-  try {
-    const boletos = await query(
-      `SELECT b.*, c.telefone, c.id as cliente_id
-       FROM boletos b
-       JOIN clientes c ON b.cliente_id = c.id
-       WHERE b.id = ?`,
-      [boletoId],
-    )
+// async function processarCashback(boletoId: number) {
+//   try {
+//     const boletos = await query(
+//       `SELECT b.*, c.telefone, c.id as cliente_id
+//        FROM boletos b
+//        JOIN clientes c ON b.cliente_id = c.id
+//        WHERE b.id = ?`,
+//       [boletoId],
+//     )
 
-    if (boletos.length === 0) return
+//     if (boletos.length === 0) return
 
-    const boleto = boletos[0]
+//     const boleto = boletos[0]
 
-    const configs = await query(`SELECT valor FROM configuracoes_pagseguro WHERE chave = 'cashback_ativo'`)
+//     const configs = await query(`SELECT valor FROM configuracoes_pagseguro WHERE chave = 'cashback_ativo'`)
 
-    if (configs.length === 0 || configs[0].valor !== "true") return
+//     if (configs.length === 0 || configs[0].valor !== "true") return
 
-    const percentualConfigs = await query(
-      `SELECT valor FROM configuracoes_pagseguro WHERE chave = 'cashback_percentual_padrao'`,
-    )
+//     const percentualConfigs = await query(
+//       `SELECT valor FROM configuracoes_pagseguro WHERE chave = 'cashback_percentual_padrao'`,
+//     )
 
-    const percentual = percentualConfigs.length > 0 ? Number.parseFloat(percentualConfigs[0].valor) : 2.0
-    const valorCashback = (boleto.valor * percentual) / 100
+//     const percentual = percentualConfigs.length > 0 ? Number.parseFloat(percentualConfigs[0].valor) : 2.0
+//     const valorCashback = (boleto.valor * percentual) / 100
 
-    await query(
-      `INSERT INTO cashback 
-       (cliente_id, telefone, valor_compra, percentual_cashback, valor_cashback, status, boleto_id, data_compra)
-       VALUES (?, ?, ?, ?, ?, 'disponivel', ?, CURRENT_TIMESTAMP)`,
-      [boleto.cliente_id, boleto.telefone, boleto.valor, percentual, valorCashback, boletoId],
-    )
+//     await query(
+//       `INSERT INTO cashback
+//        (cliente_id, telefone, valor_compra, percentual_cashback, valor_cashback, status, boleto_id, data_compra)
+//        VALUES (?, ?, ?, ?, ?, 'disponivel', ?, CURRENT_TIMESTAMP)`,
+//       [boleto.cliente_id, boleto.telefone, boleto.valor, percentual, valorCashback, boletoId],
+//     )
 
-    console.log(
-      `[PagBank Webhook] Cashback registrado: R$ ${valorCashback.toFixed(2)} para cliente ${boleto.cliente_id}`,
-    )
-  } catch (error) {
-    console.error("[PagBank Webhook] Erro ao processar cashback:", error)
-  }
-}
+//     console.log(
+//       `[PagBank Webhook] Cashback registrado: R$ ${valorCashback.toFixed(2)} para cliente ${boleto.cliente_id}`,
+//     )
+//   } catch (error) {
+//     console.error("[PagBank Webhook] Erro ao processar cashback:", error)
+//   }
+// }

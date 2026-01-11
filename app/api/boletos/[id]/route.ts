@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
+    const { id } = params
 
     const [rows] = await pool.execute(
       `
@@ -55,9 +55,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
+    const { id } = params
     const { valor, data_vencimento, data_pagamento, status, observacoes } = await request.json()
 
     // Validações
@@ -138,24 +138,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { id } = await params
+    const { id } = params
 
-    // Verificar se o boleto existe
-    const [existingRows] = await pool.execute("SELECT id, numero FROM boletos WHERE id = ?", [id])
-
-    if (!Array.isArray(existingRows) || existingRows.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Boleto não encontrado",
-        },
-        { status: 404 },
-      )
-    }
-
-    // Excluir o boleto
     await pool.execute("DELETE FROM boletos WHERE id = ?", [id])
 
     return NextResponse.json({
