@@ -155,14 +155,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const descricao_produto = `NOTA FISCAL - ${numero_nota} - ${data_nota} - Parcelas 1/${numero_parcelas}`
+    const dataFormatada = new Date(data_nota).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+    })
+
+    const descricao_produto = `NOTA FISCAL Nº ${numero_nota} - ${dataFormatada} - Parcelas 1/${numero_parcelas}`
 
     const parcelas = []
     const valorParcela = valor_total / numero_parcelas
     let dataVencimento = new Date(primeiro_vencimento)
 
     for (let i = 1; i <= numero_parcelas; i++) {
-      const descricaoParcela = `NOTA FISCAL - ${numero_nota} - ${data_nota} - Parcela ${i}`
+      const descricaoParcela = `NOTA FISCAL Nº ${numero_nota} - ${dataFormatada} - Parcela ${i}/${numero_parcelas}`
 
       parcelas.push({
         parcela: i,
