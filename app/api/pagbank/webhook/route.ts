@@ -19,58 +19,77 @@ export async function POST(request: NextRequest) {
     console.log("[v0][PagBank Webhook] Content-Type:", contentType)
 
     if (!contentType.includes("application/json")) {
-      console.log("[v0][PagBank Webhook] Ignorando webhook não-JSON (API v3 antiga)")
+      console.log("[v0][PagBank Webhook] ✅ Ignorando webhook não-JSON (API v3 antiga)")
       return NextResponse.json({ success: true }, { status: 200 })
     }
 
     const payload = await request.json()
     console.log("[v0][PagBank Webhook] Payload recebido:", JSON.stringify(payload, null, 2))
 
+    const orderId = payload.id // ORDE_XXXX
+    const referenceId = payload.reference_id
     const charges = payload.charges || []
+
+    console.log("[v0][PagBank Webhook] Order ID:", orderId)
+    console.log("[v0][PagBank Webhook] Reference ID:", referenceId)
     console.log("[v0][PagBank Webhook] Total de charges:", charges.length)
 
     for (const charge of charges) {
       const chargeId = charge.id // CHAR_XXXX
-      const status = charge.status // PAID, WAITING, etc
+      const status = charge.status // PAID, WAITING, CANCELED, etc
       const paidAt = charge.paid_at
 
-      console.log("[v0][PagBank Webhook] Processando charge:", chargeId, "Status:", status)
+      console.log("[v0][PagBank Webhook] ─────────────────────────")
+      console.log("[v0][PagBank Webhook] Processando charge:", chargeId)
+      console.log("[v0][PagBank Webhook] Status:", status)
+      console.log("[v0][PagBank Webhook] Paid At:", paidAt)
 
       if (status === "PAID") {
+        console.log("[v0][PagBank Webhook] 💰 Status PAID confirmado - iniciando atualização")
         console.log("[v0][PagBank Webhook] Buscando boleto com charge_id =", chargeId)
 
         const boletos = await query(`SELECT id, numero, status FROM boletos WHERE charge_id = ?`, [chargeId])
 
         if (boletos.length === 0) {
-          console.log("[v0][PagBank Webhook] AVISO: Boleto não encontrado para charge_id =", chargeId)
+          console.log("[v0][PagBank Webhook] ⚠️ AVISO: Boleto não encontrado para charge_id =", chargeId)
           continue
         }
 
         const boleto = boletos[0]
-        console.log("[v0][PagBank Webhook] Boleto encontrado:", boleto.numero, "Status atual:", boleto.status)
+        console.log("[v0][PagBank Webhook] ✅ Boleto encontrado:", boleto.numero)
+        console.log("[v0][PagBank Webhook] Status atual no banco:", boleto.status)
+
+        if (boleto.status === "pago") {
+          console.log("[v0][PagBank Webhook] ℹ️ IDEMPOTÊNCIA: Boleto já está pago, ignorando webhook duplicado")
+          continue
+        }
 
         const result = await query(
           `UPDATE boletos 
            SET status = 'pago',
                data_pagamento = ?,
                updated_at = CURRENT_TIMESTAMP
-           WHERE id = ?`,
+           WHERE id = ? AND status != 'pago'`,
           [paidAt || new Date().toISOString(), boleto.id],
         )
 
-        console.log("[v0][PagBank Webhook] Boleto atualizado para PAGO:", {
+        console.log("[v0][PagBank Webhook] 🎉 Boleto atualizado para PAGO:", {
           numero: boleto.numero,
           affectedRows: result.affectedRows,
         })
 
-        // Processar cashback
-        await processarCashback(boleto.id)
+        if (result.affectedRows > 0) {
+          await processarCashback(boleto.id)
+        }
+      } else {
+        console.log("[v0][PagBank Webhook] ℹ️ Status não é PAID, ignorando")
       }
     }
 
+    console.log("[v0][PagBank Webhook] ===== WEBHOOK PROCESSADO COM SUCESSO =====")
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
-    console.error("[v0][PagBank Webhook] ERRO:", error)
+    console.error("[v0][PagBank Webhook] ❌ ERRO:", error)
     return NextResponse.json({ success: true }, { status: 200 })
   }
 }
@@ -107,8 +126,8 @@ async function processarCashback(boletoId: number) {
       [boleto.cliente_id, boleto.telefone, boleto.valor, percentual, valorCashback, boletoId],
     )
 
-    console.log(`[v0][Cashback] Registrado R$ ${valorCashback.toFixed(2)} para cliente ${boleto.cliente_id}`)
+    console.log(`[v0][Cashback] ✅ Registrado R$ ${valorCashback.toFixed(2)} para cliente ${boleto.cliente_id}`)
   } catch (error) {
-    console.error("[v0][Cashback] Erro ao processar:", error)
+    console.error("[v0][Cashback] ❌ Erro ao processar:", error)
   }
 }
