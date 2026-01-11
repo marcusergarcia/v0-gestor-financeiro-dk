@@ -23,10 +23,10 @@
 
 Execute o script SQL para criar as tabelas necessárias:
 
-\`\`\`bash
+```bash
 # No MySQL
 source scripts/update-boletos-pagseguro.sql
-\`\`\`
+```
 
 Ou copie e cole o conteúdo do arquivo `/scripts/update-boletos-pagseguro.sql` no seu cliente MySQL.
 
@@ -42,23 +42,23 @@ Ou copie e cole o conteúdo do arquivo `/scripts/update-boletos-pagseguro.sql` n
 
 Na seção **Vars** da barra lateral, adicione:
 
-\`\`\`
+```
 PAGSEGURO_TOKEN=seu_token_aqui
 PAGSEGURO_ENVIRONMENT=sandbox
-\`\`\`
+```
 
 Para produção, altere para:
-\`\`\`
+```
 PAGSEGURO_ENVIRONMENT=production
-\`\`\`
+```
 
 ### 4. Configurar Webhook no PagSeguro
 
 1. No painel do PagSeguro, vá em **Integrações** > **Notificações**
 2. Configure a URL de webhook:
-   \`\`\`
-   https://seu-dominio.vercel.app/api/pagseguro/webhook
-   \`\`\`
+   ```
+   https://seu-dominio.vercel.app/api/pagbank/webhook
+   ```
 3. Marque todas as notificações relacionadas a:
    - Pagamentos (charges)
    - Boletos
@@ -147,7 +147,7 @@ PAGSEGURO_ENVIRONMENT=production
 - `GET /api/pagseguro/payout` - Listar pagamentos
 
 ### Webhook
-- `POST /api/pagseguro/webhook` - Receber notificações do PagSeguro
+- `POST /api/pagbank/webhook` - Receber notificações do PagBank
 
 ## Estrutura de Tabelas
 
@@ -179,7 +179,7 @@ PAGSEGURO_ENVIRONMENT=production
 ### Erro: "Webhook não está recebendo notificações"
 - Verifique se a URL do webhook está configurada corretamente no painel PagSeguro
 - Certifique-se que a URL é acessível publicamente (não localhost)
-- Verifique logs em `/api/pagseguro/webhook`
+- Verifique logs em `/api/pagbank/webhook`
 
 ### Erro: "Boleto não foi criado no PagSeguro"
 - Verifique se o token está correto e válido

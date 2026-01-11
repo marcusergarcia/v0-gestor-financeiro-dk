@@ -56,7 +56,7 @@ A página de redirecionamento receberá os seguintes parâmetros na URL:
 
 O webhook já está implementado em:
 ```
-https://seu-dominio.vercel.app/api/pagseguro/webhook
+https://seu-dominio.vercel.app/api/pagbank/webhook
 ```
 
 ### Configurando no PagSeguro
@@ -64,7 +64,7 @@ https://seu-dominio.vercel.app/api/pagseguro/webhook
 1. Acesse **Integrações** → **Notificações**
 2. Configure a URL de notificação:
 ```
-https://seu-dominio.vercel.app/api/pagseguro/webhook
+https://seu-dominio.vercel.app/api/pagbank/webhook
 ```
 
 3. Selecione os eventos que deseja receber:

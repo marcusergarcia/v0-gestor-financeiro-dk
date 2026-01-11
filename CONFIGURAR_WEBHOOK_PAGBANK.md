@@ -20,7 +20,7 @@ Você precisa configurar a URL do webhook no painel do PagBank para que eles env
 
 **URL do Webhook (sua aplicação):**
 ```
-https://gestor9.vercel.app/api/pagseguro/webhook
+https://gestor9.vercel.app/api/pagbank/webhook
 ```
 
 ### 3. Configurar Eventos
