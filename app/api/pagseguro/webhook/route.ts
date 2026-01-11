@@ -34,11 +34,20 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "notificationCode não fornecido" }, { status: 400 })
       }
 
-      console.log("[v0][PagSeguro Webhook] Buscando boleto com pagseguro_id =", notificationCode)
+      // O notificationCode não é o pagseguro_id, precisamos usá-lo como reference_id
+      console.log("[v0][PagSeguro Webhook] Buscando boleto com numero (reference_id) =", notificationCode)
 
-      const boletosEncontrados = await query(`SELECT id, numero, status FROM boletos WHERE pagseguro_id = ?`, [
+      let boletosEncontrados = await query(`SELECT id, numero, status FROM boletos WHERE numero = ?`, [
         notificationCode,
       ])
+
+      // Fallback: tentar buscar por pagseguro_id caso o reference_id não funcione
+      if (boletosEncontrados.length === 0) {
+        console.log("[v0][PagSeguro Webhook] Não encontrado por numero, tentando por pagseguro_id")
+        boletosEncontrados = await query(`SELECT id, numero, status FROM boletos WHERE pagseguro_id = ?`, [
+          notificationCode,
+        ])
+      }
 
       console.log("[v0][PagSeguro Webhook] Boletos encontrados:", boletosEncontrados.length)
 
