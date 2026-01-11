@@ -1,15 +1,10 @@
 -- Adicionar campos necessários para integração PagSeguro
 ALTER TABLE boletos
-ADD COLUMN pagseguro_id VARCHAR(100) COMMENT 'ID do boleto no PagSeguro',
-ADD COLUMN linha_digitavel TEXT COMMENT 'Linha digitável do boleto',
-ADD COLUMN codigo_barras TEXT COMMENT 'Código de barras do boleto',
-ADD COLUMN link_pdf TEXT COMMENT 'Link para PDF do boleto',
-ADD COLUMN link_impressao TEXT COMMENT 'Link alternativo para impressão',
-ADD COLUMN qr_code TEXT COMMENT 'QR Code do boleto (se disponível)',
-ADD COLUMN multa DECIMAL(5,2) DEFAULT 2.00 COMMENT 'Percentual de multa',
-ADD COLUMN juros DECIMAL(5,2) DEFAULT 0.033 COMMENT 'Percentual de juros ao dia',
-ADD COLUMN desconto DECIMAL(5,2) DEFAULT 0.00 COMMENT 'Percentual de desconto',
-ADD COLUMN webhook_notificado BOOLEAN DEFAULT FALSE COMMENT 'Se foi notificado via webhook';
+-- Renomeado de pagseguro_id para charge_id seguindo padrão PagBank Orders
+CHANGE COLUMN pagseguro_id charge_id VARCHAR(100) COMMENT 'ID da cobrança no PagBank (CHAR_XXXX)',
+ADD COLUMN IF NOT EXISTS order_id VARCHAR(100) COMMENT 'ID do pedido no PagBank (ORDE_XXXX)',
+ADD COLUMN IF NOT EXISTS notification_urls TEXT COMMENT 'URLs de notificação configuradas',
+ADD COLUMN IF NOT EXISTS webhook_notificado BOOLEAN DEFAULT FALSE COMMENT 'Se foi notificado via webhook';
 
 -- Criar tabela para controle de cashback ClubePag
 CREATE TABLE IF NOT EXISTS cashback (
