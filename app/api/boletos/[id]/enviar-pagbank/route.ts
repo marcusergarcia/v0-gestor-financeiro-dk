@@ -157,7 +157,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const valorMinimo = 0.2
     const valorBoleto = boleto.valor < valorMinimo ? valorMinimo : boleto.valor
 
-    const descricaoBoleto = boleto.descricao_produto || `Boleto ${boleto.numero}`
+    const dataNotaFormatada = boleto.data_nota
+      ? new Date(boleto.data_nota).toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "2-digit",
+        })
+      : ""
+
+    const descricaoBoleto =
+      boleto.numero_nota && boleto.numero_parcela && boleto.total_parcelas
+        ? `NOTA FISCAL Nº ${boleto.numero_nota} - ${dataNotaFormatada} - Parcela ${boleto.numero_parcela}/${boleto.total_parcelas}`
+        : boleto.descricao_produto || `Boleto ${boleto.numero}`
 
     const dueDateFormatted = new Date(boleto.data_vencimento).toISOString().split("T")[0]
 
