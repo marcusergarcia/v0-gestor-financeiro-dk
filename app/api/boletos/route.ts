@@ -271,10 +271,13 @@ export async function POST(request: NextRequest) {
           asaas_customer_id,
           asaas_invoice_url,
           asaas_bankslip_url,
+          asaas_barcode,
+          asaas_linha_digitavel,
+          asaas_nosso_numero,
           gateway,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `,
         [
           numeroBoleto,
@@ -299,6 +302,9 @@ export async function POST(request: NextRequest) {
           null, // asaas_customer_id
           null, // asaas_invoice_url
           null, // asaas_bankslip_url
+          null, // asaas_barcode
+          null, // asaas_linha_digitavel
+          null, // asaas_nosso_numero
           null, // gateway
         ],
       )
