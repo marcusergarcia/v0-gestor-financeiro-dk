@@ -2,11 +2,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 import { getAsaasAPI } from "@/lib/asaas"
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params
-
-    console.log("[Asaas] Enviando boleto para Asaas:", id)
+    const { id } = await params
 
     // Buscar boleto com dados do cliente
     const boletos = await query(

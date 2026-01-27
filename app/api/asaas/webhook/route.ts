@@ -39,15 +39,17 @@ export async function POST(request: NextRequest) {
     console.log("[Asaas Webhook] Status:", payment.status)
     console.log("[Asaas Webhook] External Reference:", payment.externalReference)
 
-    // Processar apenas eventos de pagamento confirmado/recebido
-    if (event !== "PAYMENT_CONFIRMED" && event !== "PAYMENT_RECEIVED") {
+    // Processar eventos de pagamento
+    const eventosProcessaveis = [
+      "PAYMENT_CONFIRMED",
+      "PAYMENT_RECEIVED", 
+      "PAYMENT_OVERDUE",
+      "PAYMENT_DELETED",
+      "PAYMENT_REFUNDED",
+    ]
+    
+    if (!eventosProcessaveis.includes(event)) {
       console.log("[Asaas Webhook] Evento ignorado:", event)
-      return NextResponse.json({ success: true }, { status: 200 })
-    }
-
-    // Verificar se o status é RECEIVED ou CONFIRMED
-    if (payment.status !== "RECEIVED" && payment.status !== "CONFIRMED") {
-      console.log("[Asaas Webhook] Status não é RECEIVED/CONFIRMED, ignorando")
       return NextResponse.json({ success: true }, { status: 200 })
     }
 
@@ -69,25 +71,51 @@ export async function POST(request: NextRequest) {
     console.log("[Asaas Webhook] Boleto encontrado:", boleto.numero)
     console.log("[Asaas Webhook] Status atual no banco:", boleto.status)
 
-    // Idempotência: verificar se já está pago
-    if (boleto.status === "pago") {
-      console.log("[Asaas Webhook] Boleto já está pago, ignorando webhook duplicado")
+    // Determinar novo status baseado no evento/status do Asaas
+    let novoStatus = boleto.status
+    let dataPagamento = null
+    
+    if (payment.status === "RECEIVED" || payment.status === "CONFIRMED") {
+      novoStatus = "pago"
+      dataPagamento = payment.paymentDate || new Date().toISOString().split("T")[0]
+    } else if (payment.status === "OVERDUE") {
+      novoStatus = "vencido"
+    } else if (payment.status === "REFUNDED" || payment.status === "DELETED") {
+      novoStatus = "cancelado"
+    }
+    
+    // Idempotência: verificar se já está no status correto
+    if (boleto.status === novoStatus) {
+      console.log("[Asaas Webhook] Boleto já está com status:", novoStatus)
       return NextResponse.json({ success: true }, { status: 200 })
     }
 
-    // Atualizar status para pago
-    const result = await query(
-      `UPDATE boletos 
-       SET status = 'pago',
-           data_pagamento = CURRENT_TIMESTAMP,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ? AND status != 'pago'`,
-      [boleto.id],
-    )
+    // Atualizar status
+    let result
+    if (dataPagamento) {
+      result = await query(
+        `UPDATE boletos 
+         SET status = ?,
+             data_pagamento = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [novoStatus, dataPagamento, boleto.id],
+      )
+    } else {
+      result = await query(
+        `UPDATE boletos 
+         SET status = ?,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [novoStatus, boleto.id],
+      )
+    }
 
-    console.log("[Asaas Webhook] Boleto atualizado para PAGO:", {
+    console.log("[Asaas Webhook] Boleto atualizado:", {
       numero: boleto.numero,
       asaas_id: payment.id,
+      statusAnterior: boleto.status,
+      novoStatus: novoStatus,
       rowsAffected: result.affectedRows,
     })
 

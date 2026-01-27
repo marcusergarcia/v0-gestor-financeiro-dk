@@ -16,8 +16,8 @@ export default function ConfirmacaoContent() {
 
   useEffect(() => {
     if (transactionId) {
-      // Buscar dados do boleto
-      fetch(`/api/boletos?pagseguro_id=${transactionId}`)
+      // Buscar dados do boleto pelo ID do Asaas
+      fetch(`/api/boletos?asaas_id=${transactionId}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.boletos && data.boletos.length > 0) {
