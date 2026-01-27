@@ -9,6 +9,7 @@ import { query } from "@/lib/db"
 // PAYMENT_RESTORED - Pagamento restaurado
 // PAYMENT_REFUNDED - Pagamento estornado
 // PAYMENT_UPDATED - Pagamento atualizado
+// PAYMENT_CREATED - Pagamento criado
 
 export async function GET(request: NextRequest) {
   return NextResponse.json({
@@ -38,6 +39,9 @@ export async function POST(request: NextRequest) {
     console.log("[Asaas Webhook] Payment ID:", payment.id)
     console.log("[Asaas Webhook] Status:", payment.status)
     console.log("[Asaas Webhook] External Reference:", payment.externalReference)
+    console.log("[Asaas Webhook] Value:", payment.value)
+    console.log("[Asaas Webhook] Net Value:", payment.netValue)
+    console.log("[Asaas Webhook] Payment Date:", payment.paymentDate)
 
     // Processar eventos de pagamento
     const eventosProcessaveis = [
@@ -46,6 +50,8 @@ export async function POST(request: NextRequest) {
       "PAYMENT_OVERDUE",
       "PAYMENT_DELETED",
       "PAYMENT_REFUNDED",
+      "PAYMENT_UPDATED",
+      "PAYMENT_CREATED",
     ]
     
     if (!eventosProcessaveis.includes(event)) {
@@ -54,12 +60,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Buscar boleto pelo asaas_id
-    let boletos = await query(`SELECT id, numero, status FROM boletos WHERE asaas_id = ?`, [payment.id])
+    let boletos = await query(
+      `SELECT id, numero, status, valor FROM boletos WHERE asaas_id = ?`, 
+      [payment.id]
+    )
 
     // Se não encontrou, tentar pelo externalReference (número do boleto)
     if (boletos.length === 0 && payment.externalReference) {
       console.log("[Asaas Webhook] Tentando buscar por externalReference:", payment.externalReference)
-      boletos = await query(`SELECT id, numero, status FROM boletos WHERE numero = ?`, [payment.externalReference])
+      boletos = await query(
+        `SELECT id, numero, status, valor FROM boletos WHERE numero = ?`, 
+        [payment.externalReference]
+      )
     }
 
     if (boletos.length === 0) {
@@ -73,51 +85,137 @@ export async function POST(request: NextRequest) {
 
     // Determinar novo status baseado no evento/status do Asaas
     let novoStatus = boleto.status
-    let dataPagamento = null
+    let dataPagamento: string | null = null
+    let valorPago: number | null = null
+    let juros: number | null = null
+    let multa: number | null = null
+    let desconto: number | null = null
     
-    if (payment.status === "RECEIVED" || payment.status === "CONFIRMED") {
+    // Mapear status do Asaas para status do sistema
+    if (payment.status === "RECEIVED" || payment.status === "CONFIRMED" || payment.status === "RECEIVED_IN_CASH") {
       novoStatus = "pago"
-      dataPagamento = payment.paymentDate || new Date().toISOString().split("T")[0]
+      dataPagamento = payment.paymentDate || payment.confirmedDate || new Date().toISOString().split("T")[0]
+      valorPago = payment.value || payment.netValue || Number(boleto.valor)
+      
+      // Capturar valores de multa, juros e desconto se disponíveis
+      if (payment.fine) {
+        multa = payment.fine.value || 0
+      }
+      if (payment.interest) {
+        juros = payment.interest.value || 0
+      }
+      if (payment.discount) {
+        desconto = payment.discount.value || 0
+      }
     } else if (payment.status === "OVERDUE") {
       novoStatus = "vencido"
-    } else if (payment.status === "REFUNDED" || payment.status === "DELETED") {
+    } else if (payment.status === "REFUNDED" || payment.status === "DELETED" || payment.status === "REFUND_REQUESTED") {
       novoStatus = "cancelado"
+    } else if (payment.status === "PENDING") {
+      novoStatus = "pendente"
     }
     
-    // Idempotência: verificar se já está no status correto
-    if (boleto.status === novoStatus) {
+    // Para eventos de criação/atualização, sempre atualizar os dados do Asaas mesmo se status não mudar
+    const deveAtualizarDados = event === "PAYMENT_CREATED" || event === "PAYMENT_UPDATED"
+    
+    // Idempotência: verificar se já está no status correto (exceto para eventos de criação/atualização)
+    if (boleto.status === novoStatus && !deveAtualizarDados && !dataPagamento) {
       console.log("[Asaas Webhook] Boleto já está com status:", novoStatus)
       return NextResponse.json({ success: true }, { status: 200 })
     }
 
-    // Atualizar status
-    let result
-    if (dataPagamento) {
-      result = await query(
-        `UPDATE boletos 
-         SET status = ?,
-             data_pagamento = ?,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?`,
-        [novoStatus, dataPagamento, boleto.id],
-      )
-    } else {
-      result = await query(
-        `UPDATE boletos 
-         SET status = ?,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?`,
-        [novoStatus, boleto.id],
-      )
+    // Montar query de atualização dinâmica
+    const updateFields: string[] = []
+    const updateValues: any[] = []
+
+    // Sempre atualizar status se mudou
+    if (boleto.status !== novoStatus) {
+      updateFields.push("status = ?")
+      updateValues.push(novoStatus)
     }
 
-    console.log("[Asaas Webhook] Boleto atualizado:", {
-      numero: boleto.numero,
-      asaas_id: payment.id,
-      statusAnterior: boleto.status,
-      novoStatus: novoStatus,
-      rowsAffected: result.affectedRows,
-    })
+    // Atualizar dados de pagamento se disponíveis
+    if (dataPagamento) {
+      updateFields.push("data_pagamento = ?")
+      updateValues.push(dataPagamento)
+    }
+
+    if (valorPago !== null) {
+      updateFields.push("valor_pago = ?")
+      updateValues.push(valorPago)
+    }
+
+    if (juros !== null) {
+      updateFields.push("juros = ?")
+      updateValues.push(juros)
+    }
+
+    if (multa !== null) {
+      updateFields.push("multa = ?")
+      updateValues.push(multa)
+    }
+
+    if (desconto !== null) {
+      updateFields.push("desconto = ?")
+      updateValues.push(desconto)
+    }
+
+    // Atualizar campos do Asaas se disponíveis no payload
+    if (payment.invoiceUrl) {
+      updateFields.push("asaas_invoice_url = ?")
+      updateValues.push(payment.invoiceUrl)
+    }
+
+    if (payment.bankSlipUrl) {
+      updateFields.push("asaas_bankslip_url = ?")
+      updateValues.push(payment.bankSlipUrl)
+    }
+
+    if (payment.identificationField) {
+      updateFields.push("asaas_linha_digitavel = ?")
+      updateValues.push(payment.identificationField)
+    }
+
+    if (payment.barCode) {
+      updateFields.push("asaas_barcode = ?")
+      updateValues.push(payment.barCode)
+    }
+
+    if (payment.nossoNumero) {
+      updateFields.push("asaas_nosso_numero = ?")
+      updateValues.push(payment.nossoNumero)
+    }
+
+    // Marcar como notificado via webhook
+    updateFields.push("webhook_notificado = ?")
+    updateValues.push(1)
+
+    // Sempre atualizar updated_at
+    updateFields.push("updated_at = CURRENT_TIMESTAMP")
+
+    // Adicionar ID do boleto para WHERE
+    updateValues.push(boleto.id)
+
+    // Executar atualização se houver campos para atualizar
+    if (updateFields.length > 1) { // > 1 porque sempre tem updated_at e webhook_notificado
+      const updateQuery = `UPDATE boletos SET ${updateFields.join(", ")} WHERE id = ?`
+      console.log("[Asaas Webhook] Query:", updateQuery)
+      console.log("[Asaas Webhook] Values:", updateValues)
+      
+      const result = await query(updateQuery, updateValues)
+
+      console.log("[Asaas Webhook] Boleto atualizado:", {
+        numero: boleto.numero,
+        asaas_id: payment.id,
+        statusAnterior: boleto.status,
+        novoStatus: novoStatus,
+        dataPagamento: dataPagamento,
+        valorPago: valorPago,
+        rowsAffected: result.affectedRows,
+      })
+    } else {
+      console.log("[Asaas Webhook] Nenhum campo para atualizar")
+    }
 
     console.log("[Asaas Webhook] ===== WEBHOOK PROCESSADO COM SUCESSO =====")
     return NextResponse.json({ success: true }, { status: 200 })
