@@ -3,10 +3,10 @@ interface AsaasConfig {
   environment: "sandbox" | "production"
 }
 
-interface CustomerData {
+interface AsaasCustomer {
   name: string
-  email?: string
   cpfCnpj: string
+  email?: string
   phone?: string
   mobilePhone?: string
   address?: string
@@ -14,23 +14,23 @@ interface CustomerData {
   complement?: string
   province?: string
   postalCode?: string
-  city?: string
-  state?: string
+  externalReference?: string
+  notificationDisabled?: boolean
 }
 
-interface BoletoData {
-  customer: string // ID do cliente no Asaas
-  billingType: "BOLETO"
+interface AsaasPayment {
+  customer: string // ID do cliente no Asaas (cus_xxxx)
+  billingType: "BOLETO" | "PIX" | "CREDIT_CARD"
   value: number
   dueDate: string // YYYY-MM-DD
   description?: string
-  externalReference?: string // Referência externa (número do boleto)
+  externalReference?: string
   fine?: {
-    value: number // Percentual de multa
+    value: number // percentual
     type: "PERCENTAGE" | "FIXED"
   }
   interest?: {
-    value: number // Percentual de juros ao mês
+    value: number // percentual ao mês
     type: "PERCENTAGE" | "FIXED"
   }
   discount?: {
@@ -46,26 +46,32 @@ interface AsaasPaymentResponse {
   customer: string
   value: number
   netValue: number
+  originalValue: number
   billingType: string
   status: string
   dueDate: string
+  description: string
+  externalReference: string
   invoiceUrl: string
   bankSlipUrl: string
   invoiceNumber: string
-  externalReference: string
   nossoNumero: string
-  description: string
-  barCode?: string
-  identificationField?: string
+  barCode: string
+  identificationField: string
 }
 
 interface AsaasCustomerResponse {
   id: string
   name: string
-  email: string
   cpfCnpj: string
-  phone?: string
-  mobilePhone?: string
+  email: string
+  phone: string
+  mobilePhone: string
+  address: string
+  addressNumber: string
+  province: string
+  postalCode: string
+  externalReference: string
 }
 
 export class AsaasAPI {
@@ -75,16 +81,10 @@ export class AsaasAPI {
   constructor(config: AsaasConfig) {
     this.config = config
     this.baseURL =
-      config.environment === "sandbox"
-        ? "https://sandbox.asaas.com/api/v3"
-        : "https://api.asaas.com/api/v3"
+      config.environment === "sandbox" ? "https://sandbox.asaas.com/api/v3" : "https://api.asaas.com/api/v3"
   }
 
-  private async request<T>(
-    endpoint: string,
-    method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
-    data?: any
-  ): Promise<T> {
+  private async request<T>(endpoint: string, method: "GET" | "POST" | "PUT" | "DELETE" = "GET", data?: any): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
 
     const headers: HeadersInit = {
@@ -101,7 +101,7 @@ export class AsaasAPI {
       options.body = JSON.stringify(data)
     }
 
-    console.log(`[Asaas] ${method} ${url}`)
+    console.log(`[Asaas] ${method} ${endpoint}`)
     if (data) {
       console.log("[Asaas] Payload:", JSON.stringify(data, null, 2))
     }
@@ -113,10 +113,9 @@ export class AsaasAPI {
     console.log("[Asaas] Response:", JSON.stringify(responseData, null, 2))
 
     if (!response.ok) {
-      const errorMessage =
-        responseData.errors?.map((e: any) => e.description).join(", ") ||
-        responseData.message ||
-        "Erro desconhecido"
+      const errorMessage = responseData.errors
+        ? responseData.errors.map((e: any) => e.description).join(", ")
+        : JSON.stringify(responseData)
       throw new Error(`Asaas API Error: ${response.status} - ${errorMessage}`)
     }
 
@@ -124,7 +123,7 @@ export class AsaasAPI {
   }
 
   // CLIENTES
-  async criarCliente(data: CustomerData): Promise<AsaasCustomerResponse> {
+  async criarCliente(data: AsaasCustomer): Promise<AsaasCustomerResponse> {
     return this.request("/customers", "POST", data)
   }
 
@@ -133,35 +132,57 @@ export class AsaasAPI {
     return this.request(`/customers?cpfCnpj=${cpfCnpjLimpo}`, "GET")
   }
 
-  async buscarOuCriarCliente(data: CustomerData): Promise<AsaasCustomerResponse> {
-    // Primeiro tenta buscar cliente existente
-    const clientes = await this.buscarClientePorCpfCnpj(data.cpfCnpj)
-    
-    if (clientes.data && clientes.data.length > 0) {
-      console.log("[Asaas] Cliente existente encontrado:", clientes.data[0].id)
-      return clientes.data[0]
-    }
-
-    // Se não encontrar, cria novo cliente
-    console.log("[Asaas] Cliente não encontrado, criando novo...")
-    return this.criarCliente(data)
+  async buscarClientePorExternalReference(externalReference: string): Promise<{ data: AsaasCustomerResponse[] }> {
+    return this.request(`/customers?externalReference=${externalReference}`, "GET")
   }
 
   // COBRANÇAS (BOLETOS)
-  async criarBoleto(data: BoletoData): Promise<AsaasPaymentResponse> {
+  async criarCobranca(data: AsaasPayment): Promise<AsaasPaymentResponse> {
     return this.request("/payments", "POST", data)
   }
 
-  async consultarBoleto(paymentId: string): Promise<AsaasPaymentResponse> {
+  async consultarCobranca(paymentId: string): Promise<AsaasPaymentResponse> {
     return this.request(`/payments/${paymentId}`, "GET")
   }
 
-  async cancelarBoleto(paymentId: string): Promise<AsaasPaymentResponse> {
+  async cancelarCobranca(paymentId: string): Promise<AsaasPaymentResponse> {
     return this.request(`/payments/${paymentId}`, "DELETE")
   }
 
-  async obterLinhaDigitavel(paymentId: string): Promise<{ identificationField: string; barCode: string }> {
-    return this.request(`/payments/${paymentId}/identificationField`, "GET")
+  async listarCobrancas(filters?: {
+    customer?: string
+    billingType?: string
+    status?: string
+    externalReference?: string
+  }): Promise<{ data: AsaasPaymentResponse[] }> {
+    const params = new URLSearchParams()
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, value)
+      })
+    }
+    const queryString = params.toString() ? `?${params.toString()}` : ""
+    return this.request(`/payments${queryString}`, "GET")
+  }
+
+  // Método auxiliar para criar ou buscar cliente
+  async obterOuCriarCliente(data: AsaasCustomer): Promise<AsaasCustomerResponse> {
+    const cpfCnpjLimpo = data.cpfCnpj.replace(/\D/g, "")
+
+    // Primeiro tenta buscar por CPF/CNPJ
+    const existente = await this.buscarClientePorCpfCnpj(cpfCnpjLimpo)
+
+    if (existente.data && existente.data.length > 0) {
+      console.log("[Asaas] Cliente já existe:", existente.data[0].id)
+      return existente.data[0]
+    }
+
+    // Se não existe, cria novo
+    console.log("[Asaas] Criando novo cliente")
+    return this.criarCliente({
+      ...data,
+      cpfCnpj: cpfCnpjLimpo,
+    })
   }
 }
 
@@ -173,7 +194,7 @@ export function getAsaasAPI(): AsaasAPI {
   const environment = (process.env.ASAAS_ENVIRONMENT as "sandbox" | "production") || "sandbox"
 
   if (!apiKey) {
-    throw new Error("Asaas não configurado. Configure ASAAS_API_KEY nas variáveis de ambiente.")
+    throw new Error("ASAAS_API_KEY não configurada. Configure a variável de ambiente.")
   }
 
   if (!asaasInstance) {
