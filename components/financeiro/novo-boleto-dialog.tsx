@@ -602,7 +602,7 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
             {numeroNota.trim() && (
               <div className="space-y-2">
                 <Label htmlFor="descricao-produto" className="text-sm font-semibold text-gray-700">
-                  Descrição do Produto/Serviço (PagBank)
+                  Descrição do Boleto
                 </Label>
                 <Input
                   id="descricao-produto"
@@ -611,7 +611,7 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
                   disabled
                   className="border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed"
                 />
-                <p className="text-xs text-gray-500">Esta descrição será enviada automaticamente ao PagBank</p>
+                <p className="text-xs text-gray-500">Esta descrição será enviada automaticamente ao Asaas</p>
               </div>
             )}
 

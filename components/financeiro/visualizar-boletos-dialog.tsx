@@ -382,9 +382,9 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                                 {boleto.numero}
                               </Badge>
                               {boleto.charge_id && (
-                                <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">
+                                <Badge variant="secondary" className="ml-2 bg-teal-100 text-teal-700">
                                   <CreditCard className="h-3 w-3 mr-1" />
-                                  PagSeguro
+                                  Asaas
                                 </Badge>
                               )}
                             </TableCell>
