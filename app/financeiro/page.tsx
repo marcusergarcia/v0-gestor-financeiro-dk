@@ -64,8 +64,12 @@ interface Boleto {
   codigo_barras?: string | null
   asaas_id?: string | null
   asaas_customer_id?: string | null
-  asaas_url?: string | null
-  asaas_bank_slip_url?: string | null
+  asaas_invoice_url?: string | null
+  asaas_bankslip_url?: string | null
+  asaas_linha_digitavel?: string | null
+  asaas_barcode?: string | null
+  asaas_nosso_numero?: string | null
+  gateway?: string | null
 }
 
 interface Recibo {
@@ -191,10 +195,10 @@ export default function FinanceiroPage() {
   }
 
   const handleImprimirBoleto = async (boleto: Boleto) => {
-    if (boleto.asaas_bank_slip_url) {
-      window.open(boleto.asaas_bank_slip_url, "_blank")
-    } else if (boleto.asaas_url) {
-      window.open(boleto.asaas_url, "_blank")
+    if (boleto.asaas_bankslip_url) {
+      window.open(boleto.asaas_bankslip_url, "_blank")
+    } else if (boleto.asaas_invoice_url) {
+      window.open(boleto.asaas_invoice_url, "_blank")
     } else {
       toast({
         title: "PDF não disponível",
@@ -869,12 +873,12 @@ export default function FinanceiroPage() {
                                   </Button>
                                 )}
 
-                                {/* Botão Imprimir - só aparece quando tem asaas_bank_slip_url */}
-                                {boleto.asaas_bank_slip_url && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => window.open(boleto.asaas_bank_slip_url || "#", "_blank")}
+{/* Botão Imprimir - só aparece quando tem asaas_bankslip_url */}
+                                  {boleto.asaas_bankslip_url && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => window.open(boleto.asaas_bankslip_url || "#", "_blank")}
                                     className="border-purple-500 text-purple-600 hover:bg-purple-50 h-9 lg:h-12 text-sm lg:text-base"
                                     title="Imprimir boleto"
                                   >
