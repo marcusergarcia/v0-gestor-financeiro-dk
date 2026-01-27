@@ -81,8 +81,12 @@ export class AsaasAPI {
   constructor(config: AsaasConfig) {
     this.config = config
     // URL base de acordo com a documentação oficial do Asaas
+    // Sandbox: https://sandbox.asaas.com/api/v3
+    // Production: https://api.asaas.com/v3 (ou www.asaas.com/api/v3)
     this.baseURL =
-      config.environment === "sandbox" ? "https://sandbox.asaas.com/api/v3" : "https://api.asaas.com/v3"
+      config.environment === "sandbox" ? "https://sandbox.asaas.com/api/v3" : "https://www.asaas.com/api/v3"
+    
+    console.log("[Asaas] Inicializado - Base URL:", this.baseURL)
   }
 
   private async request<T>(endpoint: string, method: "GET" | "POST" | "PUT" | "DELETE" = "GET", data?: any): Promise<T> {
@@ -187,21 +191,51 @@ export class AsaasAPI {
   // Método auxiliar para criar ou buscar cliente
   async obterOuCriarCliente(data: AsaasCustomer): Promise<AsaasCustomerResponse> {
     const cpfCnpjLimpo = data.cpfCnpj.replace(/\D/g, "")
+    
+    console.log("[Asaas] obterOuCriarCliente - CPF/CNPJ:", cpfCnpjLimpo)
+    console.log("[Asaas] obterOuCriarCliente - Nome:", data.name)
 
-    // Primeiro tenta buscar por CPF/CNPJ
-    const existente = await this.buscarClientePorCpfCnpj(cpfCnpjLimpo)
+    try {
+      // Primeiro tenta buscar por CPF/CNPJ
+      console.log("[Asaas] Buscando cliente por CPF/CNPJ...")
+      const existente = await this.buscarClientePorCpfCnpj(cpfCnpjLimpo)
 
-    if (existente.data && existente.data.length > 0) {
-      console.log("[Asaas] Cliente já existe:", existente.data[0].id)
-      return existente.data[0]
+      if (existente.data && existente.data.length > 0) {
+        console.log("[Asaas] Cliente já existe:", existente.data[0].id, "-", existente.data[0].name)
+        return existente.data[0]
+      }
+      
+      console.log("[Asaas] Cliente não encontrado, criando novo...")
+    } catch (searchError) {
+      console.log("[Asaas] Erro ao buscar cliente (tentando criar):", searchError)
     }
 
-    // Se não existe, cria novo
-    console.log("[Asaas] Criando novo cliente")
-    return this.criarCliente({
-      ...data,
+    // Se não existe ou erro na busca, cria novo
+    console.log("[Asaas] Criando novo cliente com dados:", {
+      name: data.name,
       cpfCnpj: cpfCnpjLimpo,
+      email: data.email,
+      mobilePhone: data.mobilePhone,
     })
+    
+    try {
+      const novoCliente = await this.criarCliente({
+        ...data,
+        cpfCnpj: cpfCnpjLimpo,
+      })
+      console.log("[Asaas] Novo cliente criado:", novoCliente.id)
+      return novoCliente
+    } catch (createError: any) {
+      // Se o erro for "cliente já existe", tenta buscar novamente
+      if (createError.message && createError.message.includes("já cadastrado")) {
+        console.log("[Asaas] Cliente já existe (via erro), buscando...")
+        const existente = await this.buscarClientePorCpfCnpj(cpfCnpjLimpo)
+        if (existente.data && existente.data.length > 0) {
+          return existente.data[0]
+        }
+      }
+      throw createError
+    }
   }
 }
 
