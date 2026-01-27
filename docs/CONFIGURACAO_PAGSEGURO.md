@@ -16,10 +16,10 @@ Este documento explica como configurar completamente a integração com PagSegur
 
 No Vercel (ou arquivo `.env` local):
 
-```env
+\`\`\`env
 PAGSEGURO_TOKEN=seu_token_aqui
 PAGSEGURO_ENVIRONMENT=production
-```
+\`\`\`
 
 ## 2. Página de Redirecionamento
 
@@ -31,19 +31,19 @@ Após o pagamento, o cliente será redirecionado para uma página de confirmaç�
 2. Em **Página de redirecionamento**, configure:
 
 **Página de redirecionamento fixa:**
-```
+\`\`\`
 https://seu-dominio.vercel.app/pagamento/confirmacao
-```
+\`\`\`
 
 **Código do Parâmetro (opcional):**
-```
+\`\`\`
 transaction_id
-```
+\`\`\`
 
 **URL completa de exemplo:**
-```
+\`\`\`
 https://seu-dominio.vercel.app/pagamento/confirmacao?transaction_id=B6E12D75-33-A1A5-63D261
-```
+\`\`\`
 
 ### Parâmetros Recebidos
 
@@ -55,17 +55,17 @@ A página de redirecionamento receberá os seguintes parâmetros na URL:
 ## 3. Webhook (Notificações)
 
 O webhook já está implementado em:
-```
+\`\`\`
 https://seu-dominio.vercel.app/api/pagbank/webhook
-```
+\`\`\`
 
 ### Configurando no PagSeguro
 
 1. Acesse **Integrações** → **Notificações**
 2. Configure a URL de notificação:
-```
+\`\`\`
 https://seu-dominio.vercel.app/api/pagbank/webhook
-```
+\`\`\`
 
 3. Selecione os eventos que deseja receber:
    - Alteração de status de cobrança
@@ -83,27 +83,27 @@ https://seu-dominio.vercel.app/api/pagbank/webhook
 3. Aguarde a liberação (pode levar alguns dias úteis)
 
 **Erro comum sem whitelist:**
-```
+\`\`\`
 403 - ACCESS_DENIED - whitelist access required
-```
+\`\`\`
 
 ## 5. Ambiente Sandbox vs Produção
 
 ### Sandbox (Testes)
 
-```env
+\`\`\`env
 PAGSEGURO_TOKEN=seu_token_sandbox
 PAGSEGURO_ENVIRONMENT=sandbox
-```
+\`\`\`
 
 URL Base: `https://sandbox.api.pagseguro.com`
 
 ### Produção
 
-```env
+\`\`\`env
 PAGSEGURO_TOKEN=seu_token_producao
 PAGSEGURO_ENVIRONMENT=production
-```
+\`\`\`
 
 URL Base: `https://api.pagseguro.com`
 
@@ -111,7 +111,7 @@ URL Base: `https://api.pagseguro.com`
 
 ### 1. Criar um Boleto de Teste
 
-```bash
+\`\`\`bash
 # Via API
 POST /api/boletos
 {
@@ -121,29 +121,29 @@ POST /api/boletos
   "vencimento": "2025-12-31",
   "cliente_id": 1
 }
-```
+\`\`\`
 
 ### 2. Verificar Logs
 
 Acesse o Vercel Dashboard e verifique os logs da função serverless para ver as requisições:
 
-```
+\`\`\`
 [PagSeguro API] Request: ...
 [PagSeguro API] Response: ...
-```
+\`\`\`
 
 ### 3. Webhook Local (Desenvolvimento)
 
 Para testar webhook localmente, use ngrok ou similar:
 
-```bash
+\`\`\`bash
 ngrok http 3000
-```
+\`\`\`
 
 Configure a URL do ngrok no PagSeguro:
-```
+\`\`\`
 https://abc123.ngrok.io/api/pagseguro/webhook
-```
+\`\`\`
 
 ## 7. Troubleshooting
 
@@ -172,7 +172,7 @@ https://abc123.ngrok.io/api/pagseguro/webhook
 
 ## 8. Campos Obrigatórios para Boleto
 
-```typescript
+\`\`\`typescript
 {
   customer: {
     name: string,        // Nome completo
@@ -191,7 +191,7 @@ https://abc123.ngrok.io/api/pagseguro/webhook
     region_code: string, // Sigla do estado (ex: "SP")
   }
 }
-```
+\`\`\`
 
 ## 9. Suporte
 

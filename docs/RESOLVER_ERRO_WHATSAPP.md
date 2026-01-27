@@ -33,10 +33,10 @@ Se você gerou um token temporário no Meta Developers, ele expira em 24 horas.
    - **WhatsApp Business Account ID**: Este é o `WHATSAPP_BUSINESS_ACCOUNT_ID`
 
 **Exemplo:**
-```
+\`\`\`
 Phone number ID: 110200345501442
 WhatsApp Business Account ID: 123456789012345
-```
+\`\`\`
 
 ### Passo 2: Gerar Token Permanente (System User)
 
@@ -68,13 +68,13 @@ Um token temporário expira em 24h. Você precisa criar um **System User** com t
 
 Acesse seu projeto no Vercel:
 
-```bash
+\`\`\`bash
 # Variáveis OBRIGATÓRIAS
 WHATSAPP_PHONE_NUMBER_ID=110200345501442
 WHATSAPP_ACCESS_TOKEN=EAAJBxxxxxxxxxxxxxxxxxxxxxxxxxx
 WHATSAPP_VERIFY_TOKEN=meu_token_secreto_qualquer_string
 WHATSAPP_BUSINESS_ACCOUNT_ID=123456789012345
-```
+\`\`\`
 
 **Importante:**
 - `WHATSAPP_PHONE_NUMBER_ID`: ID do telefone (não da conta business)
@@ -86,7 +86,7 @@ WHATSAPP_BUSINESS_ACCOUNT_ID=123456789012345
 
 Se você ainda não registrou o número, pode fazer via API:
 
-```bash
+\`\`\`bash
 curl -X POST "https://graph.facebook.com/v18.0/SEU_PHONE_NUMBER_ID/register" \
   -H "Authorization: Bearer SEU_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
@@ -94,7 +94,7 @@ curl -X POST "https://graph.facebook.com/v18.0/SEU_PHONE_NUMBER_ID/register" \
     "messaging_product": "whatsapp",
     "pin": "123456"
   }'
-```
+\`\`\`
 
 O `pin` é o PIN de verificação em duas etapas (2FA) que você configurou.
 
@@ -115,17 +115,17 @@ O `pin` é o PIN de verificação em duas etapas (2FA) que você configurou.
 Use o Graph API Explorer:
 https://developers.facebook.com/tools/explorer/
 
-```
+\`\`\`
 GET /{PHONE_NUMBER_ID}?fields=verified_name,display_phone_number,quality_rating
-```
+\`\`\`
 
 Se retornar erro, o token não tem permissões corretas.
 
 ### Verificar Validade do Token
 
-```bash
+\`\`\`bash
 curl "https://graph.facebook.com/debug_token?input_token=SEU_TOKEN&access_token=SEU_TOKEN"
-```
+\`\`\`
 
 Deve retornar as permissões (`scopes`) incluindo `whatsapp_business_*`.
 

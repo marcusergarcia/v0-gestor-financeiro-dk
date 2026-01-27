@@ -31,9 +31,9 @@ Configure as seguintes variáveis no Vercel:
 1. Acesse: Meta for Developers > Seu App > WhatsApp > Configuration
 2. Clique em "Edit" na seção Webhooks
 3. Adicione a URL do webhook:
-   ```
+   \`\`\`
    https://seu-dominio.vercel.app/api/whatsapp/webhook
-   ```
+   \`\`\`
 4. Cole o mesmo valor usado em `WHATSAPP_VERIFY_TOKEN`
 5. Inscreva-se nos seguintes campos:
    - ✅ messages

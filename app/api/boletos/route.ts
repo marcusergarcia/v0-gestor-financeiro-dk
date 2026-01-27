@@ -269,12 +269,15 @@ export async function POST(request: NextRequest) {
           juros,
           asaas_id,
           asaas_customer_id,
-          asaas_url,
-          asaas_bank_slip_url,
+          asaas_invoice_url,
+          asaas_bankslip_url,
+          asaas_barcode,
+          asaas_linha_digitavel,
+          asaas_nosso_numero,
           gateway,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `,
         [
           numeroBoleto,
@@ -297,8 +300,11 @@ export async function POST(request: NextRequest) {
           juros_mes_percentual || 2.0,
           null, // asaas_id
           null, // asaas_customer_id
-          null, // asaas_url
-          null, // asaas_bank_slip_url
+          null, // asaas_invoice_url
+          null, // asaas_bankslip_url
+          null, // asaas_barcode
+          null, // asaas_linha_digitavel
+          null, // asaas_nosso_numero
           null, // gateway
         ],
       )

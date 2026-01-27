@@ -30,10 +30,10 @@ A variável `CRON_SECRET` já está configurada no seu projeto. Ela é usada par
 
 Execute manualmente para testar:
 
-```bash
+\`\`\`bash
 curl -X GET https://gestor9.vercel.app/api/whatsapp/check-timeouts \
   -H "Authorization: Bearer SEU_CRON_SECRET"
-```
+\`\`\`
 
 ## Como Funciona
 
