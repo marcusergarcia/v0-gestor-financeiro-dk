@@ -101,15 +101,28 @@ export class AsaasAPI {
       options.body = JSON.stringify(data)
     }
 
-    console.log(`[Asaas] ${method} ${endpoint}`)
+    console.log(`[Asaas] ${method} ${url}`)
+    console.log(`[Asaas] Environment: ${this.config.environment}`)
     if (data) {
       console.log("[Asaas] Payload:", JSON.stringify(data, null, 2))
     }
 
     const response = await fetch(url, options)
+    
+    // Verificar o content-type da resposta
+    const contentType = response.headers.get("content-type") || ""
+    console.log("[Asaas] Response status:", response.status)
+    console.log("[Asaas] Content-Type:", contentType)
+    
+    // Se não for JSON, ler como texto para ver o erro
+    if (!contentType.includes("application/json")) {
+      const textResponse = await response.text()
+      console.error("[Asaas] Resposta não é JSON:", textResponse.substring(0, 500))
+      throw new Error(`Asaas API retornou HTML em vez de JSON. Status: ${response.status}. Verifique se a API Key (ASAAS_API_KEY) está correta e corresponde ao ambiente (${this.config.environment}). URL: ${url}`)
+    }
+    
     const responseData = await response.json()
 
-    console.log("[Asaas] Response status:", response.status)
     console.log("[Asaas] Response:", JSON.stringify(responseData, null, 2))
 
     if (!response.ok) {
