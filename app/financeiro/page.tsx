@@ -60,13 +60,12 @@ interface Boleto {
   total_parcelas: number
   observacoes?: string
   created_at: string
-  link_pdf?: string
-  link_impressao?: string
-  charge_id?: string | null // Renomeado de pagseguro_id para charge_id
   linha_digitavel?: string | null
-  asaas_id?: string | null // ID da cobrança no Asaas
-  asaas_bank_slip_url?: string | null // URL do boleto no Asaas
-  gateway?: string | null // Gateway utilizado: pagbank ou asaas
+  codigo_barras?: string | null
+  asaas_id?: string | null
+  asaas_customer_id?: string | null
+  asaas_url?: string | null
+  asaas_bank_slip_url?: string | null
 }
 
 interface Recibo {
@@ -110,8 +109,7 @@ export default function FinanceiroPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [boletoParaExcluir, setBoletoParaExcluir] = useState<Boleto | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
-  const [enviandoParaPagbank, setEnviandoParaPagbank] = useState<number | null>(null) // State to control loading of PagBank submission
-  const [enviandoParaAsaas, setEnviandoParaAsaas] = useState<number | null>(null) // State to control loading of Asaas submission
+  const [enviandoParaAsaas, setEnviandoParaAsaas] = useState<number | null>(null)
   const [valoresOcultos, setValoresOcultos] = useState(false)
   const { toast } = useToast()
 
@@ -193,13 +191,14 @@ export default function FinanceiroPage() {
   }
 
   const handleImprimirBoleto = async (boleto: Boleto) => {
-    if (boleto.link_pdf || boleto.link_impressao) {
-      const url = boleto.link_pdf || boleto.link_impressao
-      window.open(url, "_blank")
+    if (boleto.asaas_bank_slip_url) {
+      window.open(boleto.asaas_bank_slip_url, "_blank")
+    } else if (boleto.asaas_url) {
+      window.open(boleto.asaas_url, "_blank")
     } else {
       toast({
         title: "PDF não disponível",
-        description: "Este boleto não possui PDF gerado no PagSeguro.",
+        description: "Este boleto ainda não foi enviado ao Asaas.",
         variant: "destructive",
       })
     }
@@ -289,93 +288,6 @@ export default function FinanceiroPage() {
       })
     } finally {
       setEnviandoParaAsaas(null)
-    }
-  }
-
-  // FUNCTION: Handle sending boleto to PagBank
-  const handleEnviarPagBank = async (boleto: Boleto) => {
-    if (
-      !confirm(`Enviar boleto ${boleto.numero} para o PagBank?\n\nIsso irá gerar o código de barras e linha digitável.`)
-    ) {
-      return
-    }
-
-    try {
-      setEnviandoParaPagbank(boleto.id)
-
-      const response = await fetch(`/api/boletos/${boleto.id}/enviar-pagbank`, {
-        method: "POST",
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        toast({
-          title: "Sucesso!",
-          description: `Boleto ${boleto.numero} enviado ao PagBank com sucesso!`,
-        })
-        await loadData()
-      } else {
-        toast({
-          title: "Erro",
-          description: result.message || "Erro ao enviar boleto ao PagBank",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Erro ao enviar boleto ao PagBank:", error)
-      toast({
-        title: "Erro",
-        description: "Erro ao enviar boleto ao PagBank",
-        variant: "destructive",
-      })
-    } finally {
-      setEnviandoParaPagbank(null)
-    }
-  }
-
-  const handleReenviarPagBank = async (boleto: Boleto) => {
-    if (
-      !confirm(
-        `⚠️ ATENÇÃO: Reenviar boleto ${boleto.numero} para o PagBank?\n\n` +
-          `Este boleto JÁ tem um ID do PagBank mas pode não estar registrado corretamente.\n` +
-          `Isso irá SOBRESCREVER os dados existentes.`,
-      )
-    ) {
-      return
-    }
-
-    try {
-      setEnviandoParaPagbank(boleto.id)
-
-      const response = await fetch(`/api/boletos/${boleto.id}/enviar-pagbank?force=true`, {
-        method: "POST",
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        toast({
-          title: "Sucesso!",
-          description: `Boleto ${boleto.numero} reenviado ao PagBank com sucesso!`,
-        })
-        await loadData()
-      } else {
-        toast({
-          title: "Erro",
-          description: result.message || "Erro ao reenviar boleto ao PagBank",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Erro ao reenviar boleto ao PagBank:", error)
-      toast({
-        title: "Erro",
-        description: "Erro ao reenviar boleto ao PagBank",
-        variant: "destructive",
-      })
-    } finally {
-      setEnviandoParaPagbank(null)
     }
   }
 
@@ -939,43 +851,8 @@ export default function FinanceiroPage() {
                                   <Eye className="h-4 w-4" />
                                 </Button>
 
-                                {boleto.charge_id && !boleto.linha_digitavel && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleReenviarPagBank(boleto)}
-                                    disabled={enviandoParaPagbank === boleto.id}
-                                    className="border-amber-500 text-amber-600 hover:bg-amber-50 h-9 lg:h-12 text-sm lg:text-base"
-                                    title="Reenviar para PagBank (forçar)"
-                                  >
-                                    {enviandoParaPagbank === boleto.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <RefreshCw className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                )}
-
-                                {/* Botão Enviar para PagBank - só aparece quando NÃO tem charge_id e NÃO tem asaas_id */}
-                                {!boleto.charge_id && !boleto.asaas_id && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEnviarPagBank(boleto)}
-                                    disabled={enviandoParaPagbank === boleto.id}
-                                    className="border-orange-500 text-orange-600 hover:bg-orange-50 h-9 lg:h-12 text-sm lg:text-base"
-                                    title="Enviar para PagBank"
-                                  >
-                                    {enviandoParaPagbank === boleto.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Send className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                )}
-
-                                {/* Botão Enviar para Asaas - só aparece quando NÃO tem charge_id e NÃO tem asaas_id */}
-                                {!boleto.charge_id && !boleto.asaas_id && (
+                                {/* Botão Enviar para Asaas - só aparece quando NÃO tem asaas_id */}
+                                {!boleto.asaas_id && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -992,20 +869,12 @@ export default function FinanceiroPage() {
                                   </Button>
                                 )}
 
-                                {/* Botão Imprimir - só aparece quando tem linha digitável (PagBank ou Asaas) */}
-                                {(boleto.linha_digitavel || boleto.asaas_bank_slip_url) && (
+                                {/* Botão Imprimir - só aparece quando tem asaas_bank_slip_url */}
+                                {boleto.asaas_bank_slip_url && (
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() =>
-                                      window.open(
-                                        boleto.link_pdf ||
-                                          boleto.link_impressao ||
-                                          boleto.asaas_bank_slip_url ||
-                                          "#",
-                                        "_blank",
-                                      )
-                                    }
+                                    onClick={() => window.open(boleto.asaas_bank_slip_url || "#", "_blank")}
                                     className="border-purple-500 text-purple-600 hover:bg-purple-50 h-9 lg:h-12 text-sm lg:text-base"
                                     title="Imprimir boleto"
                                   >
