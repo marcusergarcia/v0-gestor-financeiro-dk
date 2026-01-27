@@ -136,10 +136,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       SET 
         asaas_id = ?,
         asaas_customer_id = ?,
-        asaas_url = ?,
-        asaas_bank_slip_url = ?,
-        linha_digitavel = ?,
-        codigo_barras = ?,
+        asaas_invoice_url = ?,
+        asaas_bankslip_url = ?,
+        asaas_linha_digitavel = ?,
+        asaas_barcode = ?,
+        asaas_nosso_numero = ?,
         gateway = 'asaas',
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -151,6 +152,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         cobranca.bankSlipUrl || null,
         cobranca.identificationField || null,
         cobranca.barCode || null,
+        cobranca.nossoNumero || null,
         id,
       ],
     )
