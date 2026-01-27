@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getConnection } from "@/lib/db"
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const connection = await getConnection()
 
   try {
-    const boletoId = params.id
+    const { id: boletoId } = await params
 
     const [boletos] = await connection.execute("SELECT * FROM boletos WHERE id = ?", [boletoId])
 
