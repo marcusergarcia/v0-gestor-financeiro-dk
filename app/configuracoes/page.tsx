@@ -24,7 +24,7 @@ import { VisitasTab } from "@/components/configuracoes/visitas-tab"
 import { ValorKmTab } from "@/components/configuracoes/valor-km-tab"
 import { TermosTab } from "@/components/configuracoes/termos-tab"
 import { BackupTab } from "@/components/configuracoes/backup-tab"
-import { PagBankTab } from "@/components/configuracoes/pagbank-tab"
+import { AsaasTab } from "@/components/configuracoes/asaas-tab"
 import { useEffect } from "react"
 
 export default function ConfiguracoesPage() {
@@ -147,11 +147,11 @@ export default function ConfiguracoesPage() {
                     Backup
                   </TabsTrigger>
                   <TabsTrigger
-                    value="pagbank"
+                    value="asaas"
                     className="flex flex-col items-center gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white"
                   >
                     <CreditCard className="h-4 w-4" />
-                    PagBank
+                    Asaas
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -216,11 +216,11 @@ export default function ConfiguracoesPage() {
                     <span>Backup</span>
                   </TabsTrigger>
                   <TabsTrigger
-                    value="pagbank"
+                    value="asaas"
                     className="flex flex-col items-center gap-1 py-2 text-[9px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white rounded"
                   >
                     <CreditCard className="h-4 w-4" />
-                    <span>PagBank</span>
+                    <span>Asaas</span>
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -258,8 +258,8 @@ export default function ConfiguracoesPage() {
                   <BackupTab />
                 </TabsContent>
 
-                <TabsContent value="pagbank" className="mt-0">
-                  <PagBankTab />
+                <TabsContent value="asaas" className="mt-0">
+                  <AsaasTab />
                 </TabsContent>
               </div>
             </Tabs>

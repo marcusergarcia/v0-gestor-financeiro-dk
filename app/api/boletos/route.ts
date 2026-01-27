@@ -142,7 +142,6 @@ export async function POST(request: NextRequest) {
       desconto = 0,
       instrucao_linha1 = "Pagamento ate o vencimento",
       instrucao_linha2 = "Apos vencimento cobrar multa e juros",
-      enviar_pagbank = false, // Nova opção para controlar envio ao PagBank
     } = body
 
     if (!cliente_id || !numero_nota || !valor_total || !primeiro_vencimento || !numero_parcelas) {
@@ -231,9 +230,6 @@ export async function POST(request: NextRequest) {
 
     const cliente = clientes[0]
 
-    const pagseguroToken = process.env.PAGSEGURO_TOKEN
-    const pagseguroHabilitado = pagseguroToken && pagseguroToken !== "test_token_temporario"
-
     for (let i = 0; i < parcelas.length; i++) {
       const parcela = parcelas[i]
       const numeroBoleto =
@@ -258,26 +254,13 @@ export async function POST(request: NextRequest) {
           total_parcelas, 
           observacoes,
           forma_pagamento,
-          charge_id,
-          linha_digitavel,
-          codigo_barras,
-          link_pdf,
-          link_impressao,
           data_nota,
           descricao_produto,
           multa,
           juros,
-          asaas_id,
-          asaas_customer_id,
-          asaas_invoice_url,
-          asaas_bankslip_url,
-          asaas_barcode,
-          asaas_linha_digitavel,
-          asaas_nosso_numero,
-          gateway,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `,
         [
           numeroBoleto,
@@ -289,23 +272,10 @@ export async function POST(request: NextRequest) {
           parcelas.length,
           null,
           forma_pagamento || "boleto",
-          null, // charge_id começa como null
-          null, // linha_digitavel
-          null, // codigo_barras
-          null, // link_pdf
-          null, // link_impressao
           data_nota || null,
           descricao_produto,
           multa_percentual || 2.0,
           juros_mes_percentual || 2.0,
-          null, // asaas_id
-          null, // asaas_customer_id
-          null, // asaas_invoice_url
-          null, // asaas_bankslip_url
-          null, // asaas_barcode
-          null, // asaas_linha_digitavel
-          null, // asaas_nosso_numero
-          null, // gateway
         ],
       )
 
@@ -316,7 +286,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `${parcelas.length} boleto(s) criado(s) localmente! Use o botão "Enviar para PagBank" ou "Enviar para Asaas" para gerar o boleto.`,
+      message: `${parcelas.length} boleto(s) criado(s)! Use o botão "Enviar para Asaas" para gerar o boleto bancário.`,
     })
   } catch (error) {
     console.error("Erro ao criar boletos:", error)
