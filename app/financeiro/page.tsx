@@ -64,6 +64,9 @@ interface Boleto {
   link_impressao?: string
   charge_id?: string | null // Renomeado de pagseguro_id para charge_id
   linha_digitavel?: string | null
+  asaas_id?: string | null // ID da cobrança no Asaas
+  asaas_bank_slip_url?: string | null // URL do boleto no Asaas
+  gateway?: string | null // Gateway utilizado: pagbank ou asaas
 }
 
 interface Recibo {
@@ -108,6 +111,7 @@ export default function FinanceiroPage() {
   const [boletoParaExcluir, setBoletoParaExcluir] = useState<Boleto | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [enviandoParaPagbank, setEnviandoParaPagbank] = useState<number | null>(null) // State to control loading of PagBank submission
+  const [enviandoParaAsaas, setEnviandoParaAsaas] = useState<number | null>(null) // State to control loading of Asaas submission
   const [valoresOcultos, setValoresOcultos] = useState(false)
   const { toast } = useToast()
 
@@ -246,7 +250,49 @@ export default function FinanceiroPage() {
     }
   }
 
-  // NEW FUNCTION: Handle sending boleto to PagBank
+  // FUNCTION: Handle sending boleto to Asaas
+  const handleEnviarAsaas = async (boleto: Boleto) => {
+    if (
+      !confirm(`Enviar boleto ${boleto.numero} para o Asaas?\n\nIsso irá gerar o código de barras e linha digitável.`)
+    ) {
+      return
+    }
+
+    try {
+      setEnviandoParaAsaas(boleto.id)
+
+      const response = await fetch(`/api/boletos/${boleto.id}/enviar-asaas`, {
+        method: "POST",
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "Sucesso!",
+          description: `Boleto ${boleto.numero} enviado ao Asaas com sucesso!`,
+        })
+        await loadData()
+      } else {
+        toast({
+          title: "Erro",
+          description: result.message || "Erro ao enviar boleto ao Asaas",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Erro ao enviar boleto ao Asaas:", error)
+      toast({
+        title: "Erro",
+        description: "Erro ao enviar boleto ao Asaas",
+        variant: "destructive",
+      })
+    } finally {
+      setEnviandoParaAsaas(null)
+    }
+  }
+
+  // FUNCTION: Handle sending boleto to PagBank
   const handleEnviarPagBank = async (boleto: Boleto) => {
     if (
       !confirm(`Enviar boleto ${boleto.numero} para o PagBank?\n\nIsso irá gerar o código de barras e linha digitável.`)
@@ -910,8 +956,8 @@ export default function FinanceiroPage() {
                                   </Button>
                                 )}
 
-                                {/* Botão Enviar para PagBank - só aparece quando NÃO tem charge_id */}
-                                {!boleto.charge_id && (
+                                {/* Botão Enviar para PagBank - só aparece quando NÃO tem charge_id e NÃO tem asaas_id */}
+                                {!boleto.charge_id && !boleto.asaas_id && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -928,13 +974,37 @@ export default function FinanceiroPage() {
                                   </Button>
                                 )}
 
-                                {/* Botão Imprimir - só aparece quando tem linha digitável */}
-                                {boleto.linha_digitavel && (
+                                {/* Botão Enviar para Asaas - só aparece quando NÃO tem charge_id e NÃO tem asaas_id */}
+                                {!boleto.charge_id && !boleto.asaas_id && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEnviarAsaas(boleto)}
+                                    disabled={enviandoParaAsaas === boleto.id}
+                                    className="border-teal-500 text-teal-600 hover:bg-teal-50 h-9 lg:h-12 text-sm lg:text-base"
+                                    title="Enviar para Asaas"
+                                  >
+                                    {enviandoParaAsaas === boleto.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Send className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
+
+                                {/* Botão Imprimir - só aparece quando tem linha digitável (PagBank ou Asaas) */}
+                                {(boleto.linha_digitavel || boleto.asaas_bank_slip_url) && (
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() =>
-                                      window.open(boleto.link_pdf || boleto.link_impressao || "#", "_blank")
+                                      window.open(
+                                        boleto.link_pdf ||
+                                          boleto.link_impressao ||
+                                          boleto.asaas_bank_slip_url ||
+                                          "#",
+                                        "_blank",
+                                      )
                                     }
                                     className="border-purple-500 text-purple-600 hover:bg-purple-50 h-9 lg:h-12 text-sm lg:text-base"
                                     title="Imprimir boleto"

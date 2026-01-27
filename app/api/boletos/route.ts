@@ -267,9 +267,14 @@ export async function POST(request: NextRequest) {
           descricao_produto,
           multa,
           juros,
+          asaas_id,
+          asaas_customer_id,
+          asaas_url,
+          asaas_bank_slip_url,
+          gateway,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `,
         [
           numeroBoleto,
@@ -290,6 +295,11 @@ export async function POST(request: NextRequest) {
           descricao_produto,
           multa_percentual || 2.0,
           juros_mes_percentual || 2.0,
+          null, // asaas_id
+          null, // asaas_customer_id
+          null, // asaas_url
+          null, // asaas_bank_slip_url
+          null, // gateway
         ],
       )
 
@@ -300,7 +310,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `${parcelas.length} boleto(s) criado(s) localmente! Use o botão "Enviar para PagBank" para enviar individualmente.`,
+      message: `${parcelas.length} boleto(s) criado(s) localmente! Use o botão "Enviar para PagBank" ou "Enviar para Asaas" para gerar o boleto.`,
     })
   } catch (error) {
     console.error("Erro ao criar boletos:", error)
