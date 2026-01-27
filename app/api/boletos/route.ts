@@ -269,8 +269,8 @@ export async function POST(request: NextRequest) {
           juros,
           asaas_id,
           asaas_customer_id,
-          asaas_url,
-          asaas_bank_slip_url,
+          asaas_invoice_url,
+          asaas_bankslip_url,
           gateway,
           created_at,
           updated_at
@@ -297,8 +297,8 @@ export async function POST(request: NextRequest) {
           juros_mes_percentual || 2.0,
           null, // asaas_id
           null, // asaas_customer_id
-          null, // asaas_url
-          null, // asaas_bank_slip_url
+          null, // asaas_invoice_url
+          null, // asaas_bankslip_url
           null, // gateway
         ],
       )

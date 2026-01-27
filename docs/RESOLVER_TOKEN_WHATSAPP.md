@@ -2,10 +2,10 @@
 
 ## Problema
 Você está recebendo este erro nos logs:
-```
+\`\`\`
 Error validating application. Application has been deleted.
 OAuthException, code: 190
-```
+\`\`\`
 
 Isso significa que o **token de acesso expirou** ou está inválido.
 

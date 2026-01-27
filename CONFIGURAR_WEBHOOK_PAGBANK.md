@@ -19,9 +19,9 @@ Você precisa configurar a URL do webhook no painel do PagBank para que eles env
 4. Configure a URL do webhook:
 
 **URL do Webhook (sua aplicação):**
-```
+\`\`\`
 https://gestor9.vercel.app/api/pagbank/webhook
-```
+\`\`\`
 
 ### 3. Configurar Eventos
 Marque os seguintes eventos para receber notificações:
@@ -47,14 +47,14 @@ Marque os seguintes eventos para receber notificações:
 ### 5. Verificar Logs
 Após configurar, você verá logs como este no Vercel quando um boleto for pago:
 
-```
+\`\`\`
 [v0][PagSeguro Webhook] ===== WEBHOOK RECEBIDO =====
 [v0][PagSeguro Webhook] Content-Type: application/x-www-form-urlencoded
 [v0][PagSeguro Webhook] Form data recebido: { notificationCode: '...', notificationType: 'transaction' }
 [v0][PagSeguro Webhook] Buscando detalhes da transação via API...
 [v0][PagSeguro Webhook] Status PAID - atualizando data_pagamento para boleto ID: XXX
 [v0][PagSeguro Webhook] ===== PROCESSAMENTO CONCLUÍDO =====
-```
+\`\`\`
 
 ## Troubleshooting
 
@@ -80,16 +80,16 @@ Após configurar, você verá logs como este no Vercel quando um boleto for pago
 
 Certifique-se de que estas variáveis estão configuradas no Vercel:
 
-```env
+\`\`\`env
 PAGSEGURO_TOKEN=seu_token_aqui
 PAGSEGURO_EMAIL=seu_email@exemplo.com
 PAGSEGURO_ENVIRONMENT=sandbox
-```
+\`\`\`
 
 Para produção, mude para:
-```env
+\`\`\`env
 PAGSEGURO_ENVIRONMENT=production
-```
+\`\`\`
 
 ## Suporte
 Se o problema persistir após seguir todos os passos:
