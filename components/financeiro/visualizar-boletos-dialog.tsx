@@ -34,7 +34,7 @@ interface Boleto {
   total_parcelas: number
   observacoes?: string
   created_at: string
-  charge_id?: string // Renomeado de pagseguro_id para charge_id
+  charge_id?: string // ID da cobrança no Asaas
   linha_digitavel?: string
   codigo_barras?: string
   link_pdf?: string

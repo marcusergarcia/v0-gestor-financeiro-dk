@@ -6,8 +6,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { id } = await params
 
-    console.log("[v0] Enviando boleto para Asaas, ID:", id)
-
     // Buscar boleto com dados do cliente
     const boletos = await query(
       `
@@ -50,9 +48,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Verificar API Key
     const asaasApiKey = process.env.ASAAS_API_KEY
-    console.log("[v0] ASAAS_API_KEY existe:", !!asaasApiKey)
-    console.log("[v0] ASAAS_ENVIRONMENT:", process.env.ASAAS_ENVIRONMENT || "production (default)")
-    
     if (!asaasApiKey) {
       return NextResponse.json(
         {
@@ -63,9 +58,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    console.log("[v0] Criando instância Asaas API...")
     const asaas = getAsaasAPI()
-    console.log("[v0] Instância Asaas API criada")
 
     // Preparar dados do cliente
     const cpfCnpj = (boleto.cnpj || boleto.cpf || "").replace(/\D/g, "")
@@ -83,7 +76,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const cep = (boleto.cep || "").replace(/\D/g, "")
 
     // Criar ou buscar cliente no Asaas
-    console.log("[v0] Buscando/criando cliente no Asaas para CPF/CNPJ:", cpfCnpj)
     const cliente = await asaas.obterOuCriarCliente({
       name: boleto.cliente_nome,
       cpfCnpj: cpfCnpj,
@@ -116,14 +108,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         : boleto.descricao_produto || `Boleto ${boleto.numero}`
 
     // Criar cobrança no Asaas
-    console.log("[v0] Criando cobrança no Asaas...")
-    console.log("[v0] Dados da cobrança:", JSON.stringify({
-      customer: cliente.id,
-      billingType: "BOLETO",
-      value: Number(boleto.valor),
-      dueDate: dataVencimento,
-      description: descricao.substring(0, 500),
-    }, null, 2))
     const cobranca = await asaas.criarCobranca({
       customer: cliente.id,
       billingType: "BOLETO",
@@ -185,24 +169,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     })
   } catch (error) {
-    console.error("[v0] Erro ao enviar boleto:", error)
-    console.error("[v0] Stack trace:", error instanceof Error ? error.stack : "N/A")
-    
-    // Extrair mensagem de erro mais detalhada
-    let errorMessage = "Erro desconhecido"
-    let errorDetails = null
-    
-    if (error instanceof Error) {
-      errorMessage = error.message
-      errorDetails = error.stack
-    }
-    
+    console.error("[Asaas] Erro ao enviar boleto:", error)
     return NextResponse.json(
       {
         success: false,
         message: "Erro ao enviar boleto para Asaas",
-        error: errorMessage,
-        details: errorDetails,
+        error: error instanceof Error ? error.message : "Erro desconhecido",
       },
       { status: 500 },
     )
