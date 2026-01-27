@@ -87,9 +87,14 @@ export class AsaasAPI {
   private async request<T>(endpoint: string, method: "GET" | "POST" | "PUT" | "DELETE" = "GET", data?: any): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
 
+    console.log(`[Asaas] ${method} ${url}`)
+    console.log(`[Asaas] Environment: ${this.config.environment}`)
+    console.log(`[Asaas] API Key prefix: ${this.config.apiKey.substring(0, 20)}...`)
+
     const headers: HeadersInit = {
-      access_token: this.config.apiKey,
+      "access_token": this.config.apiKey,
       "Content-Type": "application/json",
+      "Accept": "application/json",
     }
 
     const options: RequestInit = {
@@ -99,27 +104,40 @@ export class AsaasAPI {
 
     if (data && (method === "POST" || method === "PUT")) {
       options.body = JSON.stringify(data)
-    }
-
-    console.log(`[Asaas] ${method} ${endpoint}`)
-    if (data) {
       console.log("[Asaas] Payload:", JSON.stringify(data, null, 2))
     }
 
-    const response = await fetch(url, options)
-    const responseData = await response.json()
+    try {
+      const response = await fetch(url, options)
+      
+      // Verificar o content-type da resposta
+      const contentType = response.headers.get("content-type") || ""
+      console.log("[Asaas] Response status:", response.status)
+      console.log("[Asaas] Content-Type:", contentType)
+      
+      // Se não for JSON, ler como texto para ver o erro
+      if (!contentType.includes("application/json")) {
+        const textResponse = await response.text()
+        console.error("[Asaas] Resposta não é JSON:", textResponse.substring(0, 1000))
+        throw new Error(`Asaas API retornou HTML em vez de JSON. Status: ${response.status}. Verifique se a API Key (ASAAS_API_KEY) está correta e corresponde ao ambiente (${this.config.environment}). URL: ${url}`)
+      }
+      
+      const responseData = await response.json()
 
-    console.log("[Asaas] Response status:", response.status)
-    console.log("[Asaas] Response:", JSON.stringify(responseData, null, 2))
+      console.log("[Asaas] Response:", JSON.stringify(responseData, null, 2))
 
-    if (!response.ok) {
-      const errorMessage = responseData.errors
-        ? responseData.errors.map((e: any) => e.description).join(", ")
-        : JSON.stringify(responseData)
-      throw new Error(`Asaas API Error: ${response.status} - ${errorMessage}`)
+      if (!response.ok) {
+        const errorMessage = responseData.errors
+          ? responseData.errors.map((e: any) => e.description).join(", ")
+          : JSON.stringify(responseData)
+        throw new Error(`Asaas API Error: ${response.status} - ${errorMessage}`)
+      }
+
+      return responseData as T
+    } catch (fetchError) {
+      console.error("[Asaas] Erro na requisição:", fetchError)
+      throw fetchError
     }
-
-    return responseData as T
   }
 
   // CLIENTES
@@ -186,23 +204,20 @@ export class AsaasAPI {
   }
 }
 
-// Instância singleton
-let asaasInstance: AsaasAPI | null = null
-
+// Cria nova instância a cada chamada para garantir que pega as variáveis atualizadas
 export function getAsaasAPI(): AsaasAPI {
   const apiKey = process.env.ASAAS_API_KEY
-  const environment = (process.env.ASAAS_ENVIRONMENT as "sandbox" | "production") || "sandbox"
+  const environment = (process.env.ASAAS_ENVIRONMENT as "sandbox" | "production") || "production"
+
+  console.log("[Asaas] getAsaasAPI - Environment:", environment)
+  console.log("[Asaas] getAsaasAPI - API Key exists:", !!apiKey)
 
   if (!apiKey) {
-    throw new Error("ASAAS_API_KEY não configurada. Configure a variável de ambiente.")
+    throw new Error("ASAAS_API_KEY não configurada. Configure a variável de ambiente no Vercel.")
   }
 
-  if (!asaasInstance) {
-    asaasInstance = new AsaasAPI({
-      apiKey,
-      environment,
-    })
-  }
-
-  return asaasInstance
+  return new AsaasAPI({
+    apiKey,
+    environment,
+  })
 }
