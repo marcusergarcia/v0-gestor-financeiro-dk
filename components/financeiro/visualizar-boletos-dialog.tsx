@@ -34,21 +34,11 @@ interface Boleto {
   total_parcelas: number
   observacoes?: string
   created_at: string
-  // PagBank fields
-  charge_id?: string
+  charge_id?: string // Renomeado de pagseguro_id para charge_id
   linha_digitavel?: string
   codigo_barras?: string
   link_pdf?: string
   link_impressao?: string
-  // Asaas fields
-  asaas_id?: string
-  asaas_customer_id?: string
-  asaas_invoice_url?: string
-  asaas_bankslip_url?: string
-  asaas_barcode?: string
-  asaas_linha_digitavel?: string
-  asaas_nosso_numero?: string
-  gateway?: "pagbank" | "asaas"
 }
 
 interface VisualizarBoletosDialogProps {
@@ -193,7 +183,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
   const imprimirTodosBoletos = () => {
     setPrintingAll(true)
 
-    const boletosComPDF = boletos.filter((b) => b.link_pdf || b.link_impressao || b.asaas_bankslip_url)
+    const boletosComPDF = boletos.filter((b) => b.link_pdf || b.link_impressao)
 
     if (boletosComPDF.length === 0) {
       alert("Nenhum boleto disponível para impressão.")
@@ -203,7 +193,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
 
     boletosComPDF.forEach((boleto, index) => {
       setTimeout(() => {
-        const url = boleto.link_pdf || boleto.link_impressao || boleto.asaas_bankslip_url
+        const url = boleto.link_pdf || boleto.link_impressao
         if (url) {
           window.open(url, "_blank")
         }
@@ -219,7 +209,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
   }
 
   const baixarTodosPDFs = async () => {
-    const boletosComPDF = boletos.filter((b) => b.link_pdf || b.asaas_bankslip_url)
+    const boletosComPDF = boletos.filter((b) => b.link_pdf)
 
     if (boletosComPDF.length === 0) {
       alert("Nenhum PDF disponível para download.")
@@ -228,8 +218,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
 
     for (const boleto of boletosComPDF) {
       try {
-        const pdfUrl = boleto.link_pdf || boleto.asaas_bankslip_url
-        const response = await fetch(pdfUrl!)
+        const response = await fetch(boleto.link_pdf!)
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement("a")
@@ -327,11 +316,11 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
               </Card>
             </div>
 
-            {boletos.some((b) => b.link_pdf || b.link_impressao || b.asaas_bankslip_url) && (
+            {boletos.some((b) => b.link_pdf || b.link_impressao) && (
               <div className="flex gap-3 justify-end bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
                 <Button
                   onClick={baixarTodosPDFs}
-                  disabled={!boletos.some((b) => b.link_pdf || b.asaas_bankslip_url)}
+                  disabled={!boletos.some((b) => b.link_pdf)}
                   variant="outline"
                   className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300 shadow-sm"
                 >
@@ -392,16 +381,10 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                               <Badge variant="outline" className="font-mono">
                                 {boleto.numero}
                               </Badge>
-                              {boleto.gateway === "asaas" && boleto.asaas_id && (
-                                <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700">
-                                  <CreditCard className="h-3 w-3 mr-1" />
-                                  Asaas
-                                </Badge>
-                              )}
-                              {boleto.gateway === "pagbank" && boleto.charge_id && (
+                              {boleto.charge_id && (
                                 <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">
                                   <CreditCard className="h-3 w-3 mr-1" />
-                                  PagBank
+                                  PagSeguro
                                 </Badge>
                               )}
                             </TableCell>
@@ -432,43 +415,28 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col gap-2">
-                                {/* Linha digitavel - PagBank ou Asaas */}
-                                {(boleto.linha_digitavel || boleto.asaas_linha_digitavel) && (
+                                {boleto.linha_digitavel && (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => copiarLinhaDigitavel(boleto.linha_digitavel || boleto.asaas_linha_digitavel!)}
+                                    onClick={() => copiarLinhaDigitavel(boleto.linha_digitavel!)}
                                     className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 w-full justify-start"
                                   >
                                     <CreditCard className="h-4 w-4 mr-2" />
                                     Copiar Linha Digitável
                                   </Button>
                                 )}
-                                {/* PDF - PagBank ou Asaas */}
-                                {(boleto.link_pdf || boleto.asaas_bankslip_url) && (
+                                {boleto.link_pdf && (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => abrirPDF(boleto.link_pdf || boleto.asaas_bankslip_url!)}
+                                    onClick={() => abrirPDF(boleto.link_pdf!)}
                                     className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 w-full justify-start"
                                   >
                                     <Download className="h-4 w-4 mr-2" />
                                     Baixar PDF
                                   </Button>
                                 )}
-                                {/* Fatura Asaas */}
-                                {boleto.asaas_invoice_url && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => abrirPDF(boleto.asaas_invoice_url!)}
-                                    className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 w-full justify-start"
-                                  >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    Ver Fatura Asaas
-                                  </Button>
-                                )}
-                                {/* Impressao PagBank */}
                                 {boleto.link_impressao && (
                                   <Button
                                     size="sm"
@@ -480,7 +448,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                                     Imprimir Boleto
                                   </Button>
                                 )}
-                                {!boleto.charge_id && !boleto.asaas_id && <span className="text-xs text-gray-500">Boleto interno</span>}
+                                {!boleto.charge_id && <span className="text-xs text-gray-500">Boleto interno</span>}
                               </div>
                             </TableCell>
                           </TableRow>

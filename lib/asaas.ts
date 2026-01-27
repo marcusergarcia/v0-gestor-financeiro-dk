@@ -81,7 +81,7 @@ export class AsaasAPI {
   constructor(config: AsaasConfig) {
     this.config = config
     this.baseURL =
-      config.environment === "sandbox" ? "https://sandbox.asaas.com/api/v3" : "https://www.asaas.com/api/v3"
+      config.environment === "sandbox" ? "https://sandbox.asaas.com/api/v3" : "https://api.asaas.com/api/v3"
   }
 
   private async request<T>(endpoint: string, method: "GET" | "POST" | "PUT" | "DELETE" = "GET", data?: any): Promise<T> {
