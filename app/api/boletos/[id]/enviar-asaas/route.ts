@@ -5,7 +5,6 @@ import { getAsaasAPI } from "@/lib/asaas"
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    console.log("[v0] Enviando boleto para Asaas - ID:", id)
 
     // Buscar boleto com dados do cliente
     const boletos = await query(
@@ -31,16 +30,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
 
     if (boletos.length === 0) {
-      console.log("[v0] Boleto não encontrado:", id)
       return NextResponse.json({ success: false, message: "Boleto não encontrado" }, { status: 404 })
     }
 
     const boleto = boletos[0]
-    console.log("[v0] Boleto encontrado:", boleto.numero, "- Cliente:", boleto.cliente_nome)
 
     // Verificar se já foi enviado ao Asaas
     if (boleto.asaas_id) {
-      console.log("[v0] Boleto já enviado ao Asaas:", boleto.asaas_id)
       return NextResponse.json(
         {
           success: false,
@@ -52,9 +48,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Verificar API Key
     const asaasApiKey = process.env.ASAAS_API_KEY
-    const asaasEnv = process.env.ASAAS_ENVIRONMENT || "production"
-    console.log("[v0] Asaas Environment:", asaasEnv)
-    console.log("[v0] Asaas API Key exists:", !!asaasApiKey)
     
     if (!asaasApiKey) {
       return NextResponse.json(
@@ -70,10 +63,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Preparar dados do cliente
     const cpfCnpj = (boleto.cnpj || boleto.cpf || "").replace(/\D/g, "")
-    console.log("[v0] CPF/CNPJ do cliente:", cpfCnpj)
     
     if (!cpfCnpj || cpfCnpj.length < 11) {
-      console.log("[v0] CPF/CNPJ inválido")
       return NextResponse.json(
         {
           success: false,
@@ -87,7 +78,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const cep = (boleto.cep || "").replace(/\D/g, "")
 
     // PASSO 1: Criar ou buscar cliente no Asaas
-    console.log("[v0] PASSO 1: Obtendo/criando cliente no Asaas...")
     let cliente
     try {
       cliente = await asaas.obterOuCriarCliente({
@@ -101,9 +91,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         postalCode: cep.length === 8 ? cep : undefined,
         externalReference: String(boleto.cliente_db_id),
       })
-      console.log("[v0] Cliente obtido/criado com sucesso:", cliente.id)
     } catch (clienteError: any) {
-      console.error("[v0] Erro ao obter/criar cliente:", clienteError.message)
+      console.error("Erro ao obter/criar cliente no Asaas:", clienteError.message)
       return NextResponse.json(
         {
           success: false,
@@ -114,9 +103,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // PASSO 2: Formatar dados da cobrança
-    console.log("[v0] PASSO 2: Preparando dados da cobrança...")
     const dataVencimento = new Date(boleto.data_vencimento).toISOString().split("T")[0]
-    console.log("[v0] Data vencimento:", dataVencimento)
 
     // Montar descrição
     const dataNotaFormatada = boleto.data_nota
@@ -131,12 +118,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       boleto.numero_nota && boleto.numero_parcela && boleto.total_parcelas
         ? `NOTA FISCAL No ${boleto.numero_nota} - ${dataNotaFormatada} - Parcela ${boleto.numero_parcela}/${boleto.total_parcelas}`
         : boleto.descricao_produto || `Boleto ${boleto.numero}`
-    
-    console.log("[v0] Descrição:", descricao)
-    console.log("[v0] Valor:", boleto.valor)
 
     // PASSO 3: Criar cobrança no Asaas
-    console.log("[v0] PASSO 3: Criando cobrança no Asaas...")
     let cobranca
     try {
       cobranca = await asaas.criarCobranca({
@@ -155,9 +138,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           type: "PERCENTAGE",
         },
       })
-      console.log("[v0] Cobrança criada com sucesso:", cobranca.id)
     } catch (cobrancaError: any) {
-      console.error("[v0] Erro ao criar cobrança:", cobrancaError.message)
+      console.error("Erro ao criar cobrança no Asaas:", cobrancaError.message)
       return NextResponse.json(
         {
           success: false,
@@ -168,17 +150,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // PASSO 4: Atualizar boleto no banco
-    console.log("[v0] PASSO 4: Atualizando boleto no banco de dados...")
     await query(
       `
       UPDATE boletos 
       SET 
         asaas_id = ?,
         asaas_customer_id = ?,
-        asaas_url = ?,
-        asaas_bank_slip_url = ?,
-        linha_digitavel = ?,
-        codigo_barras = ?,
+        asaas_invoice_url = ?,
+        asaas_bankslip_url = ?,
+        asaas_linha_digitavel = ?,
+        asaas_barcode = ?,
+        asaas_nosso_numero = ?,
         gateway = 'asaas',
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
@@ -190,11 +172,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         cobranca.bankSlipUrl || null,
         cobranca.identificationField || null,
         cobranca.barCode || null,
+        cobranca.nossoNumero || null,
         id,
       ],
     )
-
-    console.log("[v0] Boleto atualizado com sucesso!")
 
     return NextResponse.json({
       success: true,
@@ -210,7 +191,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
     })
   } catch (error) {
-    console.error("[v0] Erro geral ao enviar boleto:", error)
+    console.error("Erro ao enviar boleto para Asaas:", error)
     return NextResponse.json(
       {
         success: false,
