@@ -1,31 +1,29 @@
 import { NextResponse } from "next/server"
 
 export async function GET() {
+  const apiKey = process.env.ASAAS_API_KEY
+  const environment = process.env.ASAAS_ENVIRONMENT || "production"
+  
+  const info = {
+    apiKeyConfigured: !!apiKey,
+    apiKeyLength: apiKey?.length || 0,
+    apiKeyPrefix: apiKey ? apiKey.substring(0, 15) + "..." : null,
+    environment,
+    baseUrl: environment === "sandbox" 
+      ? "https://sandbox.asaas.com/api/v3" 
+      : "https://api.asaas.com/v3",
+    timestamp: new Date().toISOString()
+  }
+
+  if (!apiKey) {
+    return NextResponse.json({
+      success: false,
+      message: "ASAAS_API_KEY nao configurada",
+      info
+    })
+  }
+
   try {
-    const apiKey = process.env.ASAAS_API_KEY
-    const environment = process.env.ASAAS_ENVIRONMENT || "production"
-    
-    // Informacoes basicas
-    const info = {
-      apiKeyConfigured: !!apiKey,
-      apiKeyLength: apiKey?.length || 0,
-      apiKeyPrefix: apiKey ? apiKey.substring(0, 15) + "..." : null,
-      environment,
-      baseUrl: environment === "sandbox" 
-        ? "https://sandbox.asaas.com/api/v3" 
-        : "https://api.asaas.com/v3",
-      timestamp: new Date().toISOString()
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({
-        success: false,
-        message: "ASAAS_API_KEY nao configurada",
-        info
-      })
-    }
-
-    // Testar conexao real com a API do Asaas
     const baseUrl = environment === "sandbox" 
       ? "https://sandbox.asaas.com/api/v3" 
       : "https://api.asaas.com/v3"
@@ -52,7 +50,7 @@ export async function GET() {
     if (response.ok) {
       return NextResponse.json({
         success: true,
-        message: "Conexao com Asaas OK",
+        message: "Conexao com Asaas OK!",
         info,
         test: {
           status: response.status,
@@ -66,14 +64,16 @@ export async function GET() {
         info,
         test: {
           status: response.status,
-          error: responseData?.errors || responseText.substring(0, 200)
+          statusText: response.statusText,
+          error: responseData?.errors || responseText.substring(0, 500)
         }
       })
     }
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      message: "Erro ao verificar status do Asaas",
+      message: "Erro na requisicao",
+      info,
       error: error.message
     }, { status: 500 })
   }

@@ -81,8 +81,13 @@ export class AsaasAPI {
   constructor(config: AsaasConfig) {
     this.config = config
     // URL base de acordo com a documentação oficial do Asaas
+    // Sandbox: https://sandbox.asaas.com/api/v3
+    // Production: https://api.asaas.com/v3
     this.baseURL =
       config.environment === "sandbox" ? "https://sandbox.asaas.com/api/v3" : "https://api.asaas.com/v3"
+    
+    console.log("[Asaas] Inicializado - Environment:", config.environment)
+    console.log("[Asaas] Inicializado - Base URL:", this.baseURL)
   }
 
   private async request<T>(endpoint: string, method: "GET" | "POST" | "PUT" | "DELETE" = "GET", data?: any): Promise<T> {
@@ -90,12 +95,18 @@ export class AsaasAPI {
 
     console.log(`[Asaas] ${method} ${url}`)
     console.log(`[Asaas] Environment: ${this.config.environment}`)
-    console.log(`[Asaas] API Key prefix: ${this.config.apiKey.substring(0, 20)}...`)
+    
+    // Mostra apenas parte da API key por segurança
+    const apiKeyPreview = this.config.apiKey ? 
+      `${this.config.apiKey.substring(0, 10)}...${this.config.apiKey.substring(this.config.apiKey.length - 5)}` : 
+      "UNDEFINED"
+    console.log(`[Asaas] API Key: ${apiKeyPreview}`)
 
+    // Header de autenticação conforme documentação Asaas
     const headers: HeadersInit = {
       "access_token": this.config.apiKey,
       "Content-Type": "application/json",
-      "Accept": "application/json",
+      "User-Agent": "GestorFinanceiro/1.0",
     }
 
     const options: RequestInit = {
@@ -109,6 +120,7 @@ export class AsaasAPI {
     }
 
     try {
+      console.log("[Asaas] Iniciando fetch...")
       const response = await fetch(url, options)
       
       // Verificar o content-type da resposta
@@ -116,27 +128,51 @@ export class AsaasAPI {
       console.log("[Asaas] Response status:", response.status)
       console.log("[Asaas] Content-Type:", contentType)
       
-      // Se não for JSON, ler como texto para ver o erro
+      // Ler a resposta como texto primeiro
+      const responseText = await response.text()
+      console.log("[Asaas] Response body (first 500 chars):", responseText.substring(0, 500))
+      
+      // Se não for JSON, mostrar erro detalhado
       if (!contentType.includes("application/json")) {
-        const textResponse = await response.text()
-        console.error("[Asaas] Resposta não é JSON:", textResponse.substring(0, 1000))
-        throw new Error(`Asaas API retornou HTML em vez de JSON. Status: ${response.status}. Verifique se a API Key (ASAAS_API_KEY) está correta e corresponde ao ambiente (${this.config.environment}). URL: ${url}`)
+        console.error("[Asaas] Resposta não é JSON!")
+        console.error("[Asaas] Status:", response.status)
+        console.error("[Asaas] Headers:", JSON.stringify(Object.fromEntries(response.headers.entries())))
+        
+        if (response.status === 401) {
+          throw new Error(`Asaas: Não autorizado (401). Verifique se a API Key está correta e corresponde ao ambiente (${this.config.environment}).`)
+        }
+        if (response.status === 403) {
+          throw new Error(`Asaas: Acesso negado (403). A API Key pode não ter permissão para esta operação.`)
+        }
+        if (response.status === 404) {
+          throw new Error(`Asaas: Endpoint não encontrado (404). URL: ${url}`)
+        }
+        
+        throw new Error(`Asaas retornou status ${response.status}. Verifique a API Key e o ambiente.`)
       }
       
-      const responseData = await response.json()
+      // Parse JSON
+      let responseData
+      try {
+        responseData = JSON.parse(responseText)
+      } catch (parseError) {
+        console.error("[Asaas] Erro ao parsear JSON:", parseError)
+        throw new Error(`Asaas retornou resposta inválida: ${responseText.substring(0, 200)}`)
+      }
 
-      console.log("[Asaas] Response:", JSON.stringify(responseData, null, 2))
+      console.log("[Asaas] Response JSON:", JSON.stringify(responseData, null, 2))
 
       if (!response.ok) {
         const errorMessage = responseData.errors
-          ? responseData.errors.map((e: any) => e.description).join(", ")
+          ? responseData.errors.map((e: any) => `${e.code}: ${e.description}`).join("; ")
           : JSON.stringify(responseData)
-        throw new Error(`Asaas API Error: ${response.status} - ${errorMessage}`)
+        console.error("[Asaas] Erro da API:", errorMessage)
+        throw new Error(`Asaas: ${errorMessage}`)
       }
 
       return responseData as T
-    } catch (fetchError) {
-      console.error("[Asaas] Erro na requisição:", fetchError)
+    } catch (fetchError: any) {
+      console.error("[Asaas] Erro na requisição:", fetchError.message || fetchError)
       throw fetchError
     }
   }
@@ -187,21 +223,51 @@ export class AsaasAPI {
   // Método auxiliar para criar ou buscar cliente
   async obterOuCriarCliente(data: AsaasCustomer): Promise<AsaasCustomerResponse> {
     const cpfCnpjLimpo = data.cpfCnpj.replace(/\D/g, "")
+    
+    console.log("[Asaas] obterOuCriarCliente - CPF/CNPJ:", cpfCnpjLimpo)
+    console.log("[Asaas] obterOuCriarCliente - Nome:", data.name)
 
-    // Primeiro tenta buscar por CPF/CNPJ
-    const existente = await this.buscarClientePorCpfCnpj(cpfCnpjLimpo)
+    try {
+      // Primeiro tenta buscar por CPF/CNPJ
+      console.log("[Asaas] Buscando cliente por CPF/CNPJ...")
+      const existente = await this.buscarClientePorCpfCnpj(cpfCnpjLimpo)
 
-    if (existente.data && existente.data.length > 0) {
-      console.log("[Asaas] Cliente já existe:", existente.data[0].id)
-      return existente.data[0]
+      if (existente.data && existente.data.length > 0) {
+        console.log("[Asaas] Cliente já existe:", existente.data[0].id, "-", existente.data[0].name)
+        return existente.data[0]
+      }
+      
+      console.log("[Asaas] Cliente não encontrado, criando novo...")
+    } catch (searchError) {
+      console.log("[Asaas] Erro ao buscar cliente (tentando criar):", searchError)
     }
 
-    // Se não existe, cria novo
-    console.log("[Asaas] Criando novo cliente")
-    return this.criarCliente({
-      ...data,
+    // Se não existe ou erro na busca, cria novo
+    console.log("[Asaas] Criando novo cliente com dados:", {
+      name: data.name,
       cpfCnpj: cpfCnpjLimpo,
+      email: data.email,
+      mobilePhone: data.mobilePhone,
     })
+    
+    try {
+      const novoCliente = await this.criarCliente({
+        ...data,
+        cpfCnpj: cpfCnpjLimpo,
+      })
+      console.log("[Asaas] Novo cliente criado:", novoCliente.id)
+      return novoCliente
+    } catch (createError: any) {
+      // Se o erro for "cliente já existe", tenta buscar novamente
+      if (createError.message && createError.message.includes("já cadastrado")) {
+        console.log("[Asaas] Cliente já existe (via erro), buscando...")
+        const existente = await this.buscarClientePorCpfCnpj(cpfCnpjLimpo)
+        if (existente.data && existente.data.length > 0) {
+          return existente.data[0]
+        }
+      }
+      throw createError
+    }
   }
 }
 
