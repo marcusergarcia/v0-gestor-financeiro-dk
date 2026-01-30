@@ -112,7 +112,8 @@ export async function POST(request: NextRequest) {
     } else if (payment.status === "REFUNDED" || payment.status === "DELETED" || payment.status === "REFUND_REQUESTED") {
       novoStatus = "cancelado"
     } else if (payment.status === "PENDING") {
-      novoStatus = "pendente"
+      // Se já está aguardando_pagamento, mantém esse status
+      novoStatus = boleto.status === "aguardando_pagamento" ? "aguardando_pagamento" : "pendente"
     }
     
     // Para eventos de criação/atualização, sempre atualizar os dados do Asaas mesmo se status não mudar
@@ -186,10 +187,6 @@ export async function POST(request: NextRequest) {
       updateValues.push(payment.nossoNumero)
     }
 
-    // Marcar como notificado via webhook
-    updateFields.push("webhook_notificado = ?")
-    updateValues.push(1)
-
     // Sempre atualizar updated_at
     updateFields.push("updated_at = CURRENT_TIMESTAMP")
 
@@ -197,7 +194,7 @@ export async function POST(request: NextRequest) {
     updateValues.push(boleto.id)
 
     // Executar atualização se houver campos para atualizar
-    if (updateFields.length > 1) { // > 1 porque sempre tem updated_at e webhook_notificado
+    if (updateFields.length > 0) {
       const updateQuery = `UPDATE boletos SET ${updateFields.join(", ")} WHERE id = ?`
       console.log("[Asaas Webhook] Query:", updateQuery)
       console.log("[Asaas Webhook] Values:", updateValues)

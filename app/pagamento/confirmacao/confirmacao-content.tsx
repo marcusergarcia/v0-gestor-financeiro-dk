@@ -125,8 +125,8 @@ export default function ConfirmacaoContent() {
                 </div>
               </div>
 
-              {boleto.link_pdf && status === "pending" && (
-                <Button onClick={() => window.open(boleto.link_pdf, "_blank")} variant="outline" className="w-full">
+              {boleto.asaas_bankslip_url && status === "pending" && (
+                <Button onClick={() => window.open(boleto.asaas_bankslip_url, "_blank")} variant="outline" className="w-full">
                   <Printer className="mr-2 h-4 w-4" />
                   Imprimir Boleto
                 </Button>

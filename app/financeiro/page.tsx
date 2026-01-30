@@ -55,13 +55,12 @@ interface Boleto {
   valor: number
   data_vencimento: string
   data_pagamento?: string
-  status: "pendente" | "pago" | "vencido" | "cancelado"
+  status: "pendente" | "aguardando_pagamento" | "pago" | "vencido" | "cancelado"
   numero_parcela: number
   total_parcelas: number
   observacoes?: string
   created_at: string
-  linha_digitavel?: string | null
-  codigo_barras?: string | null
+  // Campos do Asaas
   asaas_id?: string | null
   asaas_customer_id?: string | null
   asaas_invoice_url?: string | null
@@ -337,7 +336,7 @@ export default function FinanceiroPage() {
     const hoje = obterHojeZerado()
     const vencimento = criarDataLocal(dataVencimento)
 
-    const isVencido = status === "pendente" && vencimento && vencimento < hoje
+    const isVencido = (status === "pendente" || status === "aguardando_pagamento") && vencimento && vencimento < hoje
 
     if (status === "pago") {
       return (
@@ -362,6 +361,15 @@ export default function FinanceiroPage() {
         <Badge className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 font-medium px-3 py-1 animate-pulse">
           <AlertCircle className="w-3 h-3 mr-1" />
           Vencido
+        </Badge>
+      )
+    }
+
+    if (status === "aguardando_pagamento") {
+      return (
+        <Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-medium px-3 py-1">
+          <Send className="w-3 h-3 mr-1" />
+          Aguardando
         </Badge>
       )
     }
@@ -437,7 +445,10 @@ export default function FinanceiroPage() {
       if (statusFilter === "vencido") {
         const hoje = obterHojeZerado()
         const vencimento = criarDataLocal(boleto.data_vencimento)
-        matchesStatus = (boleto.status === "pendente" && vencimento && vencimento < hoje) || boleto.status === "vencido"
+        matchesStatus = ((boleto.status === "pendente" || boleto.status === "aguardando_pagamento") && vencimento && vencimento < hoje) || boleto.status === "vencido"
+      } else if (statusFilter === "pendente") {
+        // Filtro pendente inclui "pendente" e "aguardando_pagamento"
+        matchesStatus = boleto.status === "pendente" || boleto.status === "aguardando_pagamento"
       } else {
         matchesStatus = boleto.status === statusFilter
       }
@@ -491,13 +502,13 @@ export default function FinanceiroPage() {
     pendentes: filteredBoletos.filter((b) => {
       const hoje = obterHojeZerado()
       const vencimento = criarDataLocal(b.data_vencimento)
-      return b.status === "pendente" && vencimento && vencimento >= hoje
+      return (b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento >= hoje
     }).length,
     pagos: filteredBoletos.filter((b) => b.status === "pago").length,
     vencidos: filteredBoletos.filter((b) => {
       const hoje = obterHojeZerado()
       const vencimento = criarDataLocal(b.data_vencimento)
-      return (b.status === "pendente" && vencimento && vencimento < hoje) || b.status === "vencido"
+      return ((b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento < hoje) || b.status === "vencido"
     }).length,
     valorTotal: filteredBoletos.reduce((acc, b) => {
       const valor = typeof b.valor === "number" && !isNaN(b.valor) ? b.valor : 0
@@ -524,13 +535,13 @@ export default function FinanceiroPage() {
     pendentes: boletosFiltradosPorPeriodo.filter((b) => {
       const hoje = obterHojeZerado()
       const vencimento = criarDataLocal(b.data_vencimento)
-      return b.status === "pendente" && vencimento && vencimento >= hoje
+      return (b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento >= hoje
     }).length,
     pagos: boletosFiltradosPorPeriodo.filter((b) => b.status === "pago").length,
     vencidos: boletosFiltradosPorPeriodo.filter((b) => {
       const hoje = obterHojeZerado()
       const vencimento = criarDataLocal(b.data_vencimento)
-      return (b.status === "pendente" && vencimento && vencimento < hoje) || b.status === "vencido"
+      return ((b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento < hoje) || b.status === "vencido"
     }).length,
     valorPagos: boletosFiltradosPorPeriodo
       .filter((b) => b.status === "pago")
@@ -539,14 +550,14 @@ export default function FinanceiroPage() {
       .filter((b) => {
         const hoje = obterHojeZerado()
         const vencimento = criarDataLocal(b.data_vencimento)
-        return b.status === "pendente" && vencimento && vencimento >= hoje
+        return (b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento >= hoje
       })
       .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
     valorVencidos: boletosFiltradosPorPeriodo
       .filter((b) => {
         const hoje = obterHojeZerado()
         const vencimento = criarDataLocal(b.data_vencimento)
-        return (b.status === "pendente" && vencimento && vencimento < hoje) || b.status === "vencido"
+        return ((b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento < hoje) || b.status === "vencido"
       })
       .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
   }
@@ -846,72 +857,82 @@ export default function FinanceiroPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
+                                {/* Botão Visualizar - sempre aparece */}
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleVisualizarBoleto(boleto)}
                                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                  title="Visualizar boleto"
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
 
-                                {/* Botão Enviar para Asaas - só aparece quando NÃO tem asaas_id */}
-                                {!boleto.asaas_id && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEnviarAsaas(boleto)}
-                                    disabled={enviandoParaAsaas === boleto.id}
-                                    className="border-teal-500 text-teal-600 hover:bg-teal-50 h-9 lg:h-12 text-sm lg:text-base"
-                                    title="Enviar para Asaas"
-                                  >
-                                    {enviandoParaAsaas === boleto.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Send className="h-4 w-4" />
+                                {/* Botões que só aparecem quando o boleto NÃO está pago */}
+                                {!(boleto.status === "pago" && boleto.data_pagamento) && (
+                                  <>
+                                    {/* Botão Enviar para Asaas - só aparece quando NÃO tem asaas_id */}
+                                    {!boleto.asaas_id && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleEnviarAsaas(boleto)}
+                                        disabled={enviandoParaAsaas === boleto.id}
+                                        className="border-teal-500 text-teal-600 hover:bg-teal-50 h-9 lg:h-12 text-sm lg:text-base"
+                                        title="Enviar para Asaas"
+                                      >
+                                        {enviandoParaAsaas === boleto.id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Send className="h-4 w-4" />
+                                        )}
+                                      </Button>
                                     )}
-                                  </Button>
-                                )}
 
-{/* Botão Imprimir - só aparece quando tem asaas_bankslip_url */}
-                                  {boleto.asaas_bankslip_url && (
+                                    {/* Botão Imprimir - só aparece quando tem asaas_bankslip_url */}
+                                    {boleto.asaas_bankslip_url && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => window.open(boleto.asaas_bankslip_url || "#", "_blank")}
+                                        className="border-purple-500 text-purple-600 hover:bg-purple-50 h-9 lg:h-12 text-sm lg:text-base"
+                                        title="Imprimir boleto"
+                                      >
+                                        <Printer className="h-4 w-4" />
+                                      </Button>
+                                    )}
+
+                                    {/* Botão Marcar como Pago - só aparece quando pendente ou aguardando_pagamento */}
+                                    {(boleto.status === "pendente" || boleto.status === "aguardando_pagamento") && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleMarcarPago(boleto)}
+                                        className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                        title="Marcar como Pago (TESTE)"
+                                      >
+                                        <CheckCircle className="h-4 w-4" />
+                                      </Button>
+                                    )}
+
+                                    {/* Botão Editar */}
                                     <Button
-                                      variant="outline"
                                       size="sm"
-                                      onClick={() => window.open(boleto.asaas_bankslip_url || "#", "_blank")}
-                                    className="border-purple-500 text-purple-600 hover:bg-purple-50 h-9 lg:h-12 text-sm lg:text-base"
-                                    title="Imprimir boleto"
-                                  >
-                                    <Printer className="h-4 w-4" />
-                                  </Button>
+                                      variant="outline"
+                                      onClick={() => handleEditarBoleto(boleto)}
+                                      className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                      title="Editar boleto"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  </>
                                 )}
 
-                                {boleto.status === "pendente" && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleMarcarPago(boleto)}
-                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
-                                    title="Marcar como Pago (TESTE)"
-                                  >
-                                    <CheckCircle className="h-4 w-4" />
-                                  </Button>
-                                )}
+                                {/* Botão Excluir - sempre aparece */}
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleEditarBoleto(boleto)}
-                                  className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    console.log("[v0] Clicou para excluir boleto:", boleto.id, boleto.status)
-                                    handleExcluirBoleto(boleto)
-                                  }}
+                                  onClick={() => handleExcluirBoleto(boleto)}
                                   disabled={deletingId === boleto.id}
                                   className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
                                   title="Excluir boleto"
