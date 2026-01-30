@@ -112,7 +112,8 @@ export async function POST(request: NextRequest) {
     } else if (payment.status === "REFUNDED" || payment.status === "DELETED" || payment.status === "REFUND_REQUESTED") {
       novoStatus = "cancelado"
     } else if (payment.status === "PENDING") {
-      novoStatus = "pendente"
+      // Se já está aguardando_pagamento, mantém esse status
+      novoStatus = boleto.status === "aguardando_pagamento" ? "aguardando_pagamento" : "pendente"
     }
     
     // Para eventos de criação/atualização, sempre atualizar os dados do Asaas mesmo se status não mudar

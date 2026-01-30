@@ -149,7 +149,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // PASSO 4: Atualizar boleto no banco
+    // PASSO 4: Atualizar boleto no banco (incluindo mudança de status para aguardando_pagamento)
     await query(
       `
       UPDATE boletos 
@@ -162,6 +162,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         asaas_barcode = ?,
         asaas_nosso_numero = ?,
         gateway = 'asaas',
+        status = 'aguardando_pagamento',
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `,

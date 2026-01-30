@@ -29,7 +29,7 @@ interface Boleto {
   valor: number
   data_vencimento: string
   data_pagamento?: string
-  status: "pendente" | "pago" | "vencido" | "cancelado"
+  status: "pendente" | "aguardando_pagamento" | "pago" | "vencido" | "cancelado"
   numero_parcela: number
   total_parcelas: number
   observacoes?: string
@@ -110,65 +110,74 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
       vencimento.setHours(0, 0, 0, 0)
     }
 
-    const isVencido = status === "pendente" && vencimento && vencimento < hoje
+  const isVencido = (status === "pendente" || status === "aguardando_pagamento") && vencimento && vencimento < hoje
 
-    if (status === "pago") {
-      return (
-        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-medium px-3 py-1">
-          <CheckCircle className="w-3 h-3 mr-1" />
-          Pago
-        </Badge>
-      )
-    }
+  if (status === "pago") {
+  return (
+  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 font-medium px-3 py-1">
+  <CheckCircle className="w-3 h-3 mr-1" />
+  Pago
+  </Badge>
+  )
+  }
 
-    if (status === "cancelado") {
-      return (
-        <Badge className="bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 font-medium px-3 py-1">
-          <XCircle className="w-3 h-3 mr-1" />
-          Cancelado
-        </Badge>
-      )
-    }
+  if (status === "cancelado") {
+  return (
+  <Badge className="bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 font-medium px-3 py-1">
+  <XCircle className="w-3 h-3 mr-1" />
+  Cancelado
+  </Badge>
+  )
+  }
 
-    if (isVencido || status === "vencido") {
-      return (
-        <Badge className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 font-medium px-3 py-1 animate-pulse">
-          <AlertCircle className="w-3 h-3 mr-1" />
-          Vencido
-        </Badge>
-      )
-    }
+  if (isVencido || status === "vencido") {
+  return (
+  <Badge className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 font-medium px-3 py-1 animate-pulse">
+  <AlertCircle className="w-3 h-3 mr-1" />
+  Vencido
+  </Badge>
+  )
+  }
 
-    return (
-      <Badge className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 font-medium px-3 py-1">
-        <Clock className="w-3 h-3 mr-1" />
-        Pendente
-      </Badge>
-    )
+  if (status === "aguardando_pagamento") {
+  return (
+  <Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-medium px-3 py-1">
+  <Clock className="w-3 h-3 mr-1" />
+  Aguardando
+  </Badge>
+  )
+  }
+
+  return (
+  <Badge className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 font-medium px-3 py-1">
+  <Clock className="w-3 h-3 mr-1" />
+  Pendente
+  </Badge>
+  )
   }
 
   const calcularResumo = () => {
-    const total = boletos.length
-    const pagos = boletos.filter((b) => b.status === "pago").length
-    const pendentes = boletos.filter((b) => b.status === "pendente").length
-    const vencidos = boletos.filter((b) => {
-      const hoje = new Date()
-      const vencimento = new Date(b.data_vencimento)
-      hoje.setHours(0, 0, 0, 0)
-      vencimento.setHours(0, 0, 0, 0)
-      return (b.status === "pendente" && vencimento < hoje) || b.status === "vencido"
-    }).length
-    const cancelados = boletos.filter((b) => b.status === "cancelado").length
+  const total = boletos.length
+  const pagos = boletos.filter((b) => b.status === "pago").length
+  const pendentes = boletos.filter((b) => b.status === "pendente" || b.status === "aguardando_pagamento").length
+  const vencidos = boletos.filter((b) => {
+  const hoje = new Date()
+  const vencimento = new Date(b.data_vencimento)
+  hoje.setHours(0, 0, 0, 0)
+  vencimento.setHours(0, 0, 0, 0)
+  return ((b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento < hoje) || b.status === "vencido"
+  }).length
+  const cancelados = boletos.filter((b) => b.status === "cancelado").length
 
-    const valorTotal = boletos.reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0)
-    const valorPago = boletos
-      .filter((b) => b.status === "pago")
-      .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0)
-    const valorPendente = boletos
-      .filter((b) => b.status === "pendente")
-      .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0)
+  const valorTotal = boletos.reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0)
+  const valorPago = boletos
+  .filter((b) => b.status === "pago")
+  .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0)
+  const valorPendente = boletos
+  .filter((b) => b.status === "pendente" || b.status === "aguardando_pagamento")
+  .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0)
 
-    return { total, pagos, pendentes, vencidos, cancelados, valorTotal, valorPago, valorPendente }
+  return { total, pagos, pendentes, vencidos, cancelados, valorTotal, valorPago, valorPendente }
   }
 
   const resumo = calcularResumo()

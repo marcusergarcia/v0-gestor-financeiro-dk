@@ -55,7 +55,7 @@ interface Boleto {
   valor: number
   data_vencimento: string
   data_pagamento?: string
-  status: "pendente" | "pago" | "vencido" | "cancelado"
+  status: "pendente" | "aguardando_pagamento" | "pago" | "vencido" | "cancelado"
   numero_parcela: number
   total_parcelas: number
   observacoes?: string
@@ -336,7 +336,7 @@ export default function FinanceiroPage() {
     const hoje = obterHojeZerado()
     const vencimento = criarDataLocal(dataVencimento)
 
-    const isVencido = status === "pendente" && vencimento && vencimento < hoje
+    const isVencido = (status === "pendente" || status === "aguardando_pagamento") && vencimento && vencimento < hoje
 
     if (status === "pago") {
       return (
@@ -361,6 +361,15 @@ export default function FinanceiroPage() {
         <Badge className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100 font-medium px-3 py-1 animate-pulse">
           <AlertCircle className="w-3 h-3 mr-1" />
           Vencido
+        </Badge>
+      )
+    }
+
+    if (status === "aguardando_pagamento") {
+      return (
+        <Badge className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 font-medium px-3 py-1">
+          <Send className="w-3 h-3 mr-1" />
+          Aguardando
         </Badge>
       )
     }
@@ -436,7 +445,10 @@ export default function FinanceiroPage() {
       if (statusFilter === "vencido") {
         const hoje = obterHojeZerado()
         const vencimento = criarDataLocal(boleto.data_vencimento)
-        matchesStatus = (boleto.status === "pendente" && vencimento && vencimento < hoje) || boleto.status === "vencido"
+        matchesStatus = ((boleto.status === "pendente" || boleto.status === "aguardando_pagamento") && vencimento && vencimento < hoje) || boleto.status === "vencido"
+      } else if (statusFilter === "pendente") {
+        // Filtro pendente inclui "pendente" e "aguardando_pagamento"
+        matchesStatus = boleto.status === "pendente" || boleto.status === "aguardando_pagamento"
       } else {
         matchesStatus = boleto.status === statusFilter
       }
@@ -490,13 +502,13 @@ export default function FinanceiroPage() {
     pendentes: filteredBoletos.filter((b) => {
       const hoje = obterHojeZerado()
       const vencimento = criarDataLocal(b.data_vencimento)
-      return b.status === "pendente" && vencimento && vencimento >= hoje
+      return (b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento >= hoje
     }).length,
     pagos: filteredBoletos.filter((b) => b.status === "pago").length,
     vencidos: filteredBoletos.filter((b) => {
       const hoje = obterHojeZerado()
       const vencimento = criarDataLocal(b.data_vencimento)
-      return (b.status === "pendente" && vencimento && vencimento < hoje) || b.status === "vencido"
+      return ((b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento < hoje) || b.status === "vencido"
     }).length,
     valorTotal: filteredBoletos.reduce((acc, b) => {
       const valor = typeof b.valor === "number" && !isNaN(b.valor) ? b.valor : 0
@@ -523,13 +535,13 @@ export default function FinanceiroPage() {
     pendentes: boletosFiltradosPorPeriodo.filter((b) => {
       const hoje = obterHojeZerado()
       const vencimento = criarDataLocal(b.data_vencimento)
-      return b.status === "pendente" && vencimento && vencimento >= hoje
+      return (b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento >= hoje
     }).length,
     pagos: boletosFiltradosPorPeriodo.filter((b) => b.status === "pago").length,
     vencidos: boletosFiltradosPorPeriodo.filter((b) => {
       const hoje = obterHojeZerado()
       const vencimento = criarDataLocal(b.data_vencimento)
-      return (b.status === "pendente" && vencimento && vencimento < hoje) || b.status === "vencido"
+      return ((b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento < hoje) || b.status === "vencido"
     }).length,
     valorPagos: boletosFiltradosPorPeriodo
       .filter((b) => b.status === "pago")
@@ -538,14 +550,14 @@ export default function FinanceiroPage() {
       .filter((b) => {
         const hoje = obterHojeZerado()
         const vencimento = criarDataLocal(b.data_vencimento)
-        return b.status === "pendente" && vencimento && vencimento >= hoje
+        return (b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento >= hoje
       })
       .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
     valorVencidos: boletosFiltradosPorPeriodo
       .filter((b) => {
         const hoje = obterHojeZerado()
         const vencimento = criarDataLocal(b.data_vencimento)
-        return (b.status === "pendente" && vencimento && vencimento < hoje) || b.status === "vencido"
+        return ((b.status === "pendente" || b.status === "aguardando_pagamento") && vencimento && vencimento < hoje) || b.status === "vencido"
       })
       .reduce((acc, b) => acc + (typeof b.valor === "number" ? b.valor : 0), 0),
   }
@@ -890,8 +902,8 @@ export default function FinanceiroPage() {
                                       </Button>
                                     )}
 
-                                    {/* Botão Marcar como Pago - só aparece quando pendente */}
-                                    {boleto.status === "pendente" && (
+                                    {/* Botão Marcar como Pago - só aparece quando pendente ou aguardando_pagamento */}
+                                    {(boleto.status === "pendente" || boleto.status === "aguardando_pagamento") && (
                                       <Button
                                         size="sm"
                                         variant="outline"
