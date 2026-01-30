@@ -1,18 +1,28 @@
--- Script para adicionar o status "aguardando_pagamento" ao ENUM da tabela boletos
--- Este status indica que o boleto foi enviado ao Asaas e está aguardando pagamento
+-- =================================================================
+-- Script para adicionar o status "aguardando_pagamento"
+-- =================================================================
+-- INSTRUCOES: Execute os comandos na ordem, um por vez
+-- =================================================================
 
--- IMPORTANTE: Execute este script no MySQL antes de usar o novo status
-
--- 1. Alterar a coluna status para incluir o novo valor
+-- PASSO 1: Alterar a coluna status para incluir o novo valor
 ALTER TABLE boletos 
 MODIFY COLUMN status ENUM('pendente', 'aguardando_pagamento', 'pago', 'vencido', 'cancelado') 
 DEFAULT 'pendente';
 
--- 2. Verificar se a alteração foi aplicada
-SELECT COLUMN_NAME, COLUMN_TYPE, COLUMN_DEFAULT 
-FROM INFORMATION_SCHEMA.COLUMNS 
-WHERE TABLE_NAME = 'boletos' AND COLUMN_NAME = 'status';
+-- PASSO 2: Atualizar boletos que JA foram enviados ao Asaas
+-- (tem asaas_id preenchido) mas ainda estao como "pendente"
+UPDATE boletos 
+SET status = 'aguardando_pagamento' 
+WHERE asaas_id IS NOT NULL 
+AND asaas_id != '' 
+AND status = 'pendente';
 
--- NOTA: Boletos que já foram enviados ao Asaas (tem asaas_id) mas estão pendentes
--- podem ser atualizados para o novo status se desejado:
--- UPDATE boletos SET status = 'aguardando_pagamento' WHERE asaas_id IS NOT NULL AND status = 'pendente';
+-- PASSO 3: Verificar quantos foram atualizados
+SELECT 
+  status,
+  COUNT(*) as quantidade
+FROM boletos 
+GROUP BY status;
+
+-- PASSO 4: Verificar estrutura da coluna
+DESCRIBE boletos;
