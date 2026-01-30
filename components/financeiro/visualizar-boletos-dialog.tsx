@@ -34,11 +34,15 @@ interface Boleto {
   total_parcelas: number
   observacoes?: string
   created_at: string
-  charge_id?: string // ID da cobrança no Asaas
-  linha_digitavel?: string
-  codigo_barras?: string
-  link_pdf?: string
-  link_impressao?: string
+  // Campos do Asaas
+  asaas_id?: string
+  asaas_customer_id?: string
+  asaas_invoice_url?: string
+  asaas_bankslip_url?: string
+  asaas_barcode?: string
+  asaas_linha_digitavel?: string
+  asaas_nosso_numero?: string
+  gateway?: string
 }
 
 interface VisualizarBoletosDialogProps {
@@ -183,7 +187,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
   const imprimirTodosBoletos = () => {
     setPrintingAll(true)
 
-    const boletosComPDF = boletos.filter((b) => b.link_pdf || b.link_impressao)
+    const boletosComPDF = boletos.filter((b) => b.asaas_bankslip_url || b.asaas_invoice_url)
 
     if (boletosComPDF.length === 0) {
       alert("Nenhum boleto disponível para impressão.")
@@ -193,7 +197,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
 
     boletosComPDF.forEach((boleto, index) => {
       setTimeout(() => {
-        const url = boleto.link_pdf || boleto.link_impressao
+        const url = boleto.asaas_bankslip_url || boleto.asaas_invoice_url
         if (url) {
           window.open(url, "_blank")
         }
@@ -209,7 +213,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
   }
 
   const baixarTodosPDFs = async () => {
-    const boletosComPDF = boletos.filter((b) => b.link_pdf)
+    const boletosComPDF = boletos.filter((b) => b.asaas_bankslip_url)
 
     if (boletosComPDF.length === 0) {
       alert("Nenhum PDF disponível para download.")
@@ -218,7 +222,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
 
     for (const boleto of boletosComPDF) {
       try {
-        const response = await fetch(boleto.link_pdf!)
+        const response = await fetch(boleto.asaas_bankslip_url!)
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement("a")
@@ -316,11 +320,11 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
               </Card>
             </div>
 
-            {boletos.some((b) => b.link_pdf || b.link_impressao) && (
+            {boletos.some((b) => b.asaas_bankslip_url || b.asaas_invoice_url) && (
               <div className="flex gap-3 justify-end bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
                 <Button
                   onClick={baixarTodosPDFs}
-                  disabled={!boletos.some((b) => b.link_pdf)}
+                  disabled={!boletos.some((b) => b.asaas_bankslip_url)}
                   variant="outline"
                   className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300 shadow-sm"
                 >
@@ -381,7 +385,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                               <Badge variant="outline" className="font-mono">
                                 {boleto.numero}
                               </Badge>
-                              {boleto.charge_id && (
+                              {boleto.asaas_id && (
                                 <Badge variant="secondary" className="ml-2 bg-teal-100 text-teal-700">
                                   <CreditCard className="h-3 w-3 mr-1" />
                                   Asaas
@@ -415,40 +419,40 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col gap-2">
-                                {boleto.linha_digitavel && (
+                                {boleto.asaas_linha_digitavel && (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => copiarLinhaDigitavel(boleto.linha_digitavel!)}
+                                    onClick={() => copiarLinhaDigitavel(boleto.asaas_linha_digitavel!)}
                                     className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 w-full justify-start"
                                   >
                                     <CreditCard className="h-4 w-4 mr-2" />
                                     Copiar Linha Digitável
                                   </Button>
                                 )}
-                                {boleto.link_pdf && (
+                                {boleto.asaas_bankslip_url && (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => abrirPDF(boleto.link_pdf!)}
+                                    onClick={() => abrirPDF(boleto.asaas_bankslip_url!)}
                                     className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 w-full justify-start"
                                   >
                                     <Download className="h-4 w-4 mr-2" />
                                     Baixar PDF
                                   </Button>
                                 )}
-                                {boleto.link_impressao && (
+                                {boleto.asaas_invoice_url && !boleto.asaas_bankslip_url && (
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => abrirPDF(boleto.link_impressao!)}
+                                    onClick={() => abrirPDF(boleto.asaas_invoice_url!)}
                                     className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 border-purple-200 w-full justify-start"
                                   >
                                     <Printer className="h-4 w-4 mr-2" />
-                                    Imprimir Boleto
+                                    Ver Fatura
                                   </Button>
                                 )}
-                                {!boleto.charge_id && <span className="text-xs text-gray-500">Boleto interno</span>}
+                                {!boleto.asaas_id && <span className="text-xs text-gray-500">Boleto local - enviar ao Asaas</span>}
                               </div>
                             </TableCell>
                           </TableRow>

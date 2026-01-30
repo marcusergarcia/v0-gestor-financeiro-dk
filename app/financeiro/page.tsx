@@ -60,8 +60,7 @@ interface Boleto {
   total_parcelas: number
   observacoes?: string
   created_at: string
-  linha_digitavel?: string | null
-  codigo_barras?: string | null
+  // Campos do Asaas
   asaas_id?: string | null
   asaas_customer_id?: string | null
   asaas_invoice_url?: string | null
@@ -846,72 +845,82 @@ export default function FinanceiroPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex gap-2">
+                                {/* Botão Visualizar - sempre aparece */}
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleVisualizarBoleto(boleto)}
                                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                  title="Visualizar boleto"
                                 >
                                   <Eye className="h-4 w-4" />
                                 </Button>
 
-                                {/* Botão Enviar para Asaas - só aparece quando NÃO tem asaas_id */}
-                                {!boleto.asaas_id && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEnviarAsaas(boleto)}
-                                    disabled={enviandoParaAsaas === boleto.id}
-                                    className="border-teal-500 text-teal-600 hover:bg-teal-50 h-9 lg:h-12 text-sm lg:text-base"
-                                    title="Enviar para Asaas"
-                                  >
-                                    {enviandoParaAsaas === boleto.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Send className="h-4 w-4" />
+                                {/* Botões que só aparecem quando o boleto NÃO está pago */}
+                                {!(boleto.status === "pago" && boleto.data_pagamento) && (
+                                  <>
+                                    {/* Botão Enviar para Asaas - só aparece quando NÃO tem asaas_id */}
+                                    {!boleto.asaas_id && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleEnviarAsaas(boleto)}
+                                        disabled={enviandoParaAsaas === boleto.id}
+                                        className="border-teal-500 text-teal-600 hover:bg-teal-50 h-9 lg:h-12 text-sm lg:text-base"
+                                        title="Enviar para Asaas"
+                                      >
+                                        {enviandoParaAsaas === boleto.id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Send className="h-4 w-4" />
+                                        )}
+                                      </Button>
                                     )}
-                                  </Button>
-                                )}
 
-{/* Botão Imprimir - só aparece quando tem asaas_bankslip_url */}
-                                  {boleto.asaas_bankslip_url && (
+                                    {/* Botão Imprimir - só aparece quando tem asaas_bankslip_url */}
+                                    {boleto.asaas_bankslip_url && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => window.open(boleto.asaas_bankslip_url || "#", "_blank")}
+                                        className="border-purple-500 text-purple-600 hover:bg-purple-50 h-9 lg:h-12 text-sm lg:text-base"
+                                        title="Imprimir boleto"
+                                      >
+                                        <Printer className="h-4 w-4" />
+                                      </Button>
+                                    )}
+
+                                    {/* Botão Marcar como Pago - só aparece quando pendente */}
+                                    {boleto.status === "pendente" && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleMarcarPago(boleto)}
+                                        className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                        title="Marcar como Pago (TESTE)"
+                                      >
+                                        <CheckCircle className="h-4 w-4" />
+                                      </Button>
+                                    )}
+
+                                    {/* Botão Editar */}
                                     <Button
-                                      variant="outline"
                                       size="sm"
-                                      onClick={() => window.open(boleto.asaas_bankslip_url || "#", "_blank")}
-                                    className="border-purple-500 text-purple-600 hover:bg-purple-50 h-9 lg:h-12 text-sm lg:text-base"
-                                    title="Imprimir boleto"
-                                  >
-                                    <Printer className="h-4 w-4" />
-                                  </Button>
+                                      variant="outline"
+                                      onClick={() => handleEditarBoleto(boleto)}
+                                      className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
+                                      title="Editar boleto"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  </>
                                 )}
 
-                                {boleto.status === "pendente" && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleMarcarPago(boleto)}
-                                    className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
-                                    title="Marcar como Pago (TESTE)"
-                                  >
-                                    <CheckCircle className="h-4 w-4" />
-                                  </Button>
-                                )}
+                                {/* Botão Excluir - sempre aparece */}
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => handleEditarBoleto(boleto)}
-                                  className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    console.log("[v0] Clicou para excluir boleto:", boleto.id, boleto.status)
-                                    handleExcluirBoleto(boleto)
-                                  }}
+                                  onClick={() => handleExcluirBoleto(boleto)}
                                   disabled={deletingId === boleto.id}
                                   className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 bg-transparent h-9 lg:h-12 text-sm lg:text-base"
                                   title="Excluir boleto"

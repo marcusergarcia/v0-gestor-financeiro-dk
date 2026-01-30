@@ -117,7 +117,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const descricao =
       boleto.numero_nota && boleto.numero_parcela && boleto.total_parcelas
         ? `NOTA FISCAL No ${boleto.numero_nota} - ${dataNotaFormatada} - Parcela ${boleto.numero_parcela}/${boleto.total_parcelas}`
-        : boleto.descricao_produto || `Boleto ${boleto.numero}`
+        : `Boleto ${boleto.numero}`
 
     // PASSO 3: Criar cobrança no Asaas
     let cobranca

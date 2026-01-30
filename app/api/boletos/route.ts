@@ -154,26 +154,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const dataFormatada = new Date(data_nota).toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-    })
-
-    const descricao_produto = `NOTA FISCAL Nº ${numero_nota} - ${dataFormatada} - Parcelas 1/${numero_parcelas}`
-
     const parcelas = []
     const valorParcela = valor_total / numero_parcelas
     let dataVencimento = new Date(primeiro_vencimento)
 
     for (let i = 1; i <= numero_parcelas; i++) {
-      const descricaoParcela = `NOTA FISCAL Nº ${numero_nota} - ${dataFormatada} - Parcela ${i}/${numero_parcelas}`
-
       parcelas.push({
         parcela: i,
         valor: valorParcela,
         dataVencimento: dataVencimento.toISOString().split("T")[0],
-        descricao: descricaoParcela,
       })
 
       // Adicionar intervalo para próxima parcela
@@ -255,7 +244,7 @@ export async function POST(request: NextRequest) {
           observacoes,
           forma_pagamento,
           data_nota,
-          descricao_produto,
+          numero_nota,
           multa,
           juros,
           created_at,
@@ -273,7 +262,7 @@ export async function POST(request: NextRequest) {
           null,
           forma_pagamento || "boleto",
           data_nota || null,
-          descricao_produto,
+          numero_nota,
           multa_percentual || 2.0,
           juros_mes_percentual || 2.0,
         ],
