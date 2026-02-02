@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ClienteCombobox, type Cliente } from "@/components/cliente-combobox"
 import { PreviewParcelasDialog } from "./preview-parcelas-dialog"
 import { toast } from "@/hooks/use-toast"
-import { Plus, Calculator, Calendar } from "lucide-react"
+import { Plus, Calculator, Calendar, AlertTriangle } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface ParcelaPreview {
   parcela: number
@@ -51,6 +52,13 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
   const [previewOpen, setPreviewOpen] = useState(false)
   const [parcelas, setParcelas] = useState<ParcelaPreview[]>([])
   const verificarNumeroTimeoutRef = useRef<NodeJS.Timeout>()
+  const verificarVencimentoTimeoutRef = useRef<NodeJS.Timeout>()
+  const [vencimentoAlerta, setVencimentoAlerta] = useState<{
+    mensagem: string
+    dataSugerida: string
+    motivo: string
+  } | null>(null)
+  const [validandoVencimento, setValidandoVencimento] = useState(false)
 
   const gerarDescricao = (): string => {
     if (!numeroNota.trim()) return ""
@@ -71,8 +79,11 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
     if (open) {
       const hoje = new Date()
       hoje.setDate(hoje.getDate() + 7)
-      setPrimeiroVencimento(hoje.toISOString().split("T")[0])
+      const dataInicial = hoje.toISOString().split("T")[0]
+      setPrimeiroVencimento(dataInicial)
       setDataNota(new Date().toISOString().split("T")[0])
+      // Validar a data inicial
+      validarVencimento(dataInicial)
     }
   }, [open])
 
@@ -122,6 +133,61 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
     } catch (error) {
       console.error("Erro ao buscar informações do cliente:", error)
       setContratoInfo(null)
+    }
+  }
+
+  const validarVencimento = async (data: string) => {
+    if (!data) {
+      setVencimentoAlerta(null)
+      return
+    }
+
+    setValidandoVencimento(true)
+    try {
+      const response = await fetch("/api/utils/validar-dia-util", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data }),
+      })
+      const result = await response.json()
+
+      if (result.success) {
+        if (!result.isDiaUtil) {
+          setVencimentoAlerta({
+            mensagem: result.mensagem,
+            dataSugerida: result.dataSugerida,
+            motivo: result.motivo,
+          })
+        } else {
+          setVencimentoAlerta(null)
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao validar vencimento:", error)
+    } finally {
+      setValidandoVencimento(false)
+    }
+  }
+
+  const handleVencimentoChange = (value: string) => {
+    setPrimeiroVencimento(value)
+    setVencimentoAlerta(null)
+
+    if (verificarVencimentoTimeoutRef.current) {
+      clearTimeout(verificarVencimentoTimeoutRef.current)
+    }
+
+    if (value) {
+      verificarVencimentoTimeoutRef.current = setTimeout(() => {
+        validarVencimento(value)
+      }, 300)
+    }
+  }
+
+  const usarDataSugerida = () => {
+    if (vencimentoAlerta?.dataSugerida) {
+      setPrimeiroVencimento(vencimentoAlerta.dataSugerida)
+      setVencimentoAlerta(null)
     }
   }
 
@@ -347,6 +413,7 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
     setMultaPercentual("2.00")
     setJurosMesPercentual("2.00")
     setDesconto("0.00")
+    setVencimentoAlerta(null)
   }
 
   const handleClose = () => {
@@ -359,6 +426,9 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
     return () => {
       if (verificarNumeroTimeoutRef.current) {
         clearTimeout(verificarNumeroTimeoutRef.current)
+      }
+      if (verificarVencimentoTimeoutRef.current) {
+        clearTimeout(verificarVencimentoTimeoutRef.current)
       }
     }
   }, [])
@@ -462,11 +532,37 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
                   id="primeiro-vencimento"
                   type="date"
                   value={primeiroVencimento}
-                  onChange={(e) => setPrimeiroVencimento(e.target.value)}
-                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  onChange={(e) => handleVencimentoChange(e.target.value)}
+                  className={`border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 ${
+                    vencimentoAlerta ? "border-amber-500 focus:border-amber-500" : ""
+                  }`}
                 />
+                {validandoVencimento && (
+                  <p className="text-xs text-gray-500">Verificando data...</p>
+                )}
               </div>
             </div>
+
+            {vencimentoAlerta && (
+              <Alert className="border-amber-200 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  <div className="flex flex-col gap-2">
+                    <span>{vencimentoAlerta.mensagem}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={usarDataSugerida}
+                      className="w-fit border-amber-300 bg-amber-100 hover:bg-amber-200 text-amber-800"
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Usar data sugerida
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -638,7 +734,7 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
           <Button
             onClick={gerarPreview}
             disabled={
-              loading || !cliente || !valorTotal || !primeiroVencimento || !numeroNota.trim() || !!numeroNotaError
+              loading || !cliente || !valorTotal || !primeiroVencimento || !numeroNota.trim() || !!numeroNotaError || !!vencimentoAlerta
             }
             className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
           >
