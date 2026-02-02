@@ -172,9 +172,27 @@ export async function POST(request: NextRequest) {
 
         // Adicionar equipamentos se houver no contrato
         if (cliente.equipamentos_inclusos) {
-          const equipamentos = cliente.equipamentos_inclusos.split("\n").filter((e: string) => e.trim())
+          let equipamentos: any[] = []
+          
+          try {
+            // Tentar parsear como JSON (formato correto)
+            const parsed = JSON.parse(cliente.equipamentos_inclusos)
+            if (Array.isArray(parsed)) {
+              equipamentos = parsed
+            }
+          } catch (parseError) {
+            // Se não for JSON válido, tentar como string com quebras de linha (formato antigo)
+            equipamentos = cliente.equipamentos_inclusos
+              .split("\n")
+              .filter((e: string) => e.trim())
+              .map((nome: string) => ({ nome: nome.trim() }))
+          }
 
-          for (const equipamentoNome of equipamentos) {
+          for (const equipamento of equipamentos) {
+            const equipamentoNome = typeof equipamento === 'string' 
+              ? equipamento 
+              : (equipamento.nome || equipamento.descricao || 'EQUIPAMENTO')
+            
             await query(
               `INSERT INTO ordens_servico_itens 
                (ordem_servico_id, equipamento_nome, quantidade, situacao)
@@ -182,7 +200,8 @@ export async function POST(request: NextRequest) {
               [ordemId, equipamentoNome.trim().toUpperCase()],
             )
           }
-        }
+          
+          }
 
         resultados.sucesso.push({
           cliente_id: clienteId,
