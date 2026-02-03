@@ -245,6 +245,7 @@ export function EditarBoletoDialog({ open, onOpenChange, boleto, onSuccess }: Ed
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="aguardando_pagamento">Aguardando Pagamento</SelectItem>
                 <SelectItem value="pago">Pago</SelectItem>
                 <SelectItem value="vencido">Vencido</SelectItem>
                 <SelectItem value="cancelado">Cancelado</SelectItem>
