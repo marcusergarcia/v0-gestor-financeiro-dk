@@ -22,7 +22,7 @@ interface Boleto {
   cliente_nome: string
   valor: number
   data_vencimento: string
-  status: "pendente" | "pago" | "vencido" | "cancelado"
+  status: "pendente" | "aguardando_pagamento" | "pago" | "vencido" | "cancelado"
   parcela_atual: number
   total_parcelas: number
   observacoes?: string
@@ -120,6 +120,7 @@ export function BoletosTab() {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       pendente: { label: "Pendente", variant: "secondary" as const },
+      aguardando_pagamento: { label: "Aguardando", variant: "default" as const },
       pago: { label: "Pago", variant: "default" as const },
       vencido: { label: "Vencido", variant: "destructive" as const },
       cancelado: { label: "Cancelado", variant: "outline" as const },
@@ -180,6 +181,7 @@ export function BoletosTab() {
           <SelectContent>
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="pendente">Pendentes</SelectItem>
+            <SelectItem value="aguardando_pagamento">Aguardando Pagamento</SelectItem>
             <SelectItem value="pago">Pagos</SelectItem>
             <SelectItem value="vencido">Vencidos</SelectItem>
             <SelectItem value="cancelado">Cancelados</SelectItem>

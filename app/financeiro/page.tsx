@@ -447,8 +447,11 @@ export default function FinanceiroPage() {
         const vencimento = criarDataLocal(boleto.data_vencimento)
         matchesStatus = ((boleto.status === "pendente" || boleto.status === "aguardando_pagamento") && vencimento && vencimento < hoje) || boleto.status === "vencido"
       } else if (statusFilter === "pendente") {
-        // Filtro pendente inclui "pendente" e "aguardando_pagamento"
-        matchesStatus = boleto.status === "pendente" || boleto.status === "aguardando_pagamento"
+        // Filtro pendente mostra apenas pendentes
+        matchesStatus = boleto.status === "pendente"
+      } else if (statusFilter === "aguardando_pagamento") {
+        // Filtro aguardando_pagamento mostra apenas aguardando pagamento
+        matchesStatus = boleto.status === "aguardando_pagamento"
       } else {
         matchesStatus = boleto.status === statusFilter
       }
@@ -751,6 +754,7 @@ export default function FinanceiroPage() {
                       <SelectContent>
                         <SelectItem value="all">Todos os status</SelectItem>
                         <SelectItem value="pendente">Pendentes</SelectItem>
+                        <SelectItem value="aguardando_pagamento">Aguardando Pagamento</SelectItem>
                         <SelectItem value="pago">Pagos</SelectItem>
                         <SelectItem value="vencido">Vencidos</SelectItem>
                         <SelectItem value="cancelado">Cancelados</SelectItem>
