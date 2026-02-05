@@ -96,12 +96,16 @@ CREATE TABLE IF NOT EXISTS configuracao_fiscal (
 
 -- Inserir configuracao fiscal padrao
 INSERT INTO configuracao_fiscal (
-  descricao_servico_padrao,
+  municipal_service_id,
+  municipal_service_code,
   municipal_service_name,
+  descricao_servico_padrao,
   iss_percentual
 ) VALUES (
-  'Servicos de manutencao predial',
-  'Manutencao predial',
+  '07498',
+  '14.01',
+  'Conserto, restauracao, manutencao e conservacao de maquinas, equipamentos, elevadores e congeneres',
+  'Servicos de conserto, restauracao, manutencao e conservacao de maquinas, equipamentos, elevadores e congeneres',
   5.00
 );
 
