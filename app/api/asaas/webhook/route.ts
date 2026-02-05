@@ -28,63 +28,7 @@ export async function POST(request: NextRequest) {
     const payload = await request.json()
     console.log("[Asaas Webhook] Payload:", JSON.stringify(payload, null, 2))
 
-    const { event, payment, invoice } = payload
-
-    // Processar eventos de NFS-e (invoice)
-    if (event && event.startsWith("INVOICE_") && invoice) {
-      console.log("[Asaas Webhook] Evento de NFS-e:", event)
-      console.log("[Asaas Webhook] Invoice ID:", invoice.id)
-      console.log("[Asaas Webhook] Invoice Status:", invoice.status)
-
-      try {
-        // Mapear status do Asaas para status local
-        const statusMap: Record<string, string> = {
-          SCHEDULED: "agendada",
-          SYNCHRONIZED: "sincronizada",
-          AUTHORIZED: "autorizada",
-          PROCESSING_CANCELLATION: "processando_cancelamento",
-          CANCELED: "cancelada",
-          CANCELLATION_DENIED: "cancelamento_negado",
-          ERROR: "erro",
-        }
-
-        const novoStatus = statusMap[invoice.status] || "agendada"
-
-        const updateFields: string[] = ["status = ?", "asaas_status = ?", "updated_at = CURRENT_TIMESTAMP"]
-        const updateValues: any[] = [novoStatus, invoice.status]
-
-        if (invoice.number) {
-          updateFields.push("asaas_numero = ?")
-          updateValues.push(invoice.number)
-        }
-        if (invoice.pdfUrl) {
-          updateFields.push("asaas_pdf_url = ?")
-          updateValues.push(invoice.pdfUrl)
-        }
-        if (invoice.xmlUrl) {
-          updateFields.push("asaas_xml_url = ?")
-          updateValues.push(invoice.xmlUrl)
-        }
-        if (invoice.rpsSerie) {
-          updateFields.push("asaas_rps_number = ?")
-          updateValues.push(invoice.rpsSerie)
-        }
-        if (invoice.status === "ERROR" && invoice.observations) {
-          updateFields.push("asaas_error_message = ?")
-          updateValues.push(invoice.observations)
-        }
-
-        updateValues.push(invoice.id)
-        const updateQuery = `UPDATE notas_fiscais SET ${updateFields.join(", ")} WHERE asaas_id = ?`
-        await query(updateQuery, updateValues)
-
-        console.log("[Asaas Webhook] NFS-e atualizada:", invoice.id, "->", novoStatus)
-      } catch (nfError) {
-        console.error("[Asaas Webhook] Erro ao processar NFS-e:", nfError)
-      }
-
-      return NextResponse.json({ success: true }, { status: 200 })
-    }
+    const { event, payment } = payload
 
     if (!event || !payment) {
       console.log("[Asaas Webhook] Payload inválido: event ou payment ausente")

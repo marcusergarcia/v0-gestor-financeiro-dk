@@ -15,7 +15,6 @@ import {
   FileText,
   Database,
   CreditCard,
-  Receipt,
 } from "lucide-react"
 import { LogosTab } from "@/components/configuracoes/logos-tab"
 import { LayoutTab } from "@/components/configuracoes/layout-tab"
@@ -26,7 +25,6 @@ import { ValorKmTab } from "@/components/configuracoes/valor-km-tab"
 import { TermosTab } from "@/components/configuracoes/termos-tab"
 import { BackupTab } from "@/components/configuracoes/backup-tab"
 import { AsaasTab } from "@/components/configuracoes/asaas-tab"
-import { FiscalTab } from "@/components/configuracoes/fiscal-tab"
 import { useEffect } from "react"
 
 export default function ConfiguracoesPage() {
@@ -91,7 +89,7 @@ export default function ConfiguracoesPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               {/* Desktop: Grid 9 colunas agora */}
               <div className="hidden md:block border-b bg-gradient-to-r from-indigo-50 to-purple-50">
-                <TabsList className="grid w-full grid-cols-10 h-auto p-2 bg-transparent">
+                <TabsList className="grid w-full grid-cols-9 h-auto p-2 bg-transparent">
                   <TabsTrigger
                     value="logos"
                     className="flex flex-col items-center gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
@@ -149,13 +147,6 @@ export default function ConfiguracoesPage() {
                     Backup
                   </TabsTrigger>
                   <TabsTrigger
-                    value="fiscal"
-                    className="flex flex-col items-center gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-500 data-[state=active]:text-white"
-                  >
-                    <Receipt className="h-4 w-4" />
-                    Fiscal
-                  </TabsTrigger>
-                  <TabsTrigger
                     value="asaas"
                     className="flex flex-col items-center gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white"
                   >
@@ -167,7 +158,7 @@ export default function ConfiguracoesPage() {
 
               {/* Mobile: Grid 4x2 fixo no rodapé */}
               <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-2xl">
-                <TabsList className="grid grid-cols-5 grid-rows-2 w-full h-auto p-2 gap-1 bg-gradient-to-r from-indigo-50 to-purple-50">
+                <TabsList className="grid grid-cols-4 grid-rows-2 w-full h-auto p-2 gap-1 bg-gradient-to-r from-indigo-50 to-purple-50">
                   <TabsTrigger
                     value="logos"
                     className="flex flex-col items-center gap-1 py-2 text-[9px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white rounded"
@@ -225,13 +216,6 @@ export default function ConfiguracoesPage() {
                     <span>Backup</span>
                   </TabsTrigger>
                   <TabsTrigger
-                    value="fiscal"
-                    className="flex flex-col items-center gap-1 py-2 text-[9px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-500 data-[state=active]:text-white rounded"
-                  >
-                    <Receipt className="h-4 w-4" />
-                    <span>Fiscal</span>
-                  </TabsTrigger>
-                  <TabsTrigger
                     value="asaas"
                     className="flex flex-col items-center gap-1 py-2 text-[9px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-cyan-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white rounded"
                   >
@@ -272,10 +256,6 @@ export default function ConfiguracoesPage() {
 
                 <TabsContent value="backup" className="mt-0">
                   <BackupTab />
-                </TabsContent>
-
-                <TabsContent value="fiscal" className="mt-0">
-                  <FiscalTab />
                 </TabsContent>
 
                 <TabsContent value="asaas" className="mt-0">
