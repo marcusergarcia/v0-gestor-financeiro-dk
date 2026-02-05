@@ -24,6 +24,7 @@ import {
   X,
   Home,
   Calendar,
+  FileCheck,
 } from "lucide-react"
 import { useSidebar } from "@/components/sidebar-provider"
 import { usePermissions } from "@/hooks/use-permissions"
@@ -92,6 +93,12 @@ const menuItems: MenuItem[] = [
     href: "/financeiro",
     icon: DollarSign,
     permission: "financeiro",
+  },
+  {
+    title: "Notas Fiscais",
+    href: "/nota-fiscal",
+    icon: FileCheck,
+    permission: "nota_fiscal",
   },
   {
     title: "Relatórios",
