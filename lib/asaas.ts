@@ -220,6 +220,67 @@ export class AsaasAPI {
     return this.request(`/payments${queryString}`, "GET")
   }
 
+  // NOTAS FISCAIS (NFS-e)
+  async listarServicosMunicipais(descricao?: string): Promise<{ data: any[] }> {
+    const params = descricao ? `?description=${encodeURIComponent(descricao)}` : ""
+    return this.request(`/invoices/municipalServices${params}`, "GET")
+  }
+
+  async agendarNotaFiscal(data: {
+    payment?: string
+    installment?: string
+    customer?: string
+    serviceDescription: string
+    observations?: string
+    value: number
+    deductions?: number
+    effectiveDate: string
+    municipalServiceId?: string
+    municipalServiceCode?: string
+    municipalServiceName?: string
+    taxes?: {
+      retainIss?: boolean
+      iss?: number
+      cofins?: number
+      csll?: number
+      inss?: number
+      ir?: number
+      pis?: number
+    }
+  }): Promise<any> {
+    return this.request("/invoices", "POST", data)
+  }
+
+  async autorizarNotaFiscal(invoiceId: string): Promise<any> {
+    return this.request(`/invoices/${invoiceId}/authorize`, "POST")
+  }
+
+  async consultarNotaFiscal(invoiceId: string): Promise<any> {
+    return this.request(`/invoices/${invoiceId}`, "GET")
+  }
+
+  async cancelarNotaFiscal(invoiceId: string): Promise<any> {
+    return this.request(`/invoices/${invoiceId}`, "DELETE")
+  }
+
+  async listarNotasFiscais(filters?: {
+    payment?: string
+    installment?: string
+    customer?: string
+    status?: string
+    offset?: number
+    limit?: number
+  }): Promise<{ data: any[]; totalCount: number }> {
+    const params = new URLSearchParams()
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value))
+      })
+    }
+    const queryString = params.toString() ? `?${params.toString()}` : ""
+    return this.request(`/invoices${queryString}`, "GET")
+  }
+
   // Método auxiliar para criar ou buscar cliente
   async obterOuCriarCliente(data: AsaasCustomer): Promise<AsaasCustomerResponse> {
     const cpfCnpjLimpo = data.cpfCnpj.replace(/\D/g, "")

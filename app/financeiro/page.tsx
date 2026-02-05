@@ -45,6 +45,7 @@ import {
 import { NovoBoletoDialog } from "@/components/financeiro/novo-boleto-dialog"
 import { EditarBoletoDialog } from "@/components/financeiro/editar-boleto-dialog"
 import { VisualizarBoletosDialog } from "@/components/financeiro/visualizar-boletos-dialog"
+import { NotasFiscaisTab } from "@/components/financeiro/notas-fiscais-tab"
 import Link from "next/link"
 
 interface Boleto {
@@ -696,9 +697,16 @@ export default function FinanceiroPage() {
 
       {/* Tabs */}
       <Card className="border-0 shadow-lg bg-white">
-        <Tabs defaultValue="boletos" className="w-full">
+        <Tabs defaultValue="notas-fiscais" className="w-full">
           <div className="border-b bg-gradient-to-r from-green-50 to-blue-50">
-            <TabsList className="grid w-full grid-cols-2 h-auto p-2 bg-transparent">
+            <TabsList className="grid w-full grid-cols-3 h-auto p-2 bg-transparent">
+              <TabsTrigger
+                value="notas-fiscais"
+                className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-amber-500 data-[state=active]:text-white"
+              >
+                <FileText className="h-4 w-4" />
+                Notas Fiscais
+              </TabsTrigger>
               <TabsTrigger
                 value="boletos"
                 className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-green-600 data-[state=active]:text-white"
@@ -715,6 +723,14 @@ export default function FinanceiroPage() {
               </TabsTrigger>
             </TabsList>
           </div>
+
+          <TabsContent value="notas-fiscais" className="p-6">
+            <NotasFiscaisTab
+              valoresOcultos={valoresOcultos}
+              formatarValor={formatarValor}
+              onBoletosUpdated={loadData}
+            />
+          </TabsContent>
 
           <TabsContent value="boletos" className="p-6 space-y-6">
             {/* Boletos Header */}
