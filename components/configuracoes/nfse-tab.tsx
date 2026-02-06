@@ -650,21 +650,36 @@ export function NfseTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ExternalLink className="h-5 w-5 text-blue-600" />
-            Credenciamento Web Service - Prefeitura de Sao Paulo
+            Como Funciona - Prefeitura de Sao Paulo
           </CardTitle>
           <CardDescription>
-            Passo a passo para solicitar acesso ao Web Service de NFS-e
+            Informacoes sobre a emissao de NFS-e via Web Service em Sao Paulo
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Passo a Passo do Credenciamento */}
+          {/* Aviso importante: Não precisa de credenciamento */}
+          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+            <h4 className="font-medium text-green-800 mb-2 flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5" />
+              Nao e necessario credenciamento separado
+            </h4>
+            <p className="text-sm text-gray-700">
+              A Prefeitura de Sao Paulo <strong>nao exige um processo de credenciamento separado</strong> para usar o Web Service.
+              A autenticacao e feita diretamente pelo seu <strong>certificado digital A1</strong> nas chamadas ao webservice.
+              Como voce ja possui o certificado e a inscricao municipal ativa, voce ja pode emitir NFS-e pelo sistema.
+            </p>
+          </div>
+
+          {/* Passo a Passo */}
           <div className="space-y-3">
+            <h4 className="font-medium text-gray-800">Passo a passo para comecar a emitir:</h4>
+
             <div className="flex gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
               <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">1</div>
               <div>
-                <p className="font-medium text-emerald-800">Acesse o Portal NFS-e da Prefeitura</p>
+                <p className="font-medium text-emerald-800">Preencha os dados do prestador acima</p>
                 <p className="text-sm text-gray-600 mt-1">
-                  Entre em{" "}
+                  Utilize as informacoes do seu perfil no portal{" "}
                   <button
                     type="button"
                     onClick={() => window.open("https://nfe.prefeitura.sp.gov.br", "_blank")}
@@ -672,7 +687,7 @@ export function NfseTab() {
                   >
                     nfe.prefeitura.sp.gov.br
                   </button>
-                  {" "}usando seu certificado digital A1 (o mesmo que voce carregou acima).
+                  . Preencha CNPJ, Inscricao Municipal, endereco e dados fiscais conforme aparecem no portal da prefeitura.
                 </p>
               </div>
             </div>
@@ -680,11 +695,10 @@ export function NfseTab() {
             <div className="flex gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
               <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">2</div>
               <div>
-                <p className="font-medium text-emerald-800">Solicite o Credenciamento para Web Service</p>
+                <p className="font-medium text-emerald-800">Carregue o certificado digital A1</p>
                 <p className="text-sm text-gray-600 mt-1">
-                  No portal, va em <strong>{"Configuracoes > Web Service"}</strong> (ou procure por &quot;Web Service&quot; no menu).
-                  Preencha os dados solicitados e aceite os termos de uso. A Prefeitura de SP utiliza
-                  autenticacao via certificado digital no proprio webservice, entao o credenciamento e automatico na maioria dos casos.
+                  Faca o upload do seu arquivo <strong>.pfx ou .p12</strong> e informe a senha.
+                  O certificado sera usado para autenticar as chamadas ao webservice e assinar digitalmente os RPS (Recibos Provisorios de Servico).
                 </p>
               </div>
             </div>
@@ -692,18 +706,11 @@ export function NfseTab() {
             <div className="flex gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
               <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">3</div>
               <div>
-                <p className="font-medium text-emerald-800">Teste em Homologacao</p>
+                <p className="font-medium text-emerald-800">Preencha o codigo de servico</p>
                 <p className="text-sm text-gray-600 mt-1">
-                  O ambiente de <strong>homologacao (testes)</strong> esta disponivel em{" "}
-                  <button
-                    type="button"
-                    onClick={() => window.open("https://nfe.prefeitura.sp.gov.br", "_blank")}
-                    className="text-blue-600 underline hover:text-blue-800"
-                  >
-                    nfe.prefeitura.sp.gov.br
-                  </button>.
-                  Neste sistema, selecione &quot;Homologacao&quot; acima e faca um teste de emissao.
-                  As notas emitidas em homologacao nao tem valor fiscal.
+                  No portal da prefeitura, em &quot;Configuracoes do Perfil&quot;, voce encontra o <strong>Codigo de Servico Principal</strong>.
+                  No seu caso, o codigo aparece na secao &quot;Codigo de Servico Principal&quot; da pagina de configuracoes do perfil do contribuinte.
+                  Informe esse codigo no campo &quot;Codigo do Servico&quot; acima.
                 </p>
               </div>
             </div>
@@ -711,10 +718,11 @@ export function NfseTab() {
             <div className="flex gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
               <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">4</div>
               <div>
-                <p className="font-medium text-emerald-800">Ative a Producao</p>
+                <p className="font-medium text-emerald-800">Teste em Homologacao primeiro</p>
                 <p className="text-sm text-gray-600 mt-1">
-                  Apos validar os testes, mude o ambiente para <strong>Producao</strong> nesta configuracao.
-                  As notas emitidas em producao terao valor fiscal e serao registradas na Prefeitura.
+                  Mantenha o ambiente em <strong>&quot;Homologacao&quot;</strong> (ja selecionado por padrao) e faca um teste de emissao
+                  na pagina <strong>Notas Fiscais</strong>. As notas em homologacao nao tem valor fiscal.
+                  Apos validar que tudo funciona, mude para &quot;Producao&quot;.
                 </p>
               </div>
             </div>
@@ -722,39 +730,27 @@ export function NfseTab() {
 
           <Separator />
 
-          {/* Requisitos */}
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h4 className="font-medium text-blue-800 mb-2">Requisitos para emissao</h4>
-            <ul className="space-y-2 text-sm text-gray-700">
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Inscricao Municipal (IM) ativa na Prefeitura de SP</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Certificado Digital A1 (.pfx/.p12) valido e emitido por AC credenciada ICP-Brasil</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>CNPJ regular e sem pendencias com o municipio</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>Codigo do servico correto conforme LC 116/2003 e lista da Prefeitura de SP</span>
-              </li>
-            </ul>
+          {/* Como a emissão funciona tecnicamente */}
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h4 className="font-medium text-gray-800 mb-2 flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              Como funciona a emissao
+            </h4>
+            <ol className="space-y-2 text-sm text-gray-700 list-decimal list-inside">
+              <li>O sistema gera um <strong>RPS</strong> (Recibo Provisorio de Servicos) com os dados da nota</li>
+              <li>O RPS e enviado ao Web Service da Prefeitura de SP via SOAP com autenticacao por certificado digital</li>
+              <li>A prefeitura processa o RPS e converte em <strong>NFS-e</strong> (Nota Fiscal de Servico Eletronica)</li>
+              <li>O numero da NFS-e e o link de verificacao sao retornados e armazenados no sistema</li>
+            </ol>
           </div>
 
-          {/* Informacao importante sobre a Reforma Tributaria */}
-          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-            <h4 className="font-medium text-amber-800 mb-1 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              Reforma Tributaria 2026
-            </h4>
-            <p className="text-sm text-amber-700">
-              A partir de 01/01/2026, houve mudancas na emissao de NFS-e por conta da Reforma Tributaria.
-              Verifique no portal da prefeitura se ha novas exigencias ou campos obrigatorios para o seu servico.
-            </p>
+          {/* Endpoints usados */}
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h4 className="font-medium text-blue-800 mb-2">Endpoints do Web Service SP</h4>
+            <div className="space-y-1 text-xs font-mono text-blue-700">
+              <p><strong>Producao:</strong> https://nfe.prefeitura.sp.gov.br/ws/loterps.asmx</p>
+              <p><strong>Homologacao:</strong> https://nfeh.prefeitura.sp.gov.br/ws/loterps.asmx</p>
+            </div>
           </div>
 
           {/* Links Oficiais */}
