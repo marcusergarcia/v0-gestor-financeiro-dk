@@ -83,6 +83,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
+    console.log("[v0] POST /api/clientes - dados recebidos:", {
+      nome: data.nome,
+      codigo: data.codigo,
+      cnpj: data.cnpj,
+      cpf: data.cpf,
+      tem_contrato: data.tem_contrato,
+    })
 
     const insertQuery = `
       INSERT INTO clientes (
@@ -93,7 +100,7 @@ export async function POST(request: NextRequest) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `
 
-    const result = await query(insertQuery, [
+    const params = [
       data.codigo?.toUpperCase() || null,
       data.nome?.toUpperCase(),
       data.cnpj?.toUpperCase() || null,
@@ -111,24 +118,30 @@ export async function POST(request: NextRequest) {
       data.rg_sindico?.toUpperCase() || null,
       data.cpf_sindico?.toUpperCase() || null,
       data.zelador?.toUpperCase() || null,
-      data.tem_contrato || 0,
+      data.tem_contrato ? 1 : 0,
       data.dia_contrato || null,
       data.observacoes?.toUpperCase() || null,
       data.nome_adm?.toUpperCase() || null,
       data.contato_adm?.toUpperCase() || null,
       data.telefone_adm || null,
       data.email_adm?.toLowerCase() || null,
-    ])
+    ]
 
-    console.log(`✅ Cliente criado: ${data.nome} (ID: ${result.insertId})`)
+    console.log("[v0] Executando INSERT com", params.length, "parametros")
+    const result = await query(insertQuery, params)
+    console.log("[v0] INSERT resultado:", result)
 
     return NextResponse.json({
       success: true,
       message: "Cliente criado com sucesso",
       data: { id: result.insertId, ...data },
     })
-  } catch (error) {
-    console.error("❌ Erro ao criar cliente:", error)
-    return NextResponse.json({ success: false, message: "Erro interno do servidor" }, { status: 500 })
+  } catch (error: any) {
+    console.error("[v0] Erro ao criar cliente:", error?.message || error)
+    console.error("[v0] Stack:", error?.stack)
+    return NextResponse.json(
+      { success: false, message: error?.message || "Erro interno do servidor" },
+      { status: 500 },
+    )
   }
 }
