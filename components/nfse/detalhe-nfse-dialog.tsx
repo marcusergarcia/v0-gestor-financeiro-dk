@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
-import { Loader2, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw } from "lucide-react"
+import { Loader2, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, Code } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
@@ -40,6 +40,8 @@ export function DetalheNfseDialog({ open, onOpenChange, notaId }: DetalheNfseDia
   const [loading, setLoading] = useState(false)
   const [consultando, setConsultando] = useState(false)
   const [nota, setNota] = useState<any>(null)
+  const [xmlDebug, setXmlDebug] = useState<any>(null)
+  const [showXml, setShowXml] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -182,12 +184,67 @@ export function DetalheNfseDialog({ open, onOpenChange, notaId }: DetalheNfseDia
             )}
 
             {/* Erro */}
-            {nota.status === "erro" && nota.mensagem_erro && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm text-red-700 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  {nota.mensagem_erro}
-                </p>
+            {nota.status === "erro" && (
+              <div className="space-y-2">
+                {nota.mensagem_erro && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-700 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      {nota.mensagem_erro}
+                    </p>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleConsultar}
+                    disabled={consultando}
+                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                  >
+                    {consultando ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Consultando...</>
+                    ) : (
+                      <><RefreshCw className="h-4 w-4 mr-2" />Consultar na Prefeitura</>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      if (!xmlDebug) {
+                        try {
+                          const res = await fetch(`/api/nfse/${notaId}/xml-debug`)
+                          const data = await res.json()
+                          setXmlDebug(data)
+                        } catch {
+                          toast({ title: "Erro", description: "Erro ao buscar XML", variant: "destructive" })
+                        }
+                      }
+                      setShowXml(!showXml)
+                    }}
+                    className="text-gray-600"
+                  >
+                    <Code className="h-4 w-4 mr-2" />
+                    {showXml ? "Ocultar XML" : "Ver XML Debug"}
+                  </Button>
+                </div>
+                {showXml && xmlDebug && (
+                  <div className="space-y-2">
+                    <div className="p-2 bg-gray-900 rounded-lg max-h-48 overflow-auto">
+                      <p className="text-xs text-gray-400 mb-1">XML Retorno da Prefeitura:</p>
+                      <pre className="text-xs text-green-400 whitespace-pre-wrap break-all font-mono">
+                        {xmlDebug.nota?.xml_retorno || "Nenhum XML de retorno salvo"}
+                      </pre>
+                    </div>
+                    <div className="p-2 bg-gray-900 rounded-lg max-h-48 overflow-auto">
+                      <p className="text-xs text-gray-400 mb-1">XML Enviado:</p>
+                      <pre className="text-xs text-blue-400 whitespace-pre-wrap break-all font-mono">
+                        {xmlDebug.nota?.xml_envio || "Nenhum XML de envio salvo"}
+                      </pre>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
