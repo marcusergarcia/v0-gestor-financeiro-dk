@@ -71,16 +71,16 @@ const defaultConfig: NfseConfig = {
   descricao_servico: "",
   aliquota_iss: 0.05,
   codigo_cnae: "",
-  regime_tributacao: 1,
-  optante_simples: 0,
+  regime_tributacao: 6,
+  optante_simples: 1,
   incentivador_cultural: 0,
   certificado_base64: null,
   certificado_senha: "",
   certificado_validade: "",
   ambiente: 2,
-  serie_rps: "NF",
+  serie_rps: "11",
   tipo_rps: 1,
-  proximo_numero_rps: 1,
+  proximo_numero_rps: 732,
 }
 
 export function NfseTab() {

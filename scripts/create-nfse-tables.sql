@@ -28,9 +28,9 @@ CREATE TABLE IF NOT EXISTS nfse_config (
   certificado_validade DATE COMMENT 'Data de validade do certificado',
   -- Configurações do webservice
   ambiente TINYINT DEFAULT 2 COMMENT '1=Produção, 2=Homologação',
-  serie_rps VARCHAR(10) DEFAULT 'NF' COMMENT 'Série do RPS',
+  serie_rps VARCHAR(10) DEFAULT '11' COMMENT 'Serie do RPS',
   tipo_rps TINYINT DEFAULT 1 COMMENT '1=RPS, 2=RPS-Mista, 3=Cupom',
-  proximo_numero_rps INT DEFAULT 1 COMMENT 'Próximo número do RPS',
+  proximo_numero_rps INT DEFAULT 732 COMMENT 'Proximo numero do RPS',
   -- Controle
   ativo TINYINT(1) DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

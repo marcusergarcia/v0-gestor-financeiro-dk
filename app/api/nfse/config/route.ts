@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         optante_simples || 0,
         incentivador_cultural || 0,
         ambiente || 2,
-        serie_rps || "NF",
+        serie_rps || "11",
         tipo_rps || 1,
       ]
 
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
           certificado_senha || null,
           certificado_validade || null,
           ambiente || 2,
-          serie_rps || "NF",
+          serie_rps || "11",
           tipo_rps || 1,
         ],
       )
