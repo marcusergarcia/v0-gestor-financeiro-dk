@@ -145,33 +145,54 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
     }
   }
 
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   const handleEmitir = async () => {
-    // Validações
+    setSubmitError(null)
+
+    // Validacoes
     if (!form.tomador_cpf_cnpj) {
-      toast({ title: "Erro", description: "Informe o CPF/CNPJ do tomador", variant: "destructive" })
+      const msg = "Informe o CPF/CNPJ do tomador"
+      setSubmitError(msg)
+      toast({ title: "Campo obrigatorio", description: msg, variant: "destructive" })
       return
     }
     if (!form.tomador_razao_social) {
-      toast({ title: "Erro", description: "Informe a razao social/nome do tomador", variant: "destructive" })
+      const msg = "Informe a razao social/nome do tomador"
+      setSubmitError(msg)
+      toast({ title: "Campo obrigatorio", description: msg, variant: "destructive" })
       return
     }
     if (!form.valor_servicos || form.valor_servicos <= 0) {
-      toast({ title: "Erro", description: "Informe o valor dos servicos", variant: "destructive" })
+      const msg = "Informe o valor dos servicos"
+      setSubmitError(msg)
+      toast({ title: "Campo obrigatorio", description: msg, variant: "destructive" })
       return
     }
     if (!form.descricao_servico) {
-      toast({ title: "Erro", description: "Informe a descricao do servico", variant: "destructive" })
+      const msg = "Informe a descricao do servico"
+      setSubmitError(msg)
+      toast({ title: "Campo obrigatorio", description: msg, variant: "destructive" })
       return
     }
 
     setLoading(true)
+    console.log("[v0] Emitindo NFS-e, dados:", {
+      origem: form.origem,
+      tomador: form.tomador_razao_social,
+      valor: form.valor_servicos,
+    })
+
     try {
       const response = await fetch("/api/nfse/emitir", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       })
+
+      console.log("[v0] Response status:", response.status)
       const result = await response.json()
+      console.log("[v0] Response body:", result)
 
       if (result.success) {
         toast({
@@ -181,14 +202,19 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
         onOpenChange(false)
         onSuccess?.()
       } else {
+        const msg = result.message || "Erro desconhecido ao emitir NFS-e"
+        setSubmitError(msg)
         toast({
           title: "Erro na emissao",
-          description: result.message,
+          description: msg,
           variant: "destructive",
         })
       }
-    } catch {
-      toast({ title: "Erro", description: "Erro ao emitir NFS-e", variant: "destructive" })
+    } catch (error: any) {
+      console.error("[v0] Erro fetch emitir:", error)
+      const msg = "Erro de conexao ao emitir NFS-e: " + (error?.message || "Tente novamente.")
+      setSubmitError(msg)
+      toast({ title: "Erro de conexao", description: msg, variant: "destructive" })
     } finally {
       setLoading(false)
     }
@@ -446,6 +472,26 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
             )}
           </div>
         </div>
+
+        {/* Erro visivel */}
+        {submitError && (
+          <div className="p-3 bg-red-50 border border-red-300 rounded-lg flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-red-800 text-sm">Erro na emissao</p>
+              <p className="text-xs text-red-600 mt-1">{submitError}</p>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-red-500 hover:text-red-700"
+              onClick={() => setSubmitError(null)}
+            >
+              Fechar
+            </Button>
+          </div>
+        )}
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>

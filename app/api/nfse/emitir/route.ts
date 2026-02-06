@@ -61,18 +61,20 @@ export async function POST(request: NextRequest) {
 
     // Obter próximo número RPS
     const numeroRps = config.proximo_numero_rps || 1
+    console.log("[v0] Proximo numero RPS:", numeroRps, "Serie:", config.serie_rps, "Ambiente:", config.ambiente)
 
     // Calcular valores
     const valorServicos = Number(valor_servicos)
     const aliquota = aliquotaOverride || config.aliquota_iss || 0.05
-    const valorIss = issRetido ? 0 : (valorServicos - (valor_deducoes || 0)) * aliquota
+    const issRetidoBool = iss_retido === true || iss_retido === 1 || iss_retido === "true"
+    const valorIss = issRetidoBool ? 0 : (valorServicos - (valor_deducoes || 0)) * aliquota
     const valorTotal = valorServicos
 
     // Montar dados da NFS-e
     const dadosNfse: DadosNfse = {
       rps: {
         numero: numeroRps,
-        serie: config.serie_rps || "NF",
+        serie: config.serie_rps || "11",
         tipo: config.tipo_rps || 1,
         dataEmissao: new Date().toISOString().split("T")[0],
         naturezaOperacao: 1, // Tributação no município
@@ -112,14 +114,16 @@ export async function POST(request: NextRequest) {
         valorInss: valor_inss || 0,
         valorIr: valor_ir || 0,
         valorCsll: valor_csll || 0,
-        issRetido: iss_retido || false,
+        issRetido: issRetidoBool,
       },
     }
 
     // Gerar XML
     const xmlEnvio = gerarXmlEnvioLoteRps([dadosNfse], numeroRps)
+    console.log("[v0] XML gerado, tamanho:", xmlEnvio.length)
 
     // Inserir registro da nota fiscal no banco
+    console.log("[v0] Inserindo nota fiscal no banco...")
     const [insertResult] = await connection.execute(
       `INSERT INTO notas_fiscais (
         numero_rps, serie_rps, tipo_rps, origem, origem_id, origem_numero,
@@ -134,7 +138,7 @@ export async function POST(request: NextRequest) {
         iss_retido, valor_total, status, xml_envio
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'processando', ?)`,
       [
-        numeroRps, config.serie_rps || "NF", config.tipo_rps || 1,
+        numeroRps, config.serie_rps || "11", config.tipo_rps || 1,
         origem, origem_id || null, origem_numero || null,
         config.cnpj, config.inscricao_municipal,
         cliente_id || null, tomador_tipo || "PJ",
@@ -147,12 +151,14 @@ export async function POST(request: NextRequest) {
         config.codigo_cnae || null,
         valorServicos, valor_deducoes || 0, valor_pis || 0, valor_cofins || 0,
         valor_inss || 0, valor_ir || 0, valor_csll || 0, valorIss, aliquota,
-        iss_retido ? 1 : 0, valorTotal, xmlEnvio,
+        issRetidoBool ? 1 : 0, valorTotal, xmlEnvio,
       ],
     )
     const notaId = (insertResult as any).insertId
+    console.log("[v0] Nota inserida no banco com ID:", notaId)
 
     // Enviar para a prefeitura (teste ou produção)
+    console.log("[v0] Enviando para prefeitura, ambiente:", config.ambiente === 2 ? "HOMOLOGACAO" : "PRODUCAO")
     let soapResponse
     if (config.ambiente === 2) {
       // Homologação = envio de teste
@@ -186,30 +192,47 @@ export async function POST(request: NextRequest) {
       const dadosRetorno = extrairDadosNfseRetorno(soapResponse.xml)
 
       if (dadosRetorno.sucesso) {
-        // Atualizar nota com dados da NFS-e emitida
-        await connection.execute(
-          `UPDATE notas_fiscais SET 
-            numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
-            data_emissao = NOW(), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
-           WHERE id = ?`,
-          [dadosRetorno.numeroNfse, dadosRetorno.codigoVerificacao, soapResponse.xml, notaId],
-        )
+        if (dadosRetorno.numeroNfse) {
+          // NFS-e emitida com número retornado (processamento síncrono)
+          await connection.execute(
+            `UPDATE notas_fiscais SET 
+              numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
+              data_emissao = NOW(), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [dadosRetorno.numeroNfse, dadosRetorno.codigoVerificacao, soapResponse.xml, notaId],
+          )
+        } else {
+          // Lote aceito mas NFS-e em processamento assíncrono (comum na prefeitura SP)
+          await connection.execute(
+            `UPDATE notas_fiscais SET 
+              status = 'processando', xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [soapResponse.xml, notaId],
+          )
+        }
 
         // Incrementar número RPS
         await connection.execute(
           "UPDATE nfse_config SET proximo_numero_rps = proximo_numero_rps + 1 WHERE ativo = 1"
         )
 
+        const mensagem = dadosRetorno.numeroNfse
+          ? (config.ambiente === 2
+            ? `NFS-e enviada em HOMOLOGACAO com sucesso! NFS-e: ${dadosRetorno.numeroNfse}`
+            : `NFS-e emitida com sucesso! Numero: ${dadosRetorno.numeroNfse}`)
+          : (config.ambiente === 2
+            ? "RPS enviado em HOMOLOGACAO! O lote esta em processamento."
+            : "RPS enviado com sucesso! A NFS-e sera gerada pela prefeitura em instantes.")
+
         return NextResponse.json({
           success: true,
-          message: config.ambiente === 2
-            ? "NFS-e enviada em HOMOLOGACAO (teste) com sucesso!"
-            : "NFS-e emitida com sucesso!",
+          message: mensagem,
           data: {
             id: notaId,
-            numero_nfse: dadosRetorno.numeroNfse,
-            codigo_verificacao: dadosRetorno.codigoVerificacao,
+            numero_nfse: dadosRetorno.numeroNfse || null,
+            codigo_verificacao: dadosRetorno.codigoVerificacao || null,
             numero_rps: numeroRps,
+            serie_rps: config.serie_rps || "11",
             ambiente: config.ambiente === 2 ? "homologacao" : "producao",
           },
         })
@@ -250,9 +273,10 @@ export async function POST(request: NextRequest) {
       })
     }
   } catch (error: any) {
-    console.error("Erro ao emitir NFS-e:", error)
+    console.error("[v0] Erro ao emitir NFS-e:", error?.message || error)
+    console.error("[v0] Stack:", error?.stack)
     return NextResponse.json(
-      { success: false, message: "Erro interno: " + error.message },
+      { success: false, message: "Erro interno: " + (error?.message || "Erro desconhecido") },
       { status: 500 },
     )
   } finally {
