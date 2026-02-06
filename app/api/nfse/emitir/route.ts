@@ -187,9 +187,14 @@ export async function POST(request: NextRequest) {
       ],
     )
 
+    console.log("[v0] SOAP Response success:", soapResponse.success)
+    console.log("[v0] SOAP Response XML (primeiros 2000 chars):", soapResponse.xml.substring(0, 2000))
+    console.log("[v0] SOAP Response erro:", soapResponse.erro)
+
     if (soapResponse.success) {
       // Extrair dados do retorno
       const dadosRetorno = extrairDadosNfseRetorno(soapResponse.xml)
+      console.log("[v0] Dados retorno extraidos:", JSON.stringify(dadosRetorno))
 
       if (dadosRetorno.sucesso) {
         if (dadosRetorno.numeroNfse) {
@@ -302,10 +307,71 @@ export async function POST(request: NextRequest) {
         })
       }
     } else {
-      // Falha na comunicação SOAP
+      // SOAP marcou como falha, mas vamos tentar extrair dados mesmo assim
+      // Pode ser que a prefeitura retornou <Erro> como alerta mas processou a nota
+      console.log("[v0] SOAP retornou success=false, tentando extrair dados mesmo assim...")
+      const dadosRecuperacao = extrairDadosNfseRetorno(soapResponse.xml)
+      console.log("[v0] Dados recuperacao:", JSON.stringify(dadosRecuperacao))
+
+      if (dadosRecuperacao.numeroNfse) {
+        // A NFS-e FOI emitida! O SOAP marcou erro mas a nota existe
+        console.log("[v0] NFS-e ENCONTRADA mesmo com SOAP success=false! Numero:", dadosRecuperacao.numeroNfse)
+        await connection.execute(
+          `UPDATE notas_fiscais SET 
+            numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
+            data_emissao = NOW(), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [dadosRecuperacao.numeroNfse, dadosRecuperacao.codigoVerificacao || null, soapResponse.xml, notaId],
+        )
+
+        await connection.execute(
+          "UPDATE nfse_config SET proximo_numero_rps = proximo_numero_rps + 1 WHERE ativo = 1"
+        )
+
+        return NextResponse.json({
+          success: true,
+          message: `NFS-e emitida com sucesso! Numero: ${dadosRecuperacao.numeroNfse}`,
+          data: {
+            id: notaId,
+            numero_nfse: dadosRecuperacao.numeroNfse,
+            codigo_verificacao: dadosRecuperacao.codigoVerificacao || null,
+            numero_rps: numeroRps,
+            serie_rps: config.serie_rps || "11",
+            ambiente: config.ambiente === 2 ? "homologacao" : "producao",
+          },
+        })
+      }
+
+      // Verificar se <Sucesso>true</Sucesso> esta no XML (SOAP pode ter errado na deteccao)
+      if (dadosRecuperacao.sucesso) {
+        console.log("[v0] Sucesso=true no XML apesar de SOAP success=false - tratando como processando")
+        await connection.execute(
+          `UPDATE notas_fiscais SET 
+            status = 'processando', xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [soapResponse.xml, notaId],
+        )
+
+        await connection.execute(
+          "UPDATE nfse_config SET proximo_numero_rps = proximo_numero_rps + 1 WHERE ativo = 1"
+        )
+
+        return NextResponse.json({
+          success: true,
+          message: "RPS enviado com sucesso! Clique em 'Consultar na prefeitura' para obter o numero da NFS-e.",
+          data: {
+            id: notaId,
+            numero_rps: numeroRps,
+            serie_rps: config.serie_rps || "11",
+            ambiente: config.ambiente === 2 ? "homologacao" : "producao",
+          },
+        })
+      }
+
+      // Falha real na comunicacao SOAP
       await connection.execute(
         `UPDATE notas_fiscais SET status = 'erro', mensagem_erro = ?, xml_retorno = ? WHERE id = ?`,
-        [soapResponse.erro, soapResponse.xml, notaId],
+        [soapResponse.erro || dadosRecuperacao.erros.join("; "), soapResponse.xml, notaId],
       )
 
       // Incrementar RPS
@@ -315,7 +381,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: false,
-        message: "Erro na comunicacao com a prefeitura: " + soapResponse.erro,
+        message: "Erro na comunicacao com a prefeitura: " + (soapResponse.erro || dadosRecuperacao.erros.join("; ")),
         data: { id: notaId },
       })
     }

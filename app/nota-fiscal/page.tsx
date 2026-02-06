@@ -524,7 +524,7 @@ export default function NotaFiscalPage() {
                               <span className="font-semibold text-emerald-700">
                                 NFS-e {String(nota.numero_nfse).padStart(8, "0")}
                               </span>
-                            ) : nota.status === "processando" ? (
+                            ) : (nota.status === "processando" || nota.status === "erro") ? (
                               <button
                                 className="text-blue-600 text-xs font-medium hover:underline flex items-center gap-1"
                                 onClick={() => handleConsultar(nota.id)}
@@ -566,7 +566,7 @@ export default function NotaFiscalPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-end gap-1">
-                            {nota.status === "processando" && (
+                            {(nota.status === "processando" || nota.status === "erro") && !nota.numero_nfse && (
                               <Button
                                 variant="ghost"
                                 size="icon"
