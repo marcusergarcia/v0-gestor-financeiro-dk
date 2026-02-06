@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       ambiente,
       serie_rps,
       tipo_rps,
+      proximo_numero_rps,
     } = body
 
     // Verificar se já existe config
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
         ambiente || 2,
         serie_rps || "11",
         tipo_rps || 1,
+        proximo_numero_rps || 660,
       ]
 
       if (certUpdate) {
@@ -106,7 +108,8 @@ export async function POST(request: NextRequest) {
           codigo_municipio = ?, codigo_servico = ?, descricao_servico = ?,
           aliquota_iss = ?, codigo_cnae = ?, regime_tributacao = ?,
           optante_simples = ?, incentivador_cultural = ?,
-          ambiente = ?, serie_rps = ?, tipo_rps = ?
+          ambiente = ?, serie_rps = ?, tipo_rps = ?,
+          proximo_numero_rps = ?
           ${certUpdate},
           updated_at = CURRENT_TIMESTAMP
         WHERE ativo = 1`,
@@ -123,8 +126,8 @@ export async function POST(request: NextRequest) {
           aliquota_iss, codigo_cnae, regime_tributacao,
           optante_simples, incentivador_cultural,
           certificado_base64, certificado_senha, certificado_validade,
-          ambiente, serie_rps, tipo_rps, ativo
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+          ambiente, serie_rps, tipo_rps, proximo_numero_rps, ativo
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         [
           inscricao_municipal,
           razao_social,
@@ -150,6 +153,7 @@ export async function POST(request: NextRequest) {
           ambiente || 2,
           serie_rps || "11",
           tipo_rps || 1,
+          proximo_numero_rps || 660,
         ],
       )
     }
