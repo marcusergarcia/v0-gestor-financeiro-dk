@@ -80,7 +80,7 @@ const defaultConfig: NfseConfig = {
   ambiente: 2,
   serie_rps: "11",
   tipo_rps: 1,
-  proximo_numero_rps: 860,
+  proximo_numero_rps: 660,
 }
 
 export function NfseTab() {

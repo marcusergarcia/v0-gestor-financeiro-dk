@@ -32,7 +32,7 @@ export async function POST() {
         ambiente TINYINT DEFAULT 2,
         serie_rps VARCHAR(10) DEFAULT '11',
         tipo_rps TINYINT DEFAULT 1,
-        proximo_numero_rps INT DEFAULT 860,
+        proximo_numero_rps INT DEFAULT 660,
         ativo TINYINT(1) DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

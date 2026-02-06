@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS nfse_config (
   ambiente TINYINT DEFAULT 2 COMMENT '1=Produção, 2=Homologação',
   serie_rps VARCHAR(10) DEFAULT '11' COMMENT 'Serie do RPS',
   tipo_rps TINYINT DEFAULT 1 COMMENT '1=RPS, 2=RPS-Mista, 3=Cupom',
-  proximo_numero_rps INT DEFAULT 860 COMMENT 'Proximo numero do RPS (ultimo usado: 859)',
+  proximo_numero_rps INT DEFAULT 660 COMMENT 'Proximo numero do RPS (ultimo usado: 659)',
   -- Controle
   ativo TINYINT(1) DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
