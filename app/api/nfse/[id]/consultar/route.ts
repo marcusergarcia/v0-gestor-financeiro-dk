@@ -1,12 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
-import { gerarXmlConsultaNfseRps } from "@/lib/nfse/xml-builder"
-import { consultarNfse, extrairDadosNfseRetorno } from "@/lib/nfse/soap-client"
+import { gerarXmlConsultaNfseRps, gerarXmlConsultaLote } from "@/lib/nfse/xml-builder"
+import { consultarNfse, consultarLote, extrairDadosNfseRetorno } from "@/lib/nfse/soap-client"
 
 /**
  * POST /api/nfse/[id]/consultar
- * Consulta o status de uma NFS-e na prefeitura de SP usando o numero do RPS.
- * Quando o processamento e assincrono, a prefeitura retorna o NumeroNFe nesta consulta.
+ * Consulta o status de uma NFS-e na prefeitura de SP.
+ * 
+ * Tenta 2 metodos:
+ * 1. ConsultaNFe por ChaveRPS (PedidoConsultaNFe) - busca a NFS-e pelo numero do RPS
+ * 2. ConsultaLote (PedidoConsultaLote) - busca pelo numero do lote retornado no envio
+ * 
+ * O web service sincrono da prefeitura SP retorna a NFS-e na mesma conexao do envio.
+ * Se a NFS-e nao foi retornada na emissao, pode ser que o XML de retorno nao foi
+ * parseado corretamente. Esta rota tenta consultar novamente.
  */
 export async function POST(
   request: NextRequest,
@@ -50,19 +57,47 @@ export async function POST(
       )
     }
 
-    // Gerar XML de consulta por RPS
-    const xmlConsulta = gerarXmlConsultaNfseRps(
+    console.log("[v0] === CONSULTA NFS-e ===")
+    console.log("[v0] Nota ID:", id, "RPS:", nota.numero_rps, "Serie:", nota.serie_rps, "Status:", nota.status)
+    
+    // Primeiro, verificar se o xml_retorno do envio original ja contem o numero da NFS-e
+    // (pode ter sido parseado incorretamente na emissao)
+    if (nota.xml_retorno) {
+      console.log("[v0] Reanalisando XML de retorno original...")
+      const dadosOriginal = extrairDadosNfseRetorno(nota.xml_retorno)
+      if (dadosOriginal.sucesso && dadosOriginal.numeroNfse) {
+        console.log("[v0] NFS-e encontrada no XML original! Numero:", dadosOriginal.numeroNfse)
+        await connection.execute(
+          `UPDATE notas_fiscais SET 
+            numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
+            data_emissao = COALESCE(data_emissao, NOW()), updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [dadosOriginal.numeroNfse, dadosOriginal.codigoVerificacao || null, id]
+        )
+        return NextResponse.json({
+          success: true,
+          message: `NFS-e encontrada! Numero: ${dadosOriginal.numeroNfse}`,
+          data: {
+            numero_nfse: dadosOriginal.numeroNfse,
+            codigo_verificacao: dadosOriginal.codigoVerificacao,
+            status: "emitida",
+          },
+        })
+      }
+    }
+
+    // Metodo 1: Consulta por RPS (PedidoConsultaNFe com ChaveRPS)
+    console.log("[v0] Metodo 1: Consultando NFS-e por RPS:", nota.numero_rps, "Serie:", nota.serie_rps)
+    const xmlConsultaRps = gerarXmlConsultaNfseRps(
       config.cnpj,
       config.inscricao_municipal,
       nota.numero_rps,
       nota.serie_rps || "11"
     )
+    console.log("[v0] XML de consulta por RPS:", xmlConsultaRps)
 
-    console.log("[v0] Consultando NFS-e por RPS:", nota.numero_rps, "Serie:", nota.serie_rps)
-
-    // Enviar consulta para a prefeitura
-    const soapResponse = await consultarNfse(
-      xmlConsulta,
+    const responseRps = await consultarNfse(
+      xmlConsultaRps,
       config.ambiente,
       config.certificado_base64,
       config.certificado_senha
@@ -72,86 +107,118 @@ export async function POST(
     await connection.execute(
       `INSERT INTO nfse_transmissoes (nota_fiscal_id, tipo, xml_envio, xml_retorno, sucesso, codigo_erro, mensagem_erro, tempo_resposta_ms)
        VALUES (?, 'consulta_rps', ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        xmlConsulta,
-        soapResponse.xml,
-        soapResponse.success ? 1 : 0,
-        null,
-        soapResponse.erro || null,
-        soapResponse.tempoMs,
-      ]
+      [id, xmlConsultaRps, responseRps.xml, responseRps.success ? 1 : 0, null, responseRps.erro || null, responseRps.tempoMs]
     )
 
-    if (soapResponse.success) {
-      // Extrair dados do retorno
-      const dadosRetorno = extrairDadosNfseRetorno(soapResponse.xml)
-
-      if (dadosRetorno.sucesso && dadosRetorno.numeroNfse) {
-        // NFS-e encontrada! Atualizar no banco
+    if (responseRps.success) {
+      const dadosRps = extrairDadosNfseRetorno(responseRps.xml)
+      if (dadosRps.sucesso && dadosRps.numeroNfse) {
+        console.log("[v0] NFS-e encontrada via consulta RPS! Numero:", dadosRps.numeroNfse)
         await connection.execute(
           `UPDATE notas_fiscais SET 
             numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
             data_emissao = COALESCE(data_emissao, NOW()), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`,
-          [dadosRetorno.numeroNfse, dadosRetorno.codigoVerificacao || null, soapResponse.xml, id]
+          [dadosRps.numeroNfse, dadosRps.codigoVerificacao || null, responseRps.xml, id]
         )
-
         return NextResponse.json({
           success: true,
-          message: `NFS-e encontrada! Numero: ${dadosRetorno.numeroNfse}`,
+          message: `NFS-e encontrada! Numero: ${dadosRps.numeroNfse}`,
           data: {
-            numero_nfse: dadosRetorno.numeroNfse,
-            codigo_verificacao: dadosRetorno.codigoVerificacao,
+            numero_nfse: dadosRps.numeroNfse,
+            codigo_verificacao: dadosRps.codigoVerificacao,
             status: "emitida",
           },
         })
-      } else if (dadosRetorno.erros.length > 0) {
-        // Retorno com erros - pode significar que o RPS nao foi processado ainda ou falhou
-        const erroMsg = dadosRetorno.erros.join("; ")
-
-        // Verificar se e um erro de "nao encontrado" (ainda processando) ou erro real
-        const aindaProcessando = dadosRetorno.erros.some(
-          (e) =>
-            e.includes("1") || // Erro generico
-            e.toLowerCase().includes("nao encontrad") ||
-            e.toLowerCase().includes("não encontrad") ||
-            e.toLowerCase().includes("processamento")
-        )
-
-        if (!aindaProcessando) {
-          // Erro real - atualizar status
-          await connection.execute(
-            `UPDATE notas_fiscais SET status = 'erro', mensagem_erro = ?, xml_retorno = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-            [erroMsg, soapResponse.xml, id]
-          )
-        }
-
-        return NextResponse.json({
-          success: false,
-          message: aindaProcessando
-            ? "NFS-e ainda em processamento na prefeitura. Tente novamente em alguns instantes."
-            : "Erro na consulta: " + erroMsg,
-          data: {
-            status: aindaProcessando ? "processando" : "erro",
-            erros: dadosRetorno.erros,
-          },
-        })
       } else {
-        // Sem numero e sem erros - ainda processando
-        return NextResponse.json({
-          success: false,
-          message: "NFS-e ainda em processamento na prefeitura. Tente novamente em alguns instantes.",
-          data: { status: "processando" },
-        })
+        console.log("[v0] Consulta RPS retornou sucesso mas sem NumeroNFe. Erros:", dadosRps.erros)
       }
     } else {
+      console.log("[v0] Consulta RPS falhou:", responseRps.erro)
+    }
+
+    // Metodo 2: Consulta por Lote (PedidoConsultaLote com NumeroLote)
+    // Extrair NumeroLote do xml_retorno do envio original
+    const numLoteMatch = nota.xml_retorno?.match(/<NumeroLote>(\d+)<\/NumeroLote>/)
+    if (numLoteMatch) {
+      const numLote = parseInt(numLoteMatch[1])
+      console.log("[v0] Metodo 2: Consultando por lote:", numLote)
+
+      const xmlConsultaLote = gerarXmlConsultaLote(config.cnpj, numLote)
+      const responseLote = await consultarLote(
+        xmlConsultaLote,
+        config.ambiente,
+        config.certificado_base64,
+        config.certificado_senha
+      )
+
+      // Registrar transmissao
+      await connection.execute(
+        `INSERT INTO nfse_transmissoes (nota_fiscal_id, tipo, xml_envio, xml_retorno, sucesso, codigo_erro, mensagem_erro, tempo_resposta_ms)
+         VALUES (?, 'consulta_lote', ?, ?, ?, ?, ?, ?)`,
+        [id, xmlConsultaLote, responseLote.xml, responseLote.success ? 1 : 0, null, responseLote.erro || null, responseLote.tempoMs]
+      )
+
+      if (responseLote.success) {
+        const dadosLote = extrairDadosNfseRetorno(responseLote.xml)
+        if (dadosLote.sucesso && dadosLote.numeroNfse) {
+          console.log("[v0] NFS-e encontrada via consulta lote! Numero:", dadosLote.numeroNfse)
+          await connection.execute(
+            `UPDATE notas_fiscais SET 
+              numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
+              data_emissao = COALESCE(data_emissao, NOW()), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [dadosLote.numeroNfse, dadosLote.codigoVerificacao || null, responseLote.xml, id]
+          )
+          return NextResponse.json({
+            success: true,
+            message: `NFS-e encontrada! Numero: ${dadosLote.numeroNfse}`,
+            data: {
+              numero_nfse: dadosLote.numeroNfse,
+              codigo_verificacao: dadosLote.codigoVerificacao,
+              status: "emitida",
+            },
+          })
+        } else {
+          console.log("[v0] Consulta lote retornou sucesso mas sem NumeroNFe. Erros:", dadosLote.erros)
+        }
+      } else {
+        console.log("[v0] Consulta lote falhou:", responseLote.erro)
+      }
+    }
+
+    // Nenhum metodo retornou a NFS-e
+    // Verificar se houve erros especificos
+    const errosRps = responseRps.success ? extrairDadosNfseRetorno(responseRps.xml).erros : [responseRps.erro || "Falha na comunicacao"]
+    const todosErros = errosRps.filter(Boolean)
+
+    // Se o erro indica que o RPS nao foi encontrado, pode estar realmente processando ainda
+    const aindaProcessando = todosErros.some(
+      (e) =>
+        e?.toLowerCase().includes("nao encontrad") ||
+        e?.toLowerCase().includes("não encontrad") ||
+        e?.toLowerCase().includes("processamento") ||
+        e?.toLowerCase().includes("nenhuma") ||
+        e?.includes("Erro 9") // Erro 9 = "Nenhuma NFS-e encontrada"
+    )
+
+    if (!aindaProcessando && todosErros.length > 0) {
+      // Erro real - atualizar status se fizer sentido
+      const erroMsg = todosErros.join("; ")
+      console.log("[v0] Erros na consulta (nao processando):", erroMsg)
+      
       return NextResponse.json({
         success: false,
-        message: "Erro na comunicacao com a prefeitura: " + soapResponse.erro,
-        data: { status: "erro" },
+        message: "Erro na consulta: " + erroMsg,
+        data: { status: "erro", erros: todosErros },
       })
     }
+
+    return NextResponse.json({
+      success: false,
+      message: "NFS-e ainda nao encontrada na prefeitura. O RPS pode estar em processamento. Tente novamente em alguns instantes.",
+      data: { status: "processando" },
+    })
   } catch (error: any) {
     console.error("[v0] Erro ao consultar NFS-e:", error?.message || error)
     return NextResponse.json(
