@@ -176,6 +176,22 @@ export function gerarXmlCancelamentoNfse(
 </PedidoCancelamentoNFe>`
 }
 
+// Gerar XML de consulta de lote
+export function gerarXmlConsultaLote(
+  prestadorCnpj: string,
+  numeroLote: number,
+): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<PedidoConsultaLote xmlns="http://www.prefeitura.sp.gov.br/nfe">
+  <Cabecalho xmlns="" Versao="1">
+    <CPFCNPJRemetente>
+      <CNPJ>${prestadorCnpj}</CNPJ>
+    </CPFCNPJRemetente>
+    <NumeroLote>${numeroLote}</NumeroLote>
+  </Cabecalho>
+</PedidoConsultaLote>`
+}
+
 // Gerar XML para testar envio (teste de conexão)
 export function gerarXmlTesteEnvio(prestadorCnpj: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>

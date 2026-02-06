@@ -83,6 +83,7 @@ export default function NotaFiscalPage() {
   const [notaCancelar, setNotaCancelar] = useState<NotaFiscal | null>(null)
   const [motivoCancelamento, setMotivoCancelamento] = useState("")
   const [cancelando, setCancelando] = useState(false)
+  const [consultandoId, setConsultandoId] = useState<number | null>(null)
   const [logoMenu, setLogoMenu] = useState<string>("")
 
   const { toast } = useToast()
@@ -154,6 +155,60 @@ export default function NotaFiscalPage() {
       erros: notas.filter((n) => n.status === "erro").length,
       valorTotal: emitidas.reduce((sum, n) => sum + Number(n.valor_total), 0),
     })
+  }
+
+  const handleConsultar = async (notaId: number) => {
+    setConsultandoId(notaId)
+    try {
+      const response = await fetch(`/api/nfse/${notaId}/consultar`, {
+        method: "POST",
+      })
+      const result = await response.json()
+
+      if (result.success) {
+        toast({
+          title: "NFS-e Encontrada!",
+          description: result.message,
+        })
+        fetchNotas()
+      } else {
+        toast({
+          title: "Consulta NFS-e",
+          description: result.message,
+          variant: result.data?.status === "processando" ? "default" : "destructive",
+        })
+        // Se houve mudanca de status, atualizar lista
+        if (result.data?.status === "erro") {
+          fetchNotas()
+        }
+      }
+    } catch {
+      toast({
+        title: "Erro",
+        description: "Erro ao consultar status da NFS-e na prefeitura",
+        variant: "destructive",
+      })
+    } finally {
+      setConsultandoId(null)
+    }
+  }
+
+  const handleConsultarTodas = async () => {
+    const processando = notas.filter((n) => n.status === "processando")
+    if (processando.length === 0) {
+      toast({ title: "Nenhuma nota pendente", description: "Nao ha notas em processamento para consultar." })
+      return
+    }
+
+    toast({ title: "Consultando...", description: `Consultando ${processando.length} nota(s) na prefeitura...` })
+
+    for (const nota of processando) {
+      await handleConsultar(nota.id)
+      // Pequeno delay entre consultas para nao sobrecarregar
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+
+    fetchNotas()
   }
 
   const handleCancelar = async () => {
@@ -361,10 +416,28 @@ export default function NotaFiscalPage() {
                 <FileCheck className="h-5 w-5 text-emerald-600" />
                 Notas Fiscais Emitidas
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchNotas() }}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Atualizar
-              </Button>
+              <div className="flex items-center gap-2">
+                {stats.pendentes > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleConsultarTodas}
+                    disabled={consultandoId !== null}
+                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                  >
+                    {consultandoId !== null ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-2" />
+                    )}
+                    Consultar Pendentes ({stats.pendentes})
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchNotas() }}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Atualizar
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -451,8 +524,21 @@ export default function NotaFiscalPage() {
                               <span className="font-semibold text-emerald-700">
                                 NFS-e {String(nota.numero_nfse).padStart(8, "0")}
                               </span>
+                            ) : (nota.status === "processando" || nota.status === "erro") ? (
+                              <button
+                                className="text-blue-600 text-xs font-medium hover:underline flex items-center gap-1"
+                                onClick={() => handleConsultar(nota.id)}
+                                disabled={consultandoId === nota.id}
+                              >
+                                {consultandoId === nota.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-3 w-3" />
+                                )}
+                                Consultar na prefeitura
+                              </button>
                             ) : (
-                              <span className="text-gray-400 text-xs italic">Aguardando prefeitura</span>
+                              <span className="text-gray-400 text-xs italic">-</span>
                             )}
                             <p className="text-xs text-gray-400">RPS: {nota.serie_rps || "11"}.{String(nota.numero_rps).padStart(8, "0")}</p>
                           </div>
@@ -480,6 +566,22 @@ export default function NotaFiscalPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-end gap-1">
+                            {(nota.status === "processando" || nota.status === "erro") && !nota.numero_nfse && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => handleConsultar(nota.id)}
+                                disabled={consultandoId === nota.id}
+                                title="Consultar status na prefeitura"
+                              >
+                                {consultandoId === nota.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"

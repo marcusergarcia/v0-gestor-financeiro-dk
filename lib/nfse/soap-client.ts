@@ -164,7 +164,8 @@ export async function enviarSoap(
 
     const tempoMs = Date.now() - inicio
     console.log("[v0] SOAP Response status:", xmlRetorno.statusCode, "tempo:", tempoMs, "ms")
-    console.log("[v0] SOAP Response body (primeiros 500 chars):", xmlRetorno.body.substring(0, 500))
+    console.log("[v0] SOAP Response body length:", xmlRetorno.body.length)
+    console.log("[v0] SOAP Response body (primeiros 1000 chars):", xmlRetorno.body.substring(0, 1000))
 
     if (xmlRetorno.statusCode < 200 || xmlRetorno.statusCode >= 300) {
       return {
@@ -176,18 +177,47 @@ export async function enviarSoap(
       }
     }
 
-    // Verificar se o retorno contem erro
-    const temErro =
-      xmlRetorno.body.includes("<Erro>") ||
+    // Extrair o XML interno do SOAP envelope (pode estar em CDATA ou encodado)
+    const xmlInterno = extrairXmlInternoSoap(xmlRetorno.body)
+    console.log("[v0] XML interno extraido, length:", xmlInterno.length)
+    console.log("[v0] XML interno (primeiros 1000 chars):", xmlInterno.substring(0, 1000))
+
+    // Verificar SOAP Fault (erro de protocolo)
+    const temSoapFault =
       xmlRetorno.body.includes("<soap:Fault>") ||
       xmlRetorno.body.includes("<soap12:Fault>")
 
+    if (temSoapFault) {
+      return {
+        success: false,
+        xml: xmlInterno,
+        httpStatus: xmlRetorno.statusCode,
+        tempoMs,
+        erro: extrairErroSoap(xmlRetorno.body),
+      }
+    }
+
+    // Para o retorno da prefeitura SP, verificar <Sucesso> no cabecalho
+    // A tag <Erro> pode estar presente em retornos de sucesso parcial (alertas)
+    // O que determina sucesso e a tag <Sucesso>true</Sucesso>
+    const sucessoMatch = xmlInterno.match(/<Sucesso>(true|false)<\/Sucesso>/i)
+    const temSucesso = sucessoMatch ? sucessoMatch[1].toLowerCase() === "true" : !xmlInterno.includes("<Erro>")
+    console.log("[v0] Tag <Sucesso> encontrada:", sucessoMatch?.[1], "-> sucesso:", temSucesso)
+
+    // Verificar se ha erros criticos
+    const temErro = xmlInterno.includes("<Erro>")
+    if (temErro) {
+      console.log("[v0] XML contem <Erro> tags, extraindo detalhes...")
+      const erroMsg = extrairErroSoap(xmlInterno)
+      console.log("[v0] Erro extraido:", erroMsg)
+    }
+
     return {
-      success: !temErro,
-      xml: xmlRetorno.body,
+      success: temSucesso,
+      xml: xmlInterno,
       httpStatus: xmlRetorno.statusCode,
       tempoMs,
-      erro: temErro ? extrairErroSoap(xmlRetorno.body) : undefined,
+      erro: (!temSucesso && temErro) ? extrairErroSoap(xmlInterno) : undefined,
     }
   } catch (error: any) {
     const tempoMs = Date.now() - inicio
@@ -279,6 +309,153 @@ export async function consultarLote(
   return enviarSoap(xml, SP_SOAP_ACTIONS.consultaLote, ambiente, certificadoBase64, certificadoSenha)
 }
 
+/**
+ * Extrai o XML de negocio de dentro do envelope SOAP.
+ * 
+ * A prefeitura de SP retorna o XML dentro do SOAP envelope de varias formas:
+ * 
+ * 1. CDATA dentro do elemento *Result:
+ *    <EnvioLoteRPSResult><![CDATA[<?xml ...><RetornoEnvioLoteRPS>...</RetornoEnvioLoteRPS>]]></EnvioLoteRPSResult>
+ * 
+ * 2. HTML entities dentro do elemento *Result:
+ *    <EnvioLoteRPSResult>&lt;?xml ...&gt;&lt;RetornoEnvioLoteRPS&gt;...&lt;/RetornoEnvioLoteRPS&gt;</EnvioLoteRPSResult>
+ * 
+ * 3. XML direto dentro do Body/Response (menos comum):
+ *    <RetornoEnvioLoteRPS>...</RetornoEnvioLoteRPS>
+ * 
+ * 4. Texto simples dentro do Result (string XML):
+ *    <EnvioLoteRPSResult>string com XML</EnvioLoteRPSResult>
+ */
+function extrairXmlInternoSoap(soapXml: string): string {
+  console.log("[v0] extrairXmlInternoSoap - tentando extrair XML interno...")
+  console.log("[v0] Contem CDATA?", soapXml.includes("<![CDATA["))
+  console.log("[v0] Contem &lt;?", soapXml.includes("&lt;"))
+  console.log("[v0] Contem Result?", /\w+Result/.test(soapXml))
+  console.log("[v0] Contem RetornoEnvioLoteRPS?", soapXml.includes("RetornoEnvioLoteRPS"))
+  console.log("[v0] Contem RetornoConsulta?", soapXml.includes("RetornoConsulta"))
+
+  // METODO 1: Buscar elemento *Result e extrair conteudo
+  // O nome do Result depende do metodo SOAP chamado:
+  // - EnvioLoteRPSResult, TesteEnvioLoteRPSResult, ConsultaNFeResult, ConsultaLoteResult, CancelamentoNFeResult
+  const resultPattern = /<(\w+Result)[^>]*>([\s\S]*)<\/\1>/
+  const resultMatch = soapXml.match(resultPattern)
+
+  if (resultMatch) {
+    const resultName = resultMatch[1]
+    let inner = resultMatch[2].trim()
+    console.log("[v0] Encontrou elemento Result:", resultName, "conteudo length:", inner.length)
+    console.log("[v0] Result inner (primeiros 300 chars):", inner.substring(0, 300))
+
+    // 1a. Se contem CDATA, extrair o conteudo de dentro do CDATA
+    // Usar greedy match para pegar todo o CDATA (pode conter ]]> internos escapados, mas improvavel)
+    const cdataInResult = inner.match(/<!\[CDATA\[([\s\S]*)\]\]>/)
+    if (cdataInResult) {
+      console.log("[v0] Extraido conteudo de CDATA dentro do Result")
+      return cdataInResult[1].trim()
+    }
+
+    // 1b. Se contem HTML entities, decodificar
+    if (inner.includes("&lt;")) {
+      console.log("[v0] Decodificando HTML entities dentro do Result...")
+      inner = decodeHtmlEntities(inner)
+      console.log("[v0] Decodificado, primeiros 300 chars:", inner.substring(0, 300))
+    }
+
+    // 1c. Se o conteudo parece ser XML valido, retornar
+    if (inner.includes("<Retorno") || inner.includes("<Cabecalho") || inner.includes("<Sucesso") || inner.includes("<Erro") || inner.includes("<NFe")) {
+      console.log("[v0] Conteudo do Result parece ser XML de retorno valido")
+      return inner
+    }
+
+    // 1d. Se tem qualquer coisa que comeca com <, retornar
+    if (inner.startsWith("<")) {
+      console.log("[v0] Conteudo do Result comeca com <, retornando como XML")
+      return inner
+    }
+
+    console.log("[v0] Conteudo do Result nao parece XML, continuando busca...")
+  }
+
+  // METODO 2: Buscar CDATA em qualquer lugar do SOAP (pode haver multiplos, pegar o ultimo que e a resposta)
+  const allCdata = [...soapXml.matchAll(/<!\[CDATA\[([\s\S]*?)\]\]>/g)]
+  if (allCdata.length > 0) {
+    // O ultimo CDATA geralmente e a resposta (o primeiro pode ser o request ecoado)
+    const lastCdata = allCdata[allCdata.length - 1][1].trim()
+    if (lastCdata.includes("<Retorno") || lastCdata.includes("<Cabecalho") || lastCdata.includes("<Sucesso")) {
+      console.log("[v0] XML extraido do ultimo CDATA encontrado")
+      return lastCdata
+    }
+    // Se ha apenas 1 CDATA e parece XML, usar
+    if (allCdata.length === 1 && lastCdata.startsWith("<")) {
+      console.log("[v0] XML extraido do unico CDATA encontrado")
+      return lastCdata
+    }
+  }
+
+  // METODO 3: Buscar o XML de retorno diretamente (sem estar em Result/CDATA)
+  // Ordem de prioridade: RetornoEnvioLoteRPS, RetornoConsulta, RetornoCancelamentoNFe
+  const retornoPatterns = [
+    /(<RetornoEnvioLoteRPS[\s>][\s\S]*<\/RetornoEnvioLoteRPS>)/,
+    /(<RetornoConsulta[\s>][\s\S]*<\/RetornoConsulta>)/,
+    /(<RetornoCancelamentoNFe[\s>][\s\S]*<\/RetornoCancelamentoNFe>)/,
+    /(<RetornoConsultaLote[\s>][\s\S]*<\/RetornoConsultaLote>)/,
+  ]
+  for (const pattern of retornoPatterns) {
+    const match = soapXml.match(pattern)
+    if (match) {
+      console.log("[v0] XML de retorno encontrado diretamente no SOAP:", match[1].substring(0, 100))
+      return match[1]
+    }
+  }
+
+  // METODO 4: Buscar dentro do Body do SOAP
+  const bodyMatch = soapXml.match(/<(?:soap12?:)?Body[^>]*>([\s\S]*)<\/(?:soap12?:)?Body>/)
+  if (bodyMatch) {
+    let bodyContent = bodyMatch[1].trim()
+    // Remover o wrapper *Response se presente
+    const responseMatch = bodyContent.match(/<\w+Response[^>]*>([\s\S]*)<\/\w+Response>/)
+    if (responseMatch) {
+      bodyContent = responseMatch[1].trim()
+      // Verificar se e Result com entities
+      if (bodyContent.includes("&lt;")) {
+        bodyContent = decodeHtmlEntities(bodyContent)
+      }
+    }
+    if (bodyContent.includes("<Sucesso") || bodyContent.includes("<Retorno") || bodyContent.includes("<NFe")) {
+      console.log("[v0] XML extraido do Body do SOAP")
+      return bodyContent
+    }
+  }
+
+  // METODO 5: Se tem HTML entities no XML inteiro, decodificar e buscar
+  if (soapXml.includes("&lt;Retorno") || soapXml.includes("&lt;Cabecalho")) {
+    console.log("[v0] XML inteiro parece ter HTML entities, decodificando...")
+    const decoded = decodeHtmlEntities(soapXml)
+    // Buscar novamente apos decodificar
+    for (const pattern of retornoPatterns) {
+      const match = decoded.match(pattern)
+      if (match) {
+        console.log("[v0] XML de retorno encontrado apos decodificacao")
+        return match[1]
+      }
+    }
+  }
+
+  // Fallback: retornar o XML completo
+  console.log("[v0] FALLBACK: Nao foi possivel extrair XML interno, retornando XML completo")
+  console.log("[v0] XML completo (ultimos 500 chars):", soapXml.substring(soapXml.length - 500))
+  return soapXml
+}
+
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+}
+
 // Extrair mensagem de erro do XML de retorno
 function extrairErroSoap(xml: string): string {
   const codigoMatch = xml.match(/<Codigo>(\d+)<\/Codigo>/)
@@ -302,7 +479,28 @@ function extrairErroSoap(xml: string): string {
 }
 
 /**
- * Extrair dados da NFS-e do XML de retorno
+ * Extrair dados da NFS-e do XML de retorno da Prefeitura de SP.
+ * 
+ * Formatos de retorno esperados:
+ * 
+ * 1. RetornoEnvioLoteRPS (envio sincrono):
+ *    <RetornoEnvioLoteRPS>
+ *      <Cabecalho><Sucesso>true</Sucesso>...</Cabecalho>
+ *      <ChaveNFeRPS>
+ *        <ChaveNFe><InscricaoPrestador>...</InscricaoPrestador><NumeroNFe>732</NumeroNFe><CodigoVerificacao>XXXX</CodigoVerificacao></ChaveNFe>
+ *        <ChaveRPS>...</ChaveRPS>
+ *      </ChaveNFeRPS>
+ *    </RetornoEnvioLoteRPS>
+ * 
+ * 2. RetornoConsulta (consulta por RPS/NFe):
+ *    <RetornoConsulta>
+ *      <Cabecalho><Sucesso>true</Sucesso></Cabecalho>
+ *      <NFe>
+ *        <ChaveNFe><InscricaoPrestador>...</InscricaoPrestador><NumeroNFe>732</NumeroNFe><CodigoVerificacao>XXXX</CodigoVerificacao></ChaveNFe>
+ *        <DataEmissaoNFe>...</DataEmissaoNFe>
+ *        ...
+ *      </NFe>
+ *    </RetornoConsulta>
  */
 export function extrairDadosNfseRetorno(xml: string): {
   numeroNfse?: string
@@ -313,52 +511,123 @@ export function extrairDadosNfseRetorno(xml: string): {
 } {
   const erros: string[] = []
 
+  console.log("[v0] extrairDadosNfseRetorno - XML length:", xml.length)
+  console.log("[v0] extrairDadosNfseRetorno - XML (primeiros 2000 chars):", xml.substring(0, 2000))
+
+  // Verificar <Sucesso> no cabecalho
+  const sucessoTag = xml.match(/<Sucesso>(true|false)<\/Sucesso>/i)
+  const sucesso = sucessoTag ? sucessoTag[1].toLowerCase() === "true" : false
+  console.log("[v0] Tag <Sucesso>:", sucessoTag?.[1], "-> sucesso:", sucesso)
+
   // Extrair erros
-  const erroRegex = /<Erro>.*?<Codigo>(\d+)<\/Codigo>.*?<Descricao>(.*?)<\/Descricao>.*?<\/Erro>/gs
+  const erroRegex = /<Erro>[\s\S]*?<Codigo>(\d+)<\/Codigo>[\s\S]*?<Descricao>([\s\S]*?)<\/Descricao>[\s\S]*?<\/Erro>/g
   let match
   while ((match = erroRegex.exec(xml)) !== null) {
-    erros.push(`Erro ${match[1]}: ${match[2]}`)
+    erros.push(`Erro ${match[1]}: ${match[2].trim()}`)
   }
 
-  // Alertas
-  const alertaRegex = /<Alerta>.*?<Codigo>(\d+)<\/Codigo>.*?<Descricao>(.*?)<\/Descricao>.*?<\/Alerta>/gs
+  // Alertas (nao sao erros, apenas informativos)
+  const alertaRegex = /<Alerta>[\s\S]*?<Codigo>(\d+)<\/Codigo>[\s\S]*?<Descricao>([\s\S]*?)<\/Descricao>[\s\S]*?<\/Alerta>/g
   while ((match = alertaRegex.exec(xml)) !== null) {
-    console.log("[v0] Alerta da prefeitura:", match[1], match[2])
+    console.log("[v0] Alerta da prefeitura:", match[1], match[2].trim())
   }
 
   if (erros.length > 0) {
-    return { sucesso: false, erros }
+    console.log("[v0] Erros encontrados:", erros)
+    // Se <Sucesso> e false e ha erros, retornar com erro
+    if (!sucesso) {
+      return { sucesso: false, erros }
+    }
+    // Se <Sucesso> e true mas ha "erros", podem ser alertas/avisos - continuar
+    console.log("[v0] Sucesso=true com erros - tratando como alertas")
   }
 
+  // Extrair numero da NFS-e - Varios formatos possiveis da prefeitura SP
+  // Formato 1: <ChaveNFe><InscricaoPrestador>X</InscricaoPrestador><NumeroNFe>732</NumeroNFe>...
+  // Formato 2: <Numero>732</Numero> dentro de <ChaveNFe>
+  // Formato 3: <NumeroNota>732</NumeroNota>
   const nfseNumero =
     xml.match(/<NumeroNFe>(\d+)<\/NumeroNFe>/) ||
+    xml.match(/<ChaveNFe>[\s\S]*?<Numero>(\d+)<\/Numero>[\s\S]*?<\/ChaveNFe>/) ||
     xml.match(/<NumeroNota>(\d+)<\/NumeroNota>/)
+
   const codigoVerificacao =
     xml.match(/<CodigoVerificacao>([^<]+)<\/CodigoVerificacao>/) ||
     xml.match(/<CodigoVerificacaoNFe>([^<]+)<\/CodigoVerificacaoNFe>/)
+
   const dataEmissao =
     xml.match(/<DataEmissaoNFe>([^<]+)<\/DataEmissaoNFe>/) ||
     xml.match(/<DataEmissaoRPS>([^<]+)<\/DataEmissaoRPS>/)
 
-  // Se nao encontrou numero de NFS-e, pode ser processamento assincrono
-  if (!nfseNumero && erros.length === 0) {
+  console.log("[v0] NumeroNFe match:", nfseNumero?.[1] || "NAO ENCONTRADO")
+  console.log("[v0] CodigoVerificacao match:", codigoVerificacao?.[1] || "NAO ENCONTRADO")
+  console.log("[v0] DataEmissao match:", dataEmissao?.[1] || "NAO ENCONTRADO")
+
+  // Se <Sucesso>true e tem numero, perfeito
+  if (nfseNumero) {
+    console.log("[v0] NFS-e encontrada! Numero:", nfseNumero[1])
+    return {
+      numeroNfse: nfseNumero[1],
+      codigoVerificacao: codigoVerificacao?.[1],
+      dataEmissao: dataEmissao?.[1],
+      sucesso: true,
+      erros: [],
+    }
+  }
+
+  // Se <Sucesso>true mas sem numero - pode ser que o lote foi aceito (retorno de envio com NumeroLote)
+  if (sucesso && !nfseNumero) {
     const numLote = xml.match(/<NumeroLote>(\d+)<\/NumeroLote>/)
-    if (numLote) {
+    console.log("[v0] Sucesso=true sem NumeroNFe. NumeroLote:", numLote?.[1] || "NAO ENCONTRADO")
+    
+    // Verificar se ha ChaveNFeRPS (formato do RetornoEnvioLoteRPS com NFS-e inline)
+    const chaveNFeRPS = xml.match(/<ChaveNFeRPS>/)
+    if (chaveNFeRPS) {
+      console.log("[v0] Encontrou <ChaveNFeRPS> mas nao extraiu NumeroNFe - verificar formato")
+      // Tentar formato alternativo do numero
+      const numAlt = xml.match(/<ChaveNFe>[\s\S]*?<\/ChaveNFe>/)
+      if (numAlt) {
+        console.log("[v0] ChaveNFe encontrada:", numAlt[0].substring(0, 200))
+      }
+    }
+    
+    return {
+      sucesso: true,
+      erros: [],
+      numeroNfse: undefined,
+      codigoVerificacao: undefined,
+      dataEmissao: undefined,
+    }
+  }
+
+  // Se nao encontrou <Sucesso> e nao encontrou numero, verificar se o XML tem algo util
+  // Pode ser que a extracao do SOAP envelope nao funcionou
+  if (!sucessoTag) {
+    console.log("[v0] ATENCAO: Tag <Sucesso> NAO encontrada no XML!")
+    console.log("[v0] XML pode estar com formato inesperado. Primeiros 500 chars:", xml.substring(0, 500))
+    console.log("[v0] Ultimos 500 chars:", xml.substring(Math.max(0, xml.length - 500)))
+    
+    // Ultima tentativa: buscar NumeroNFe mesmo sem tag Sucesso
+    // Pode acontecer se o SOAP envelope nao foi removido corretamente
+    const numDireto = xml.match(/<NumeroNFe>(\d+)<\/NumeroNFe>/)
+    if (numDireto) {
+      const codDireto = xml.match(/<CodigoVerificacao>([^<]+)<\/CodigoVerificacao>/)
+      console.log("[v0] NumeroNFe encontrado mesmo sem tag Sucesso:", numDireto[1])
       return {
+        numeroNfse: numDireto[1],
+        codigoVerificacao: codDireto?.[1],
         sucesso: true,
         erros: [],
-        numeroNfse: undefined,
-        codigoVerificacao: undefined,
-        dataEmissao: undefined,
       }
     }
   }
 
+  // Sucesso=false, sem numero e com ou sem erros
   return {
-    numeroNfse: nfseNumero?.[1],
-    codigoVerificacao: codigoVerificacao?.[1],
-    dataEmissao: dataEmissao?.[1],
-    sucesso: !!nfseNumero || erros.length === 0,
-    erros: [],
+    sucesso: sucesso,
+    erros: erros.length > 0 ? erros : ["Retorno inesperado da prefeitura. Verifique os logs para detalhes do XML recebido."],
+    numeroNfse: undefined,
+    codigoVerificacao: undefined,
+    dataEmissao: undefined,
   }
 }

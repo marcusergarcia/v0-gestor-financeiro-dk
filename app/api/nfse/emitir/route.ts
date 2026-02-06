@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
-import { gerarXmlEnvioLoteRps, type DadosNfse } from "@/lib/nfse/xml-builder"
-import { enviarLoteRps, testeEnvioLoteRps, extrairDadosNfseRetorno } from "@/lib/nfse/soap-client"
+import { gerarXmlEnvioLoteRps, gerarXmlConsultaNfseRps, type DadosNfse } from "@/lib/nfse/xml-builder"
+import { enviarLoteRps, testeEnvioLoteRps, consultarNfse, extrairDadosNfseRetorno } from "@/lib/nfse/soap-client"
 
 export async function POST(request: NextRequest) {
   const connection = await pool.getConnection()
@@ -187,13 +187,18 @@ export async function POST(request: NextRequest) {
       ],
     )
 
+    console.log("[v0] SOAP Response success:", soapResponse.success)
+    console.log("[v0] SOAP Response XML (primeiros 2000 chars):", soapResponse.xml.substring(0, 2000))
+    console.log("[v0] SOAP Response erro:", soapResponse.erro)
+
     if (soapResponse.success) {
       // Extrair dados do retorno
       const dadosRetorno = extrairDadosNfseRetorno(soapResponse.xml)
+      console.log("[v0] Dados retorno extraidos:", JSON.stringify(dadosRetorno))
 
       if (dadosRetorno.sucesso) {
         if (dadosRetorno.numeroNfse) {
-          // NFS-e emitida com número retornado (processamento síncrono)
+          // NFS-e emitida com numero retornado (processamento sincrono)
           await connection.execute(
             `UPDATE notas_fiscais SET 
               numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
@@ -202,16 +207,63 @@ export async function POST(request: NextRequest) {
             [dadosRetorno.numeroNfse, dadosRetorno.codigoVerificacao, soapResponse.xml, notaId],
           )
         } else {
-          // Lote aceito mas NFS-e em processamento assíncrono (comum na prefeitura SP)
+          // Lote aceito mas NFS-e em processamento assincrono (comum na prefeitura SP)
           await connection.execute(
             `UPDATE notas_fiscais SET 
               status = 'processando', xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
             [soapResponse.xml, notaId],
           )
+
+          // Tentar consultar automaticamente apos 3 segundos (a prefeitura geralmente processa rapido)
+          try {
+            console.log("[v0] Aguardando 3s para consultar NFS-e automaticamente...")
+            await new Promise((r) => setTimeout(r, 3000))
+
+            const xmlConsulta = gerarXmlConsultaNfseRps(
+              config.cnpj,
+              config.inscricao_municipal,
+              numeroRps,
+              config.serie_rps || "11"
+            )
+
+            const consultaResponse = await consultarNfse(
+              xmlConsulta,
+              config.ambiente,
+              config.certificado_base64,
+              config.certificado_senha
+            )
+
+            // Registrar transmissao da consulta
+            await connection.execute(
+              `INSERT INTO nfse_transmissoes (nota_fiscal_id, tipo, xml_envio, xml_retorno, sucesso, tempo_resposta_ms)
+               VALUES (?, 'consulta_auto', ?, ?, ?, ?)`,
+              [notaId, xmlConsulta, consultaResponse.xml, consultaResponse.success ? 1 : 0, consultaResponse.tempoMs]
+            )
+
+            if (consultaResponse.success) {
+              const dadosConsulta = extrairDadosNfseRetorno(consultaResponse.xml)
+              if (dadosConsulta.sucesso && dadosConsulta.numeroNfse) {
+                // NFS-e processada! Atualizar
+                await connection.execute(
+                  `UPDATE notas_fiscais SET 
+                    numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
+                    data_emissao = COALESCE(data_emissao, NOW()), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ?`,
+                  [dadosConsulta.numeroNfse, dadosConsulta.codigoVerificacao || null, consultaResponse.xml, notaId]
+                )
+                dadosRetorno.numeroNfse = dadosConsulta.numeroNfse
+                dadosRetorno.codigoVerificacao = dadosConsulta.codigoVerificacao
+                console.log("[v0] NFS-e encontrada na consulta automatica:", dadosConsulta.numeroNfse)
+              }
+            }
+          } catch (consultaError: any) {
+            console.log("[v0] Consulta automatica falhou (nao critico):", consultaError?.message)
+            // Nao e critico - o usuario pode consultar manualmente
+          }
         }
 
-        // Incrementar número RPS
+        // Incrementar numero RPS
         await connection.execute(
           "UPDATE nfse_config SET proximo_numero_rps = proximo_numero_rps + 1 WHERE ativo = 1"
         )
@@ -221,8 +273,8 @@ export async function POST(request: NextRequest) {
             ? `NFS-e enviada em HOMOLOGACAO com sucesso! NFS-e: ${dadosRetorno.numeroNfse}`
             : `NFS-e emitida com sucesso! Numero: ${dadosRetorno.numeroNfse}`)
           : (config.ambiente === 2
-            ? "RPS enviado em HOMOLOGACAO! O lote esta em processamento."
-            : "RPS enviado com sucesso! A NFS-e sera gerada pela prefeitura em instantes.")
+            ? "RPS enviado em HOMOLOGACAO! O lote esta em processamento. Clique em 'Consultar' para verificar o numero da NFS-e."
+            : "RPS enviado com sucesso! Clique em 'Consultar na prefeitura' para obter o numero da NFS-e.")
 
         return NextResponse.json({
           success: true,
@@ -255,10 +307,71 @@ export async function POST(request: NextRequest) {
         })
       }
     } else {
-      // Falha na comunicação SOAP
+      // SOAP marcou como falha, mas vamos tentar extrair dados mesmo assim
+      // Pode ser que a prefeitura retornou <Erro> como alerta mas processou a nota
+      console.log("[v0] SOAP retornou success=false, tentando extrair dados mesmo assim...")
+      const dadosRecuperacao = extrairDadosNfseRetorno(soapResponse.xml)
+      console.log("[v0] Dados recuperacao:", JSON.stringify(dadosRecuperacao))
+
+      if (dadosRecuperacao.numeroNfse) {
+        // A NFS-e FOI emitida! O SOAP marcou erro mas a nota existe
+        console.log("[v0] NFS-e ENCONTRADA mesmo com SOAP success=false! Numero:", dadosRecuperacao.numeroNfse)
+        await connection.execute(
+          `UPDATE notas_fiscais SET 
+            numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
+            data_emissao = NOW(), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [dadosRecuperacao.numeroNfse, dadosRecuperacao.codigoVerificacao || null, soapResponse.xml, notaId],
+        )
+
+        await connection.execute(
+          "UPDATE nfse_config SET proximo_numero_rps = proximo_numero_rps + 1 WHERE ativo = 1"
+        )
+
+        return NextResponse.json({
+          success: true,
+          message: `NFS-e emitida com sucesso! Numero: ${dadosRecuperacao.numeroNfse}`,
+          data: {
+            id: notaId,
+            numero_nfse: dadosRecuperacao.numeroNfse,
+            codigo_verificacao: dadosRecuperacao.codigoVerificacao || null,
+            numero_rps: numeroRps,
+            serie_rps: config.serie_rps || "11",
+            ambiente: config.ambiente === 2 ? "homologacao" : "producao",
+          },
+        })
+      }
+
+      // Verificar se <Sucesso>true</Sucesso> esta no XML (SOAP pode ter errado na deteccao)
+      if (dadosRecuperacao.sucesso) {
+        console.log("[v0] Sucesso=true no XML apesar de SOAP success=false - tratando como processando")
+        await connection.execute(
+          `UPDATE notas_fiscais SET 
+            status = 'processando', xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [soapResponse.xml, notaId],
+        )
+
+        await connection.execute(
+          "UPDATE nfse_config SET proximo_numero_rps = proximo_numero_rps + 1 WHERE ativo = 1"
+        )
+
+        return NextResponse.json({
+          success: true,
+          message: "RPS enviado com sucesso! Clique em 'Consultar na prefeitura' para obter o numero da NFS-e.",
+          data: {
+            id: notaId,
+            numero_rps: numeroRps,
+            serie_rps: config.serie_rps || "11",
+            ambiente: config.ambiente === 2 ? "homologacao" : "producao",
+          },
+        })
+      }
+
+      // Falha real na comunicacao SOAP
       await connection.execute(
         `UPDATE notas_fiscais SET status = 'erro', mensagem_erro = ?, xml_retorno = ? WHERE id = ?`,
-        [soapResponse.erro, soapResponse.xml, notaId],
+        [soapResponse.erro || dadosRecuperacao.erros.join("; "), soapResponse.xml, notaId],
       )
 
       // Incrementar RPS
@@ -268,7 +381,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: false,
-        message: "Erro na comunicacao com a prefeitura: " + soapResponse.erro,
+        message: "Erro na comunicacao com a prefeitura: " + (soapResponse.erro || dadosRecuperacao.erros.join("; ")),
         data: { id: notaId },
       })
     }

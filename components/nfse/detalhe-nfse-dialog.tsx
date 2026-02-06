@@ -10,8 +10,10 @@ import {
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Loader2, FileText, Clock, CheckCircle2, XCircle, AlertCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Loader2, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
 
 interface DetalheNfseDialogProps {
   open: boolean
@@ -36,13 +38,39 @@ function formatDateBR(dateStr: string | null): string {
 
 export function DetalheNfseDialog({ open, onOpenChange, notaId }: DetalheNfseDialogProps) {
   const [loading, setLoading] = useState(false)
+  const [consultando, setConsultando] = useState(false)
   const [nota, setNota] = useState<any>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (open && notaId) {
       fetchNota()
     }
   }, [open, notaId])
+
+  const handleConsultar = async () => {
+    if (!notaId) return
+    setConsultando(true)
+    try {
+      const response = await fetch(`/api/nfse/${notaId}/consultar`, { method: "POST" })
+      const result = await response.json()
+
+      if (result.success) {
+        toast({ title: "NFS-e Encontrada!", description: result.message })
+        fetchNota() // Recarregar dados
+      } else {
+        toast({
+          title: "Consulta NFS-e",
+          description: result.message,
+          variant: result.data?.status === "processando" ? "default" : "destructive",
+        })
+      }
+    } catch {
+      toast({ title: "Erro", description: "Erro ao consultar na prefeitura", variant: "destructive" })
+    } finally {
+      setConsultando(false)
+    }
+  }
 
   const fetchNota = async () => {
     setLoading(true)
@@ -120,6 +148,38 @@ export function DetalheNfseDialog({ open, onOpenChange, notaId }: DetalheNfseDia
                 )}
               </div>
             </div>
+
+            {/* Botao consultar - para notas em processamento */}
+            {nota.status === "processando" && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">NFS-e em processamento</p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      O RPS foi enviado, mas a prefeitura ainda nao retornou o numero da NFS-e.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleConsultar}
+                    disabled={consultando}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {consultando ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Consultando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Consultar na Prefeitura
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Erro */}
             {nota.status === "erro" && nota.mensagem_erro && (
