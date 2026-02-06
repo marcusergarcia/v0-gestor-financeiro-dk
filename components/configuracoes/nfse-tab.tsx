@@ -650,25 +650,118 @@ export function NfseTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ExternalLink className="h-5 w-5 text-blue-600" />
-            Orientacoes - Prefeitura de Sao Paulo
+            Credenciamento Web Service - Prefeitura de Sao Paulo
           </CardTitle>
+          <CardDescription>
+            Passo a passo para solicitar acesso ao Web Service de NFS-e
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h4 className="font-medium text-blue-800 mb-2">Para emitir NFS-e em Sao Paulo voce precisa:</h4>
-            <ol className="list-decimal list-inside space-y-1 text-sm text-gray-700">
-              <li>Ter inscricao municipal ativa na Prefeitura de SP</li>
-              <li>Ter o certificado digital A1 (.pfx) valido</li>
-              <li>Solicitar acesso ao Web Service da NFS-e no portal da prefeitura</li>
-              <li>Cadastrar o IP do servidor na Prefeitura de SP (para producao)</li>
-              <li>Realizar testes em ambiente de homologacao antes de produzir notas reais</li>
-            </ol>
+          {/* Passo a Passo do Credenciamento */}
+          <div className="space-y-3">
+            <div className="flex gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">1</div>
+              <div>
+                <p className="font-medium text-emerald-800">Acesse o Portal NFS-e da Prefeitura</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Entre em{" "}
+                  <button
+                    type="button"
+                    onClick={() => window.open("https://nfe.prefeitura.sp.gov.br", "_blank")}
+                    className="text-blue-600 underline hover:text-blue-800"
+                  >
+                    nfe.prefeitura.sp.gov.br
+                  </button>
+                  {" "}usando seu certificado digital A1 (o mesmo que voce carregou acima).
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">2</div>
+              <div>
+                <p className="font-medium text-emerald-800">Solicite o Credenciamento para Web Service</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  No portal, va em <strong>{"Configuracoes > Web Service"}</strong> (ou procure por &quot;Web Service&quot; no menu).
+                  Preencha os dados solicitados e aceite os termos de uso. A Prefeitura de SP utiliza
+                  autenticacao via certificado digital no proprio webservice, entao o credenciamento e automatico na maioria dos casos.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">3</div>
+              <div>
+                <p className="font-medium text-emerald-800">Teste em Homologacao</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  O ambiente de <strong>homologacao (testes)</strong> esta disponivel em{" "}
+                  <button
+                    type="button"
+                    onClick={() => window.open("https://nfe.prefeitura.sp.gov.br", "_blank")}
+                    className="text-blue-600 underline hover:text-blue-800"
+                  >
+                    nfe.prefeitura.sp.gov.br
+                  </button>.
+                  Neste sistema, selecione &quot;Homologacao&quot; acima e faca um teste de emissao.
+                  As notas emitidas em homologacao nao tem valor fiscal.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">4</div>
+              <div>
+                <p className="font-medium text-emerald-800">Ative a Producao</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Apos validar os testes, mude o ambiente para <strong>Producao</strong> nesta configuracao.
+                  As notas emitidas em producao terao valor fiscal e serao registradas na Prefeitura.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex gap-3">
+          <Separator />
+
+          {/* Requisitos */}
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h4 className="font-medium text-blue-800 mb-2">Requisitos para emissao</h4>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span>Inscricao Municipal (IM) ativa na Prefeitura de SP</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span>Certificado Digital A1 (.pfx/.p12) valido e emitido por AC credenciada ICP-Brasil</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span>CNPJ regular e sem pendencias com o municipio</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                <span>Codigo do servico correto conforme LC 116/2003 e lista da Prefeitura de SP</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Informacao importante sobre a Reforma Tributaria */}
+          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+            <h4 className="font-medium text-amber-800 mb-1 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Reforma Tributaria 2026
+            </h4>
+            <p className="text-sm text-amber-700">
+              A partir de 01/01/2026, houve mudancas na emissao de NFS-e por conta da Reforma Tributaria.
+              Verifique no portal da prefeitura se ha novas exigencias ou campos obrigatorios para o seu servico.
+            </p>
+          </div>
+
+          {/* Links Oficiais */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Button
               variant="outline"
-              className="flex-1"
+              className="w-full"
               onClick={() => window.open("https://nfe.prefeitura.sp.gov.br", "_blank")}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
@@ -676,11 +769,19 @@ export function NfseTab() {
             </Button>
             <Button
               variant="outline"
-              className="flex-1"
+              className="w-full"
               onClick={() => window.open("https://nfe.prefeitura.sp.gov.br/arquivos/nfews.pdf", "_blank")}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
               Manual Web Service
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => window.open("https://www.prefeitura.sp.gov.br/cidade/secretarias/financas/servicos/?p=1883", "_blank")}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Secretaria da Fazenda
             </Button>
           </div>
         </CardContent>
