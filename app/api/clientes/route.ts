@@ -83,13 +83,60 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
-    console.log("[v0] POST /api/clientes - dados recebidos:", {
-      nome: data.nome,
-      codigo: data.codigo,
-      cnpj: data.cnpj,
-      cpf: data.cpf,
-      tem_contrato: data.tem_contrato,
-    })
+
+    // Verificar duplicidade de CNPJ
+    if (data.cnpj && data.cnpj.trim()) {
+      const cnpjExistente = await query(
+        "SELECT id, nome, codigo FROM clientes WHERE cnpj = ? AND (status IS NULL OR status != 'inativo') LIMIT 1",
+        [data.cnpj.toUpperCase().replace(/[^\d]/g, "")]
+      )
+      if (cnpjExistente && cnpjExistente.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `CNPJ ja cadastrado para o cliente "${cnpjExistente[0].nome}" (Codigo: ${cnpjExistente[0].codigo || "N/A"})`,
+            field: "cnpj",
+          },
+          { status: 409 },
+        )
+      }
+    }
+
+    // Verificar duplicidade de CPF
+    if (data.cpf && data.cpf.trim()) {
+      const cpfExistente = await query(
+        "SELECT id, nome, codigo FROM clientes WHERE cpf = ? AND (status IS NULL OR status != 'inativo') LIMIT 1",
+        [data.cpf.toUpperCase().replace(/[^\d]/g, "")]
+      )
+      if (cpfExistente && cpfExistente.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `CPF ja cadastrado para o cliente "${cpfExistente[0].nome}" (Codigo: ${cpfExistente[0].codigo || "N/A"})`,
+            field: "cpf",
+          },
+          { status: 409 },
+        )
+      }
+    }
+
+    // Verificar duplicidade de codigo
+    if (data.codigo && data.codigo.trim()) {
+      const codigoExistente = await query(
+        "SELECT id, nome FROM clientes WHERE codigo = ? AND (status IS NULL OR status != 'inativo') LIMIT 1",
+        [data.codigo.toUpperCase()]
+      )
+      if (codigoExistente && codigoExistente.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Codigo ja cadastrado para o cliente "${codigoExistente[0].nome}"`,
+            field: "codigo",
+          },
+          { status: 409 },
+        )
+      }
+    }
 
     const insertQuery = `
       INSERT INTO clientes (
@@ -127,9 +174,7 @@ export async function POST(request: NextRequest) {
       data.email_adm?.toLowerCase() || null,
     ]
 
-    console.log("[v0] Executando INSERT com", params.length, "parametros")
     const result = await query(insertQuery, params)
-    console.log("[v0] INSERT resultado:", result)
 
     return NextResponse.json({
       success: true,
@@ -137,10 +182,37 @@ export async function POST(request: NextRequest) {
       data: { id: result.insertId, ...data },
     })
   } catch (error: any) {
-    console.error("[v0] Erro ao criar cliente:", error?.message || error)
-    console.error("[v0] Stack:", error?.stack)
+    console.error("Erro ao criar cliente:", error?.message || error)
+
+    // Tratar erro de duplicidade do MySQL (ER_DUP_ENTRY)
+    if (error?.code === "ER_DUP_ENTRY" || error?.errno === 1062) {
+      const msg = error?.message || ""
+      if (msg.includes("cnpj")) {
+        return NextResponse.json(
+          { success: false, message: "CNPJ ja cadastrado para outro cliente", field: "cnpj" },
+          { status: 409 },
+        )
+      }
+      if (msg.includes("cpf")) {
+        return NextResponse.json(
+          { success: false, message: "CPF ja cadastrado para outro cliente", field: "cpf" },
+          { status: 409 },
+        )
+      }
+      if (msg.includes("codigo")) {
+        return NextResponse.json(
+          { success: false, message: "Codigo ja cadastrado para outro cliente", field: "codigo" },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json(
+        { success: false, message: "Registro duplicado. Verifique CNPJ, CPF ou Codigo." },
+        { status: 409 },
+      )
+    }
+
     return NextResponse.json(
-      { success: false, message: error?.message || "Erro interno do servidor" },
+      { success: false, message: "Erro interno do servidor" },
       { status: 500 },
     )
   }

@@ -147,13 +147,6 @@ export default function NovoClientePage() {
     e.preventDefault()
     setSubmitError(null)
 
-    console.log("[v0] handleSubmit chamado, formData:", {
-      nome: formData.nome,
-      cnpj: formData.cnpj,
-      cpf: formData.cpf,
-      codigo: formData.codigo,
-    })
-
     if (!formData.nome.trim()) {
       const msg = "Nome e obrigatorio"
       setSubmitError(msg)
@@ -162,7 +155,6 @@ export default function NovoClientePage() {
         description: msg,
         variant: "destructive",
       })
-      console.log("[v0] Validacao falhou: nome vazio")
       return
     }
 
@@ -174,19 +166,16 @@ export default function NovoClientePage() {
         description: msg,
         variant: "destructive",
       })
-      console.log("[v0] Validacao falhou: sem CNPJ e sem CPF")
       return
     }
 
     setLoading(true)
-    console.log("[v0] Enviando dados para API /api/clientes POST...")
 
     try {
       const payload = {
         ...formData,
         dia_contrato: formData.dia_contrato ? Number.parseInt(formData.dia_contrato) : null,
       }
-      console.log("[v0] Payload:", JSON.stringify(payload).substring(0, 500))
 
       const response = await fetch("/api/clientes", {
         method: "POST",
@@ -196,9 +185,7 @@ export default function NovoClientePage() {
         body: JSON.stringify(payload),
       })
 
-      console.log("[v0] Response status:", response.status)
       const result = await response.json()
-      console.log("[v0] Response body:", result)
 
       if (result.success) {
         toast({
@@ -207,18 +194,22 @@ export default function NovoClientePage() {
         })
         router.push("/clientes")
       } else {
+        // Montar titulo adequado baseado no campo duplicado
+        let titulo = "Erro ao salvar"
+        if (result.field === "cnpj") titulo = "CNPJ ja cadastrado"
+        else if (result.field === "cpf") titulo = "CPF ja cadastrado"
+        else if (result.field === "codigo") titulo = "Codigo ja cadastrado"
+
         const msg = result.message || "Erro ao criar cliente"
         setSubmitError(msg)
         toast({
-          title: "Erro ao salvar",
+          title: titulo,
           description: msg,
           variant: "destructive",
         })
-        console.log("[v0] API retornou erro:", msg)
       }
     } catch (error: any) {
-      console.error("[v0] Erro ao criar cliente:", error)
-      const msg = `Erro de conexao: ${error?.message || "Tente novamente."}`
+      const msg = "Erro de conexao. Tente novamente."
       setSubmitError(msg)
       toast({
         title: "Erro de conexao",
