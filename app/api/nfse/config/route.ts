@@ -3,6 +3,16 @@ import { pool } from "@/lib/db"
 
 export async function GET() {
   try {
+    // Auto-migration: adicionar coluna ultima_nfse_numero se nao existir
+    try {
+      await pool.execute(
+        "ALTER TABLE nfse_config ADD COLUMN ultima_nfse_numero INT DEFAULT 0"
+      )
+      console.log("[v0] Coluna ultima_nfse_numero adicionada com sucesso")
+    } catch {
+      // Coluna ja existe - ignorar
+    }
+
     const [rows] = await pool.execute(
       "SELECT * FROM nfse_config WHERE ativo = 1 ORDER BY created_at DESC LIMIT 1"
     )
@@ -60,6 +70,7 @@ export async function POST(request: NextRequest) {
       serie_rps,
       tipo_rps,
       proximo_numero_rps,
+      ultima_nfse_numero,
     } = body
 
     // Verificar se já existe config
@@ -94,6 +105,7 @@ export async function POST(request: NextRequest) {
         serie_rps || "11",
         tipo_rps || 1,
         proximo_numero_rps || 660,
+        ultima_nfse_numero || 0,
       ]
 
       if (certUpdate) {
@@ -109,7 +121,7 @@ export async function POST(request: NextRequest) {
           aliquota_iss = ?, codigo_cnae = ?, regime_tributacao = ?,
           optante_simples = ?, incentivador_cultural = ?,
           ambiente = ?, serie_rps = ?, tipo_rps = ?,
-          proximo_numero_rps = ?
+          proximo_numero_rps = ?, ultima_nfse_numero = ?
           ${certUpdate},
           updated_at = CURRENT_TIMESTAMP
         WHERE ativo = 1`,
@@ -126,8 +138,8 @@ export async function POST(request: NextRequest) {
           aliquota_iss, codigo_cnae, regime_tributacao,
           optante_simples, incentivador_cultural,
           certificado_base64, certificado_senha, certificado_validade,
-          ambiente, serie_rps, tipo_rps, proximo_numero_rps, ativo
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+          ambiente, serie_rps, tipo_rps, proximo_numero_rps, ultima_nfse_numero, ativo
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         [
           inscricao_municipal,
           razao_social,
@@ -154,6 +166,7 @@ export async function POST(request: NextRequest) {
           serie_rps || "11",
           tipo_rps || 1,
           proximo_numero_rps || 660,
+          ultima_nfse_numero || 0,
         ],
       )
     }

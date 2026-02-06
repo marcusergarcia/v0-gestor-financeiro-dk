@@ -206,6 +206,11 @@ export async function POST(request: NextRequest) {
              WHERE id = ?`,
             [dadosRetorno.numeroNfse, dadosRetorno.codigoVerificacao, soapResponse.xml, notaId],
           )
+          // Atualizar ultima NFS-e conhecida na config
+          await connection.execute(
+            `UPDATE nfse_config SET ultima_nfse_numero = GREATEST(COALESCE(ultima_nfse_numero, 0), ?) WHERE ativo = 1`,
+            [Number(dadosRetorno.numeroNfse)]
+          )
         } else {
           // Lote aceito mas NFS-e em processamento assincrono (comum na prefeitura SP)
           await connection.execute(
@@ -322,6 +327,11 @@ export async function POST(request: NextRequest) {
             data_emissao = NOW(), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`,
           [dadosRecuperacao.numeroNfse, dadosRecuperacao.codigoVerificacao || null, soapResponse.xml, notaId],
+        )
+        // Atualizar ultima NFS-e conhecida na config
+        await connection.execute(
+          `UPDATE nfse_config SET ultima_nfse_numero = GREATEST(COALESCE(ultima_nfse_numero, 0), ?) WHERE ativo = 1`,
+          [Number(dadosRecuperacao.numeroNfse)]
         )
 
         await connection.execute(
