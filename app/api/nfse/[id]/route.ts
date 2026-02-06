@@ -1,48 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 
-// Excluir nota fiscal (apenas status 'erro' ou 'processando' sem numero NFS-e)
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params
-  try {
-    // Verificar se a nota pode ser excluida
-    const [rows] = await pool.execute(
-      "SELECT id, status, numero_nfse FROM notas_fiscais WHERE id = ?",
-      [id],
-    )
-    const notas = rows as any[]
-    if (notas.length === 0) {
-      return NextResponse.json({ success: false, message: "Nota nao encontrada" }, { status: 404 })
-    }
-
-    const nota = notas[0]
-    if (nota.numero_nfse) {
-      return NextResponse.json(
-        { success: false, message: "Nao e possivel excluir uma nota ja emitida pela prefeitura. Use o cancelamento." },
-        { status: 400 },
-      )
-    }
-
-    // Excluir transmissoes e nota
-    await pool.execute("DELETE FROM nfse_transmissoes WHERE nota_fiscal_id = ?", [id])
-    await pool.execute("DELETE FROM notas_fiscais WHERE id = ?", [id])
-
-    return NextResponse.json({
-      success: true,
-      message: "Nota fiscal excluida com sucesso",
-    })
-  } catch (error: any) {
-    console.error("Erro ao excluir nota fiscal:", error)
-    return NextResponse.json(
-      { success: false, message: "Erro: " + error.message },
-      { status: 500 },
-    )
-  }
-}
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
