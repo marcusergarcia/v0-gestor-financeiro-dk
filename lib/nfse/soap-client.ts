@@ -1,5 +1,8 @@
 // Cliente SOAP para comunicação com o Web Service da Prefeitura de SP
+// Ref: Manual de Utilização do Web Service v2.1 - nfe.prefeitura.sp.gov.br/arquivos/nfews.pdf
 // O certificado A1 (.pfx) é usado para autenticação via HTTPS/TLS mutual auth
+// Produção: https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx
+// Homologação: https://nfeh.prefeitura.sp.gov.br/ws/lotenfe.asmx
 import { SP_WEBSERVICE_URLS, SP_SOAP_ACTIONS } from "./xml-builder"
 
 interface SoapResponse {

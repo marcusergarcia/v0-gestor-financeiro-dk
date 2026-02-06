@@ -744,12 +744,35 @@ export function NfseTab() {
             </ol>
           </div>
 
+          {/* Reforma Tributária 2026 */}
+          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+            <h4 className="font-medium text-amber-800 mb-2 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              Reforma Tributaria 2026 - Layouts de Emissao
+            </h4>
+            <div className="text-sm text-amber-700 space-y-2">
+              <p>
+                A partir de 01/01/2026, a Prefeitura de SP permite emissao em <strong>dois layouts</strong>:
+              </p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li><strong>Layout 1 (atual)</strong> - Emissao apenas com destaque de ISS. Funciona via Web Service, TXT e Online.</li>
+                <li><strong>Layout 2 (novo)</strong> - Emissao com destaque de ISS, IBS e CBS (novos tributos). Funciona via Web Service e Online.</li>
+              </ul>
+              <p>
+                O ano de 2026 e um <strong>ano de teste</strong> para IBS/CBS (LC 214/2025). Este sistema utiliza
+                o <strong>Layout 1</strong> por padrao. O preenchimento dos campos de IBS/CBS no Layout 2 e opcional,
+                mas se preenchidos, serao validados pela prefeitura.
+              </p>
+            </div>
+          </div>
+
           {/* Endpoints usados */}
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h4 className="font-medium text-blue-800 mb-2">Endpoints do Web Service SP</h4>
+            <h4 className="font-medium text-blue-800 mb-2">Endpoints do Web Service SP (LoteNFe)</h4>
             <div className="space-y-1 text-xs font-mono text-blue-700">
-              <p><strong>Producao:</strong> https://nfe.prefeitura.sp.gov.br/ws/loterps.asmx</p>
-              <p><strong>Homologacao:</strong> https://nfeh.prefeitura.sp.gov.br/ws/loterps.asmx</p>
+              <p><strong>Producao:</strong> https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx</p>
+              <p><strong>Homologacao:</strong> https://nfeh.prefeitura.sp.gov.br/ws/lotenfe.asmx</p>
+              <p className="mt-2 text-blue-600"><strong>Schemas XSD:</strong> https://nfe.prefeitura.sp.gov.br/ws/schemas.zip</p>
             </div>
           </div>
 

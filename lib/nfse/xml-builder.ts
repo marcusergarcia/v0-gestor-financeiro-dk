@@ -224,8 +224,10 @@ function escapeXml(str: string): string {
 }
 
 // URLs dos webservices da Prefeitura de SP
+// Ref: Manual de Utilização do Web Service v2.1 - Prefeitura de SP
+// Homologação usa subdomínio "nfeh" (com H)
 export const SP_WEBSERVICE_URLS = {
-  homologacao: "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx",
+  homologacao: "https://nfeh.prefeitura.sp.gov.br/ws/lotenfe.asmx",
   producao: "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx",
 }
 
