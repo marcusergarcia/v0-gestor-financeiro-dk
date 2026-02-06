@@ -80,7 +80,7 @@ const defaultConfig: NfseConfig = {
   ambiente: 2,
   serie_rps: "11",
   tipo_rps: 1,
-  proximo_numero_rps: 732,
+  proximo_numero_rps: 860,
 }
 
 export function NfseTab() {
@@ -534,9 +534,12 @@ export function NfseTab() {
             <FileText className="h-5 w-5 text-blue-600" />
             Configuracao do RPS
           </CardTitle>
-          <CardDescription>Recibo Provisorio de Servicos</CardDescription>
+          <CardDescription>
+            Recibo Provisorio de Servicos - o numero do RPS e diferente do numero da NFS-e.
+            O RPS e gerado pelo sistema, a NFS-e e atribuida pela prefeitura.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="serie_rps">Serie do RPS</Label>
@@ -544,8 +547,9 @@ export function NfseTab() {
                 id="serie_rps"
                 value={config.serie_rps}
                 onChange={(e) => updateConfig("serie_rps", e.target.value)}
-                placeholder="NF"
+                placeholder="11"
               />
+              <p className="text-xs text-gray-500">Sua serie atual: 11</p>
             </div>
             <div className="space-y-2">
               <Label>Tipo do RPS</Label>
@@ -570,10 +574,18 @@ export function NfseTab() {
                 type="number"
                 value={config.proximo_numero_rps}
                 onChange={(e) => updateConfig("proximo_numero_rps", Number(e.target.value))}
-                disabled
               />
-              <p className="text-xs text-gray-500">Incrementado automaticamente</p>
+              <p className="text-xs text-gray-500">
+                Ultimo RPS usado: {config.proximo_numero_rps - 1} (serie {config.serie_rps}.{String(config.proximo_numero_rps - 1).padStart(8, "0")})
+              </p>
             </div>
+          </div>
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-700">
+              <strong>Importante:</strong> O numero do RPS (ex: {config.serie_rps}.{String(config.proximo_numero_rps).padStart(8, "0")}) e gerado por este sistema e enviado a prefeitura.
+              O numero da NFS-e (ex: 00000732) e atribuido automaticamente pela prefeitura apos processamento.
+              Se voce precisar ajustar o proximo RPS, altere o campo acima.
+            </p>
           </div>
         </CardContent>
       </Card>

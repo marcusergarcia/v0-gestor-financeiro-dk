@@ -192,30 +192,47 @@ export async function POST(request: NextRequest) {
       const dadosRetorno = extrairDadosNfseRetorno(soapResponse.xml)
 
       if (dadosRetorno.sucesso) {
-        // Atualizar nota com dados da NFS-e emitida
-        await connection.execute(
-          `UPDATE notas_fiscais SET 
-            numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
-            data_emissao = NOW(), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
-           WHERE id = ?`,
-          [dadosRetorno.numeroNfse, dadosRetorno.codigoVerificacao, soapResponse.xml, notaId],
-        )
+        if (dadosRetorno.numeroNfse) {
+          // NFS-e emitida com número retornado (processamento síncrono)
+          await connection.execute(
+            `UPDATE notas_fiscais SET 
+              numero_nfse = ?, codigo_verificacao = ?, status = 'emitida',
+              data_emissao = NOW(), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [dadosRetorno.numeroNfse, dadosRetorno.codigoVerificacao, soapResponse.xml, notaId],
+          )
+        } else {
+          // Lote aceito mas NFS-e em processamento assíncrono (comum na prefeitura SP)
+          await connection.execute(
+            `UPDATE notas_fiscais SET 
+              status = 'processando', xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [soapResponse.xml, notaId],
+          )
+        }
 
         // Incrementar número RPS
         await connection.execute(
           "UPDATE nfse_config SET proximo_numero_rps = proximo_numero_rps + 1 WHERE ativo = 1"
         )
 
+        const mensagem = dadosRetorno.numeroNfse
+          ? (config.ambiente === 2
+            ? `NFS-e enviada em HOMOLOGACAO com sucesso! NFS-e: ${dadosRetorno.numeroNfse}`
+            : `NFS-e emitida com sucesso! Numero: ${dadosRetorno.numeroNfse}`)
+          : (config.ambiente === 2
+            ? "RPS enviado em HOMOLOGACAO! O lote esta em processamento."
+            : "RPS enviado com sucesso! A NFS-e sera gerada pela prefeitura em instantes.")
+
         return NextResponse.json({
           success: true,
-          message: config.ambiente === 2
-            ? "NFS-e enviada em HOMOLOGACAO (teste) com sucesso!"
-            : "NFS-e emitida com sucesso!",
+          message: mensagem,
           data: {
             id: notaId,
-            numero_nfse: dadosRetorno.numeroNfse,
-            codigo_verificacao: dadosRetorno.codigoVerificacao,
+            numero_nfse: dadosRetorno.numeroNfse || null,
+            codigo_verificacao: dadosRetorno.codigoVerificacao || null,
             numero_rps: numeroRps,
+            serie_rps: config.serie_rps || "11",
             ambiente: config.ambiente === 2 ? "homologacao" : "producao",
           },
         })

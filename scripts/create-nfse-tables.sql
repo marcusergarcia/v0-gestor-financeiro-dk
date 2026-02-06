@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS nfse_config (
   ambiente TINYINT DEFAULT 2 COMMENT '1=Produção, 2=Homologação',
   serie_rps VARCHAR(10) DEFAULT '11' COMMENT 'Serie do RPS',
   tipo_rps TINYINT DEFAULT 1 COMMENT '1=RPS, 2=RPS-Mista, 3=Cupom',
-  proximo_numero_rps INT DEFAULT 732 COMMENT 'Proximo numero do RPS',
+  proximo_numero_rps INT DEFAULT 860 COMMENT 'Proximo numero do RPS (ultimo usado: 859)',
   -- Controle
   ativo TINYINT(1) DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS notas_fiscais (
   -- Identificação
   numero_nfse VARCHAR(20) COMMENT 'Número da NFS-e retornado pela prefeitura',
   numero_rps INT NOT NULL COMMENT 'Número do RPS enviado',
-  serie_rps VARCHAR(10) DEFAULT 'NF',
+  serie_rps VARCHAR(10) DEFAULT '11',
   tipo_rps TINYINT DEFAULT 1,
   codigo_verificacao VARCHAR(50) COMMENT 'Código de verificação da NFS-e',
   -- Origem

@@ -449,12 +449,12 @@ export default function NotaFiscalPage() {
                           <div>
                             {nota.numero_nfse ? (
                               <span className="font-semibold text-emerald-700">
-                                {nota.numero_nfse}
+                                NFS-e {String(nota.numero_nfse).padStart(8, "0")}
                               </span>
                             ) : (
-                              <span className="text-gray-500">-</span>
+                              <span className="text-gray-400 text-xs italic">Aguardando prefeitura</span>
                             )}
-                            <p className="text-xs text-gray-400">RPS: {nota.numero_rps}</p>
+                            <p className="text-xs text-gray-400">RPS: {nota.serie_rps || "11"}.{String(nota.numero_rps).padStart(8, "0")}</p>
                           </div>
                         </TableCell>
                         <TableCell>
