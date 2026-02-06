@@ -74,6 +74,11 @@ export async function POST(
            WHERE id = ?`,
           [dadosOriginal.numeroNfse, dadosOriginal.codigoVerificacao || null, id]
         )
+        // Atualizar ultima NFS-e conhecida
+        await connection.execute(
+          `UPDATE nfse_config SET ultima_nfse_numero = GREATEST(COALESCE(ultima_nfse_numero, 0), ?) WHERE ativo = 1`,
+          [Number(dadosOriginal.numeroNfse)]
+        )
         return NextResponse.json({
           success: true,
           message: `NFS-e encontrada! Numero: ${dadosOriginal.numeroNfse}`,
@@ -120,6 +125,10 @@ export async function POST(
             data_emissao = COALESCE(data_emissao, NOW()), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`,
           [dadosRps.numeroNfse, dadosRps.codigoVerificacao || null, responseRps.xml, id]
+        )
+        await connection.execute(
+          `UPDATE nfse_config SET ultima_nfse_numero = GREATEST(COALESCE(ultima_nfse_numero, 0), ?) WHERE ativo = 1`,
+          [Number(dadosRps.numeroNfse)]
         )
         return NextResponse.json({
           success: true,
@@ -169,6 +178,10 @@ export async function POST(
               data_emissao = COALESCE(data_emissao, NOW()), xml_retorno = ?, updated_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
             [dadosLote.numeroNfse, dadosLote.codigoVerificacao || null, responseLote.xml, id]
+          )
+          await connection.execute(
+            `UPDATE nfse_config SET ultima_nfse_numero = GREATEST(COALESCE(ultima_nfse_numero, 0), ?) WHERE ativo = 1`,
+            [Number(dadosLote.numeroNfse)]
           )
           return NextResponse.json({
             success: true,

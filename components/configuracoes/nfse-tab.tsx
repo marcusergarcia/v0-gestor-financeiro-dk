@@ -53,6 +53,7 @@ interface NfseConfig {
   serie_rps: string
   tipo_rps: number
   proximo_numero_rps: number
+  ultima_nfse_numero: number
 }
 
 const defaultConfig: NfseConfig = {
@@ -81,6 +82,7 @@ const defaultConfig: NfseConfig = {
   serie_rps: "11",
   tipo_rps: 1,
   proximo_numero_rps: 660,
+  ultima_nfse_numero: 0,
 }
 
 export function NfseTab() {
@@ -578,14 +580,53 @@ export function NfseTab() {
               <p className="text-xs text-gray-500">
                 Ultimo RPS usado: {config.proximo_numero_rps - 1} (serie {config.serie_rps}.{String(config.proximo_numero_rps - 1).padStart(8, "0")})
               </p>
-            </div>
-          </div>
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-700">
-              <strong>Importante:</strong> O numero do RPS (ex: {config.serie_rps}.{String(config.proximo_numero_rps).padStart(8, "0")}) e gerado por este sistema e enviado a prefeitura.
-              O numero da NFS-e (ex: 00000732) e atribuido automaticamente pela prefeitura apos processamento.
-              Se voce precisar ajustar o proximo RPS, altere o campo acima.
-            </p>
+  </div>
+  </div>
+
+  <Separator />
+
+  <div className="space-y-2">
+    <Label htmlFor="ultima_nfse_numero" className="flex items-center gap-2">
+      <Hash className="h-4 w-4 text-emerald-600" />
+      Ultima NFS-e Conhecida
+    </Label>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Input
+          id="ultima_nfse_numero"
+          type="number"
+          value={config.ultima_nfse_numero}
+          onChange={(e) => updateConfig("ultima_nfse_numero", Number(e.target.value))}
+          placeholder="Ex: 732"
+        />
+        <p className="text-xs text-gray-500">
+          Informe o numero da ultima NFS-e emitida pela prefeitura (ex: 732).
+        </p>
+      </div>
+      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+        <p className="text-xs text-emerald-700">
+          <strong>Para que serve:</strong> Este numero ajuda o sistema a identificar a proxima NFS-e esperada.
+          Quando a prefeitura processa o RPS e retorna a NFS-e, o sistema usa essa referencia para validar e atualizar automaticamente.
+          Consulte o ultimo numero no portal da{" "}
+          <a
+            href="https://nfe.prefeitura.sp.gov.br"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline font-medium"
+          >
+            Prefeitura de SP
+          </a>.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+  <p className="text-xs text-blue-700">
+  <strong>Importante:</strong> O numero do RPS (ex: {config.serie_rps}.{String(config.proximo_numero_rps).padStart(8, "0")}) e gerado por este sistema e enviado a prefeitura.
+  O numero da NFS-e (ex: {config.ultima_nfse_numero ? String(config.ultima_nfse_numero + 1).padStart(8, "0") : "00000XXX"}) e atribuido automaticamente pela prefeitura apos processamento.
+  Se voce precisar ajustar o proximo RPS, altere o campo acima.
+  </p>
           </div>
         </CardContent>
       </Card>
