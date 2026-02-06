@@ -60,8 +60,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Obter próximo número RPS
-    const numeroRps = config.proximo_numero_rps || 1
-    console.log("[v0] Proximo numero RPS:", numeroRps, "Serie:", config.serie_rps, "Ambiente:", config.ambiente)
+    const numeroRps = config.proximo_numero_rps || 660
+    if (numeroRps < 2) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "O numero do proximo RPS esta incorreto (" + numeroRps + "). Va em Configuracoes > NFS-e, ajuste o campo 'Proximo Numero RPS' para o valor correto (ex: 660) e clique em Salvar.",
+        },
+        { status: 400 },
+      )
+    }
 
     // Calcular valores
     const valorServicos = Number(valor_servicos)

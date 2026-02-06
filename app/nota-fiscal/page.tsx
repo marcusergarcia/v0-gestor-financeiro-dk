@@ -28,6 +28,7 @@ import {
   AlertCircle,
   Loader2,
   Filter,
+  Trash2,
   FileCheck,
   DollarSign,
   Send,
@@ -504,6 +505,31 @@ export default function NotaFiscalPage() {
                                 title="Cancelar NFS-e"
                               >
                                 <XCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {(nota.status === "erro" || (nota.status === "processando" && !nota.numero_nfse)) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={async () => {
+                                  if (!confirm("Excluir esta nota com erro?")) return
+                                  try {
+                                    const res = await fetch(`/api/nfse/${nota.id}`, { method: "DELETE" })
+                                    const result = await res.json()
+                                    if (result.success) {
+                                      toast({ title: "Excluida", description: "Nota excluida com sucesso" })
+                                      fetchNotas()
+                                    } else {
+                                      toast({ title: "Erro", description: result.message, variant: "destructive" })
+                                    }
+                                  } catch {
+                                    toast({ title: "Erro", description: "Erro ao excluir nota", variant: "destructive" })
+                                  }
+                                }}
+                                title="Excluir nota com erro"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
                           </div>
