@@ -1,12 +1,14 @@
-// Cliente SOAP para comunicação com o Web Service da Prefeitura de SP
-// Ref: Manual de Utilização do Web Service v2.1 - nfe.prefeitura.sp.gov.br/arquivos/nfews.pdf
-// Produção: https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx
-// Homologação: https://nfeh.prefeitura.sp.gov.br/ws/lotenfe.asmx
+// Cliente SOAP para comunicacao com o Web Service da Prefeitura de SP
+// Ref: Manual de Utilizacao do Web Service v2.1 - nfe.prefeitura.sp.gov.br/arquivos/nfews.pdf
+// Producao: https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx
+// Homologacao: https://nfeh.prefeitura.sp.gov.br/ws/lotenfe.asmx
 //
-// A autenticação é feita via TLS mútuo (mutual TLS/mTLS) com certificado A1 (.pfx)
-// O Node.js https.Agent é usado para passar o certificado na conexão
+// A autenticacao e feita via TLS mutuo (mTLS) com certificado A1 (.pfx)
+// Usa node-forge para extrair cert+key do PFX (compativel com cifras legadas ICP-Brasil)
+// e depois passa como PEM para o https.Agent do Node.js
 
 import https from "https"
+import forge from "node-forge"
 import { SP_WEBSERVICE_URLS, SP_SOAP_ACTIONS } from "./xml-builder"
 
 interface SoapResponse {
@@ -18,20 +20,75 @@ interface SoapResponse {
 }
 
 /**
- * Envia requisição SOAP para a Prefeitura de SP com autenticação por certificado A1
+ * Extrai certificado e chave privada de um PFX usando node-forge
+ * Compativel com cifras legadas (RC2, 3DES) comuns em certificados A1 ICP-Brasil
+ */
+function extrairCertificadoPfx(
+  pfxBase64: string,
+  senha: string
+): { certPem: string; keyPem: string; validade: string } {
+  // Limpar base64
+  let cleanBase64 = pfxBase64
+  if (cleanBase64.includes(",")) {
+    cleanBase64 = cleanBase64.split(",")[1]
+  }
+  cleanBase64 = cleanBase64.replace(/[\s\r\n]/g, "")
+
+  // Decodificar base64 para DER (binary)
+  const derBuffer = forge.util.decode64(cleanBase64)
+
+  // Converter DER para ASN1 e depois para PKCS12
+  const asn1 = forge.asn1.fromDer(derBuffer)
+  const p12 = forge.pkcs12.pkcs12FromAsn1(asn1, senha)
+
+  // Extrair certificados
+  const certBags = p12.getBags({ bagType: forge.pki.oids.certBag })
+  const certBagList = certBags[forge.pki.oids.certBag] || []
+
+  if (certBagList.length === 0) {
+    throw new Error("Nenhum certificado encontrado no arquivo PFX")
+  }
+
+  // Pegar o certificado principal (geralmente o primeiro)
+  const cert = certBagList[0].cert
+  if (!cert) {
+    throw new Error("Certificado invalido no arquivo PFX")
+  }
+
+  // Extrair chave privada
+  const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })
+  const keyBagList = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag] || []
+
+  if (keyBagList.length === 0) {
+    throw new Error("Nenhuma chave privada encontrada no arquivo PFX")
+  }
+
+  const key = keyBagList[0].key
+  if (!key) {
+    throw new Error("Chave privada invalida no arquivo PFX")
+  }
+
+  // Converter para PEM
+  const certPem = forge.pki.certificateToPem(cert)
+  const keyPem = forge.pki.privateKeyToPem(key)
+  const validade = cert.validity.notAfter.toISOString()
+
+  return { certPem, keyPem, validade }
+}
+
+/**
+ * Envia requisicao SOAP para a Prefeitura de SP com autenticacao por certificado A1
  */
 export async function enviarSoap(
   xmlBody: string,
   soapAction: string,
-  ambiente: number, // 1=Produção, 2=Homologação
+  ambiente: number, // 1=Producao, 2=Homologacao
   certificadoBase64?: string,
   certificadoSenha?: string,
 ): Promise<SoapResponse> {
   const url = ambiente === 1 ? SP_WEBSERVICE_URLS.producao : SP_WEBSERVICE_URLS.homologacao
   const inicio = Date.now()
 
-  // O XML do pedido vai dentro do VersaoArg do SOAP
-  // A Prefeitura de SP espera o XML encapsulado em CDATA dentro do envelope SOAP
   const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
@@ -43,25 +100,29 @@ export async function enviarSoap(
 </soap12:Envelope>`
 
   try {
-    // Configurar o agente HTTPS com o certificado A1 para mTLS
+    // Configurar agente HTTPS
     const agentOptions: https.AgentOptions = {
       rejectUnauthorized: true,
     }
 
     if (certificadoBase64 && certificadoSenha) {
-      const pfxBuffer = Buffer.from(certificadoBase64, "base64")
-      agentOptions.pfx = pfxBuffer
-      agentOptions.passphrase = certificadoSenha
+      // Usar node-forge para extrair cert e key do PFX
+      // Isso contorna o problema do OpenSSL 3.x com cifras legadas (RC2/3DES)
+      // que sao comuns em certificados A1 emitidos por ICP-Brasil
+      console.log("[v0] Extraindo certificado do PFX com node-forge...")
+      const { certPem, keyPem } = extrairCertificadoPfx(certificadoBase64, certificadoSenha)
+      console.log("[v0] Certificado extraido com sucesso, cert PEM length:", certPem.length)
+
+      agentOptions.cert = certPem
+      agentOptions.key = keyPem
     }
 
     const agent = new https.Agent(agentOptions)
 
     console.log("[v0] SOAP Request para:", url)
     console.log("[v0] SOAPAction:", soapAction)
-    console.log("[v0] Certificado presente:", !!certificadoBase64)
-    console.log("[v0] Envelope tamanho:", soapEnvelope.length)
 
-    // Fazer a requisição HTTPS com o certificado
+    // Fazer a requisicao HTTPS com o certificado
     const xmlRetorno = await new Promise<{ body: string; statusCode: number }>((resolve, reject) => {
       const parsedUrl = new URL(url)
 
@@ -115,7 +176,7 @@ export async function enviarSoap(
       }
     }
 
-    // Verificar se o retorno contém erro
+    // Verificar se o retorno contem erro
     const temErro =
       xmlRetorno.body.includes("<Erro>") ||
       xmlRetorno.body.includes("<soap:Fault>") ||
@@ -134,7 +195,12 @@ export async function enviarSoap(
 
     // Mensagens de erro mais claras
     let erroMsg = error?.message || "Erro desconhecido na comunicacao SOAP"
-    if (erroMsg.includes("DEPTH_ZERO_SELF_SIGNED_CERT") || erroMsg.includes("self signed")) {
+
+    if (erroMsg.includes("Invalid password") || erroMsg.includes("PKCS#12 MAC could not be verified")) {
+      erroMsg = "Senha do certificado digital incorreta. Verifique a senha do seu certificado A1."
+    } else if (erroMsg.includes("Nenhum certificado") || erroMsg.includes("Nenhuma chave")) {
+      erroMsg = "Arquivo PFX invalido. Verifique se o arquivo do certificado esta correto."
+    } else if (erroMsg.includes("DEPTH_ZERO_SELF_SIGNED_CERT") || erroMsg.includes("self signed")) {
       erroMsg = "Erro de certificado SSL do servidor da prefeitura. Verifique se o ambiente esta correto."
     } else if (erroMsg.includes("ERR_OSSL") || erroMsg.includes("wrong password") || erroMsg.includes("mac verify failure")) {
       erroMsg = "Senha do certificado digital incorreta. Verifique a senha do certificado A1."
@@ -155,13 +221,11 @@ export async function enviarSoap(
 }
 
 /**
- * Extrai o nome do método SOAP a partir da action
+ * Extrai o nome do metodo SOAP a partir da action
  */
 function getSoapMethodName(soapAction: string): string {
-  // http://www.prefeitura.sp.gov.br/nfe/ws/envioLoteRPS -> EnvioLoteRPS
   const parts = soapAction.split("/")
   const method = parts[parts.length - 1]
-  // Capitalizar primeira letra
   return method.charAt(0).toUpperCase() + method.slice(1)
 }
 
@@ -217,7 +281,6 @@ export async function consultarLote(
 
 // Extrair mensagem de erro do XML de retorno
 function extrairErroSoap(xml: string): string {
-  // Tentar extrair código e mensagem de erro do padrão SP
   const codigoMatch = xml.match(/<Codigo>(\d+)<\/Codigo>/)
   const mensagemMatch = xml.match(/<Descricao>(.*?)<\/Descricao>/s)
 
@@ -225,13 +288,11 @@ function extrairErroSoap(xml: string): string {
     return `Erro ${codigoMatch[1]}: ${mensagemMatch[1]}`
   }
 
-  // Tentar extrair SOAP Fault
   const faultMatch = xml.match(/<faultstring>(.*?)<\/faultstring>/s)
   if (faultMatch) {
     return faultMatch[1]
   }
 
-  // Tentar extrair MensagemRetorno
   const msgRetorno = xml.match(/<MensagemRetorno>(.*?)<\/MensagemRetorno>/s)
   if (msgRetorno) {
     return msgRetorno[1]
@@ -241,10 +302,7 @@ function extrairErroSoap(xml: string): string {
 }
 
 /**
- * Extrair dados da NFS-e do XML de retorno (após emissão bem-sucedida)
- * O retorno da Prefeitura de SP usa tags como:
- * - <ChaveNFeRPS><ChaveNFe><NumeroNFe> para o número
- * - <CodigoVerificacao> para o código de verificação
+ * Extrair dados da NFS-e do XML de retorno
  */
 export function extrairDadosNfseRetorno(xml: string): {
   numeroNfse?: string
@@ -255,17 +313,16 @@ export function extrairDadosNfseRetorno(xml: string): {
 } {
   const erros: string[] = []
 
-  // Extrair erros se houver
+  // Extrair erros
   const erroRegex = /<Erro>.*?<Codigo>(\d+)<\/Codigo>.*?<Descricao>(.*?)<\/Descricao>.*?<\/Erro>/gs
   let match
   while ((match = erroRegex.exec(xml)) !== null) {
     erros.push(`Erro ${match[1]}: ${match[2]}`)
   }
 
-  // Alertas (também podem conter informações importantes)
+  // Alertas
   const alertaRegex = /<Alerta>.*?<Codigo>(\d+)<\/Codigo>.*?<Descricao>(.*?)<\/Descricao>.*?<\/Alerta>/gs
   while ((match = alertaRegex.exec(xml)) !== null) {
-    // Alertas não são erros fatais, mas registramos
     console.log("[v0] Alerta da prefeitura:", match[1], match[2])
   }
 
@@ -273,8 +330,6 @@ export function extrairDadosNfseRetorno(xml: string): {
     return { sucesso: false, erros }
   }
 
-  // Extrair dados da NFS-e emitida - padrão SP
-  // Pode estar em <ChaveNFeRPS><ChaveNFe><NumeroNFe> ou diretamente <NumeroNFe>
   const nfseNumero =
     xml.match(/<NumeroNFe>(\d+)<\/NumeroNFe>/) ||
     xml.match(/<NumeroNota>(\d+)<\/NumeroNota>/)
@@ -285,10 +340,8 @@ export function extrairDadosNfseRetorno(xml: string): {
     xml.match(/<DataEmissaoNFe>([^<]+)<\/DataEmissaoNFe>/) ||
     xml.match(/<DataEmissaoRPS>([^<]+)<\/DataEmissaoRPS>/)
 
-  // Se não encontrou número de NFS-e mas também não tem erros,
-  // pode ser que o lote esteja em processamento assíncrono
+  // Se nao encontrou numero de NFS-e, pode ser processamento assincrono
   if (!nfseNumero && erros.length === 0) {
-    // Verificar se tem número de lote (processamento assíncrono)
     const numLote = xml.match(/<NumeroLote>(\d+)<\/NumeroLote>/)
     if (numLote) {
       return {
