@@ -103,7 +103,8 @@ export async function POST(request: NextRequest) {
         codigoMunicipio: tomador_codigo_municipio,
       },
       servico: {
-        codigoServico: codigoServicoOverride || config.codigo_servico,
+        // Usar codigo_servico se informado, senao usar CNAE como fallback
+        codigoServico: codigoServicoOverride || config.codigo_servico || config.codigo_cnae,
         descricao: descricao_servico || config.descricao_servico || "Servico prestado",
         codigoCnae: config.codigo_cnae,
         aliquotaIss: aliquota,
@@ -206,9 +207,9 @@ export async function POST(request: NextRequest) {
              WHERE id = ?`,
             [dadosRetorno.numeroNfse, dadosRetorno.codigoVerificacao, soapResponse.xml, notaId],
           )
-          // Atualizar ultima NFS-e conhecida na config
+          // Atualizar proxima NFS-e na config (incrementar para o proximo)
           await connection.execute(
-            `UPDATE nfse_config SET ultima_nfse_numero = GREATEST(COALESCE(ultima_nfse_numero, 0), ?) WHERE ativo = 1`,
+            `UPDATE nfse_config SET ultima_nfse_numero = GREATEST(COALESCE(ultima_nfse_numero, 0), ?) + 1 WHERE ativo = 1`,
             [Number(dadosRetorno.numeroNfse)]
           )
         } else {
@@ -328,9 +329,9 @@ export async function POST(request: NextRequest) {
            WHERE id = ?`,
           [dadosRecuperacao.numeroNfse, dadosRecuperacao.codigoVerificacao || null, soapResponse.xml, notaId],
         )
-        // Atualizar ultima NFS-e conhecida na config
+        // Atualizar proxima NFS-e na config (incrementar para o proximo)
         await connection.execute(
-          `UPDATE nfse_config SET ultima_nfse_numero = GREATEST(COALESCE(ultima_nfse_numero, 0), ?) WHERE ativo = 1`,
+          `UPDATE nfse_config SET ultima_nfse_numero = GREATEST(COALESCE(ultima_nfse_numero, 0), ?) + 1 WHERE ativo = 1`,
           [Number(dadosRecuperacao.numeroNfse)]
         )
 
