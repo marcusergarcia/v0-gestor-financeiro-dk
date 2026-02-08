@@ -145,10 +145,10 @@ export function NfseTab() {
   }
 
   const handleSave = async () => {
-    if (!config.inscricao_municipal || !config.razao_social || !config.cnpj || !config.codigo_servico) {
+    if (!config.inscricao_municipal || !config.razao_social || !config.cnpj || !config.codigo_cnae) {
       toast({
         title: "Campos obrigatorios",
-        description: "Preencha a inscricao municipal, razao social, CNPJ e codigo do servico",
+        description: "Preencha a inscricao municipal, razao social, CNPJ e codigo CNAE",
         variant: "destructive",
       })
       return
@@ -439,22 +439,22 @@ export function NfseTab() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="codigo_servico">Codigo do Servico (LC 116) *</Label>
+              <Label htmlFor="codigo_servico">Codigo do Servico (SP)</Label>
               <Input
                 id="codigo_servico"
                 value={config.codigo_servico}
                 onChange={(e) => updateConfig("codigo_servico", e.target.value)}
-                placeholder="Ex: 14.01"
+                placeholder="Ex: 1401 (somente digitos)"
               />
-              <p className="text-xs text-gray-500">Consulte a lista de servicos da LC 116/2003</p>
+              <p className="text-xs text-gray-500">Somente digitos, sem ponto. Ex: 1401 (nao 14.01). Se nao informado, sera usado o CNAE.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="codigo_cnae">Codigo CNAE</Label>
+              <Label htmlFor="codigo_cnae">Codigo CNAE *</Label>
               <Input
                 id="codigo_cnae"
                 value={config.codigo_cnae}
                 onChange={(e) => updateConfig("codigo_cnae", e.target.value)}
-                placeholder="Ex: 4322302"
+                placeholder="Ex: 07498"
               />
             </div>
             <div className="space-y-2">
@@ -588,7 +588,7 @@ export function NfseTab() {
   <div className="space-y-2">
     <Label htmlFor="ultima_nfse_numero" className="flex items-center gap-2">
       <Hash className="h-4 w-4 text-emerald-600" />
-      Ultima NFS-e Conhecida
+      Proxima Numero NFS-e
     </Label>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="space-y-2">
@@ -600,14 +600,14 @@ export function NfseTab() {
           placeholder="Ex: 732"
         />
         <p className="text-xs text-gray-500">
-          Informe o numero da ultima NFS-e emitida pela prefeitura (ex: 732).
+          Informe o proximo numero de NFS-e esperado. Apos cada emissao, sera incrementado automaticamente.
         </p>
       </div>
       <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
         <p className="text-xs text-emerald-700">
-          <strong>Para que serve:</strong> Este numero ajuda o sistema a identificar a proxima NFS-e esperada.
-          Quando a prefeitura processa o RPS e retorna a NFS-e, o sistema usa essa referencia para validar e atualizar automaticamente.
-          Consulte o ultimo numero no portal da{" "}
+          <strong>Para que serve:</strong> Este numero e o proximo numero de NFS-e que sera atribuido pela prefeitura.
+          Apos cada emissao bem-sucedida, o sistema incrementa automaticamente.
+          Consulte o ultimo numero emitido no portal da{" "}
           <a
             href="https://nfe.prefeitura.sp.gov.br"
             target="_blank"
@@ -615,7 +615,8 @@ export function NfseTab() {
             className="underline font-medium"
           >
             Prefeitura de SP
-          </a>.
+          </a>{" "}
+          e informe o proximo (ultimo + 1).
         </p>
       </div>
     </div>
@@ -624,8 +625,8 @@ export function NfseTab() {
   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
   <p className="text-xs text-blue-700">
   <strong>Importante:</strong> O numero do RPS (ex: {config.serie_rps}.{String(config.proximo_numero_rps).padStart(8, "0")}) e gerado por este sistema e enviado a prefeitura.
-  O numero da NFS-e (ex: {config.ultima_nfse_numero ? String(config.ultima_nfse_numero + 1).padStart(8, "0") : "00000XXX"}) e atribuido automaticamente pela prefeitura apos processamento.
-  Se voce precisar ajustar o proximo RPS, altere o campo acima.
+  O numero da NFS-e (ex: {config.ultima_nfse_numero ? String(config.ultima_nfse_numero).padStart(8, "0") : "00000XXX"}) e atribuido automaticamente pela prefeitura apos processamento.
+  Se voce precisar ajustar o proximo RPS ou NFS-e, altere os campos acima.
   </p>
           </div>
         </CardContent>
