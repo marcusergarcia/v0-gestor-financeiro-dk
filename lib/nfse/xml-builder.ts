@@ -90,6 +90,26 @@ function gerarRpsXml(nota: DadosNfse): string {
       ? `<CPF>${tomador.cpfCnpj}</CPF>`
       : `<CNPJ>${tomador.cpfCnpj}</CNPJ>`
 
+  // SP exige CodigoServico apenas com digitos (ex: "1401" e nao "14.01")
+  const codigoServicoFormatado = servico.codigoServico.replace(/\D/g, "")
+
+  // Montar EnderecoTomador como elemento estruturado (exigido pelo schema SP)
+  let enderecoTomadorXml = ""
+  if (tomador.endereco || tomador.numero || tomador.bairro || tomador.cidade || tomador.cep) {
+    const enderecoPartes: string[] = []
+    if (tomador.endereco) enderecoPartes.push(`      <Logradouro>${escapeXml(tomador.endereco)}</Logradouro>`)
+    if (tomador.numero) enderecoPartes.push(`      <NumeroEndereco>${escapeXml(tomador.numero)}</NumeroEndereco>`)
+    if (tomador.complemento) enderecoPartes.push(`      <ComplementoEndereco>${escapeXml(tomador.complemento)}</ComplementoEndereco>`)
+    if (tomador.bairro) enderecoPartes.push(`      <Bairro>${escapeXml(tomador.bairro)}</Bairro>`)
+    if (tomador.cidade) enderecoPartes.push(`      <Cidade>${tomador.codigoMunicipio || "3550308"}</Cidade>`)
+    if (tomador.uf) enderecoPartes.push(`      <UF>${tomador.uf}</UF>`)
+    if (tomador.cep) enderecoPartes.push(`      <CEP>${tomador.cep.replace(/\D/g, "")}</CEP>`)
+    enderecoTomadorXml = `
+    <EnderecoTomador>
+${enderecoPartes.join("\n")}
+    </EnderecoTomador>`
+  }
+
   return `  <RPS xmlns="">
     <Assinatura></Assinatura>
     <ChaveRPS>
@@ -108,21 +128,14 @@ function gerarRpsXml(nota: DadosNfse): string {
     <ValorINSS>${(servico.valorInss || 0).toFixed(2)}</ValorINSS>
     <ValorIR>${(servico.valorIr || 0).toFixed(2)}</ValorIR>
     <ValorCSLL>${(servico.valorCsll || 0).toFixed(2)}</ValorCSLL>
-    <CodigoServico>${servico.codigoServico}</CodigoServico>
+    <CodigoServico>${codigoServicoFormatado}</CodigoServico>
     <AliquotaServicos>${(servico.aliquotaIss * 100).toFixed(4)}</AliquotaServicos>
     <ISSRetido>${servico.issRetido ? "true" : "false"}</ISSRetido>
     <CPFCNPJTomador>
       ${tomadorCpfCnpj}
     </CPFCNPJTomador>${tomador.inscricaoMunicipal ? `
     <InscricaoMunicipalTomador>${tomador.inscricaoMunicipal}</InscricaoMunicipalTomador>` : ""}${tomador.razaoSocial ? `
-    <RazaoSocialTomador>${escapeXml(tomador.razaoSocial)}</RazaoSocialTomador>` : ""}${tomador.endereco ? `
-    <EnderecoTomador>${escapeXml(tomador.endereco)}</EnderecoTomador>` : ""}${tomador.numero ? `
-    <NumeroEnderecoTomador>${escapeXml(tomador.numero)}</NumeroEnderecoTomador>` : ""}${tomador.complemento ? `
-    <ComplementoEnderecoTomador>${escapeXml(tomador.complemento)}</ComplementoEnderecoTomador>` : ""}${tomador.bairro ? `
-    <BairroTomador>${escapeXml(tomador.bairro)}</BairroTomador>` : ""}${tomador.cidade ? `
-    <CidadeTomador>${tomador.codigoMunicipio || "3550308"}</CidadeTomador>` : ""}${tomador.uf ? `
-    <UFTomador>${tomador.uf}</UFTomador>` : ""}${tomador.cep ? `
-    <CEPTomador>${tomador.cep.replace(/\D/g, "")}</CEPTomador>` : ""}${tomador.email ? `
+    <RazaoSocialTomador>${escapeXml(tomador.razaoSocial)}</RazaoSocialTomador>` : ""}${enderecoTomadorXml}${tomador.email ? `
     <EmailTomador>${escapeXml(tomador.email)}</EmailTomador>` : ""}
     <Discriminacao>${escapeXml(servico.descricao)}</Discriminacao>
   </RPS>`
