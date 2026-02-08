@@ -2,6 +2,11 @@ import { type NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { gerarXmlCancelamentoNfse } from "@/lib/nfse/xml-builder"
 import { cancelarNfse } from "@/lib/nfse/soap-client"
+import {
+  gerarAssinaturaCancelamento,
+  assinarXmlDigital,
+  extrairCertificadoParaAssinatura,
+} from "@/lib/nfse/xml-signer"
 
 export async function POST(
   request: NextRequest,
@@ -43,12 +48,36 @@ export async function POST(
     }
     const config = configs[0]
 
-    // Gerar XML de cancelamento
-    const xmlCancelamento = gerarXmlCancelamentoNfse(
+    // Extrair certificado para assinatura digital
+    let certPem = ""
+    let keyPem = ""
+    try {
+      const certData = extrairCertificadoParaAssinatura(config.certificado_base64, config.certificado_senha)
+      certPem = certData.certPem
+      keyPem = certData.keyPem
+    } catch (certError: any) {
+      return NextResponse.json(
+        { success: false, message: "Erro no certificado digital: " + (certError?.message || "Falha ao extrair certificado") },
+        { status: 400 },
+      )
+    }
+
+    // Gerar assinatura de cancelamento (hash InscricaoPrestador + NumeroNFe)
+    const assinaturaCancelamento = gerarAssinaturaCancelamento(
+      { inscricaoPrestador: config.inscricao_municipal, numeroNfse: nota.numero_nfse },
+      keyPem,
+    )
+
+    // Gerar XML de cancelamento com assinatura hash
+    const xmlSemAssinatura = gerarXmlCancelamentoNfse(
       config.cnpj,
       config.inscricao_municipal,
       nota.numero_nfse,
+      assinaturaCancelamento,
     )
+
+    // Aplicar assinatura digital XMLDSIG ao XML completo
+    const xmlCancelamento = assinarXmlDigital(xmlSemAssinatura, keyPem, certPem)
 
     // Enviar cancelamento
     const soapResponse = await cancelarNfse(

@@ -1,7 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
-import { gerarXmlEnvioLoteRps, gerarXmlConsultaNfseRps, type DadosNfse } from "@/lib/nfse/xml-builder"
+import { gerarXmlEnvioLoteRps, gerarXmlConsultaNfseRps, getTributacaoSP, type DadosNfse } from "@/lib/nfse/xml-builder"
 import { enviarLoteRps, testeEnvioLoteRps, consultarNfse, extrairDadosNfseRetorno } from "@/lib/nfse/soap-client"
+import {
+  gerarAssinaturaRps,
+  assinarXmlDigital,
+  extrairCertificadoParaAssinatura,
+  type DadosAssinaturaRps,
+} from "@/lib/nfse/xml-signer"
 
 export async function POST(request: NextRequest) {
   const connection = await pool.getConnection()
@@ -119,9 +125,47 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    // Gerar XML
-    const xmlEnvio = gerarXmlEnvioLoteRps([dadosNfse], numeroRps)
-    console.log("[v0] XML gerado, tamanho:", xmlEnvio.length)
+    // Extrair certificado para assinatura digital
+    let certPem = ""
+    let keyPem = ""
+    try {
+      const certData = extrairCertificadoParaAssinatura(config.certificado_base64, config.certificado_senha)
+      certPem = certData.certPem
+      keyPem = certData.keyPem
+      console.log("[v0] Certificado extraido para assinatura digital")
+    } catch (certError: any) {
+      console.error("[v0] Erro ao extrair certificado para assinatura:", certError?.message)
+      return NextResponse.json(
+        { success: false, message: "Erro no certificado digital: " + (certError?.message || "Falha ao extrair certificado") },
+        { status: 400 },
+      )
+    }
+
+    // Gerar assinatura hash do RPS (campo <Assinatura> dentro de <RPS>)
+    const tributacao = getTributacaoSP(dadosNfse.rps.regimeTributacao, dadosNfse.rps.optanteSimples)
+    const dadosAssinatura: DadosAssinaturaRps = {
+      inscricaoPrestador: dadosNfse.prestador.inscricaoMunicipal,
+      serieRps: dadosNfse.rps.serie,
+      numeroRps: dadosNfse.rps.numero,
+      dataEmissao: dadosNfse.rps.dataEmissao,
+      tributacaoRps: tributacao,
+      statusRps: "N",
+      issRetido: dadosNfse.servico.issRetido,
+      valorServicos: dadosNfse.servico.valorServicos,
+      valorDeducoes: dadosNfse.servico.valorDeducoes || 0,
+      codigoServico: dadosNfse.servico.codigoServico,
+      tomadorCpfCnpj: dadosNfse.tomador.cpfCnpj,
+      tomadorTipo: dadosNfse.tomador.tipo,
+    }
+    const assinaturaRps = gerarAssinaturaRps(dadosAssinatura, keyPem)
+    console.log("[v0] Assinatura RPS gerada, length:", assinaturaRps.length)
+
+    // Gerar XML com assinatura do RPS
+    const xmlSemAssinatura = gerarXmlEnvioLoteRps([dadosNfse], numeroRps, [assinaturaRps])
+
+    // Aplicar assinatura digital XMLDSIG ao XML completo
+    const xmlEnvio = assinarXmlDigital(xmlSemAssinatura, keyPem, certPem)
+    console.log("[v0] XML assinado com XMLDSIG, tamanho:", xmlEnvio.length)
 
     // Inserir registro da nota fiscal no banco
     console.log("[v0] Inserindo nota fiscal no banco...")

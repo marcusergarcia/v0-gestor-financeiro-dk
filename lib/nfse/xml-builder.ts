@@ -57,12 +57,12 @@ export interface DadosNfse {
 }
 
 // Gerar XML de envio de lote de RPS para SP
-export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number): string {
-  const listaRps = notas.map((nota) => gerarRpsXml(nota)).join("\n")
+export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number, assinaturasRps?: string[]): string {
+  const listaRps = notas.map((nota, idx) => gerarRpsXml(nota, assinaturasRps?.[idx])).join("\n")
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Cabecalho xmlns="" Versao="1">
+  <Cabecalho Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${notas[0].prestador.cnpj}</CNPJ>
     </CPFCNPJRemetente>
@@ -100,7 +100,7 @@ ${partes.join("\n")}
     </EnderecoTomador>`
 }
 
-function gerarRpsXml(nota: DadosNfse): string {
+function gerarRpsXml(nota: DadosNfse, assinatura?: string): string {
   const { rps, prestador, tomador, servico } = nota
 
   const valorIss = servico.issRetido
@@ -116,8 +116,8 @@ function gerarRpsXml(nota: DadosNfse): string {
   // SP exige CodigoServico apenas com digitos (ex: "1401" e nao "14.01")
   const codigoServicoFormatado = servico.codigoServico.replace(/\D/g, "")
 
-  return `  <RPS xmlns="">
-    <Assinatura></Assinatura>
+  return `  <RPS>${assinatura ? `
+    <Assinatura>${assinatura}</Assinatura>` : ""}
     <ChaveRPS>
       <InscricaoPrestador>${prestador.inscricaoMunicipal}</InscricaoPrestador>
       <SerieRPS>${rps.serie}</SerieRPS>
@@ -156,12 +156,12 @@ export function gerarXmlConsultaNfseRps(
 ): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoConsultaNFe xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho xmlns="" Versao="1">
+  <Cabecalho Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
   </Cabecalho>
-  <Detalhe xmlns="">
+  <Detalhe>
     <ChaveRPS>
       <InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador>
       <SerieRPS>${serieRps}</SerieRPS>
@@ -176,21 +176,22 @@ export function gerarXmlCancelamentoNfse(
   prestadorCnpj: string,
   inscricaoMunicipal: string,
   numeroNfse: string,
+  assinaturaCancelamento?: string,
 ): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoCancelamentoNFe xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho xmlns="" Versao="1">
+  <Cabecalho Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
     <transacao>true</transacao>
   </Cabecalho>
-  <Detalhe xmlns="">
+  <Detalhe>
     <ChaveNFe>
       <InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador>
       <NumeroNFe>${numeroNfse}</NumeroNFe>
     </ChaveNFe>
-    <AssinaturaCancelamento></AssinaturaCancelamento>
+    <AssinaturaCancelamento>${assinaturaCancelamento || ""}</AssinaturaCancelamento>
   </Detalhe>
 </PedidoCancelamentoNFe>`
 }
@@ -202,7 +203,7 @@ export function gerarXmlConsultaLote(
 ): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoConsultaLote xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho xmlns="" Versao="1">
+  <Cabecalho Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
@@ -215,7 +216,7 @@ export function gerarXmlConsultaLote(
 export function gerarXmlTesteEnvio(prestadorCnpj: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoConsultaLote xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho xmlns="" Versao="1">
+  <Cabecalho Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
@@ -225,7 +226,7 @@ export function gerarXmlTesteEnvio(prestadorCnpj: string): string {
 }
 
 // Helper: Mapear regime tributação para código SP
-function getTributacaoSP(regime: number, optanteSimples: number): string {
+export function getTributacaoSP(regime: number, optanteSimples: number): string {
   if (optanteSimples === 1) return "T" // Simples Nacional
   switch (regime) {
     case 1:
