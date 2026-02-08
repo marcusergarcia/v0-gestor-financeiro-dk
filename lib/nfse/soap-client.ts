@@ -198,18 +198,22 @@ export async function enviarSoap(
     }
 
     // Para o retorno da prefeitura SP, verificar <Sucesso> no cabecalho
-    // A tag <Erro> pode estar presente em retornos de sucesso parcial (alertas)
-    // O que determina sucesso e a tag <Sucesso>true</Sucesso>
+    // O xmlInterno ja tem namespaces removidos pelo extrairXmlInternoSoap
     const sucessoMatch = xmlInterno.match(/<Sucesso>(true|false)<\/Sucesso>/i)
-    const temSucesso = sucessoMatch ? sucessoMatch[1].toLowerCase() === "true" : !xmlInterno.includes("<Erro>")
-    console.log("[v0] Tag <Sucesso> encontrada:", sucessoMatch?.[1], "-> sucesso:", temSucesso)
+    const temNumeroNFe = xmlInterno.includes("<NumeroNFe>")
+    
+    // Sucesso se: <Sucesso>true ou se encontrou NumeroNFe (mesmo sem tag Sucesso)
+    const temSucesso = sucessoMatch 
+      ? sucessoMatch[1].toLowerCase() === "true" 
+      : (temNumeroNFe || !xmlInterno.includes("<Erro>"))
+    
+    console.log("[v0] Tag <Sucesso>:", sucessoMatch?.[1], "temNumeroNFe:", temNumeroNFe, "-> sucesso:", temSucesso)
 
-    // Verificar se ha erros criticos
+    // Verificar se ha erros
     const temErro = xmlInterno.includes("<Erro>")
     if (temErro) {
-      console.log("[v0] XML contem <Erro> tags, extraindo detalhes...")
       const erroMsg = extrairErroSoap(xmlInterno)
-      console.log("[v0] Erro extraido:", erroMsg)
+      console.log("[v0] Erro no XML:", erroMsg)
     }
 
     return {
@@ -310,141 +314,15 @@ export async function consultarLote(
 }
 
 /**
- * Extrai o XML de negocio de dentro do envelope SOAP.
- * 
- * A prefeitura de SP retorna o XML dentro do SOAP envelope de varias formas:
- * 
- * 1. CDATA dentro do elemento *Result:
- *    <EnvioLoteRPSResult><![CDATA[<?xml ...><RetornoEnvioLoteRPS>...</RetornoEnvioLoteRPS>]]></EnvioLoteRPSResult>
- * 
- * 2. HTML entities dentro do elemento *Result:
- *    <EnvioLoteRPSResult>&lt;?xml ...&gt;&lt;RetornoEnvioLoteRPS&gt;...&lt;/RetornoEnvioLoteRPS&gt;</EnvioLoteRPSResult>
- * 
- * 3. XML direto dentro do Body/Response (menos comum):
- *    <RetornoEnvioLoteRPS>...</RetornoEnvioLoteRPS>
- * 
- * 4. Texto simples dentro do Result (string XML):
- *    <EnvioLoteRPSResult>string com XML</EnvioLoteRPSResult>
+ * Remove todos os namespace prefixes de um XML para facilitar o parsing.
+ * Ex: <soap12:Body> -> <Body>, <ns1:Result> -> <Result>
  */
-function extrairXmlInternoSoap(soapXml: string): string {
-  console.log("[v0] extrairXmlInternoSoap - tentando extrair XML interno...")
-  console.log("[v0] Contem CDATA?", soapXml.includes("<![CDATA["))
-  console.log("[v0] Contem &lt;?", soapXml.includes("&lt;"))
-  console.log("[v0] Contem Result?", /\w+Result/.test(soapXml))
-  console.log("[v0] Contem RetornoEnvioLoteRPS?", soapXml.includes("RetornoEnvioLoteRPS"))
-  console.log("[v0] Contem RetornoConsulta?", soapXml.includes("RetornoConsulta"))
-
-  // METODO 1: Buscar elemento *Result e extrair conteudo
-  // O nome do Result depende do metodo SOAP chamado:
-  // - EnvioLoteRPSResult, TesteEnvioLoteRPSResult, ConsultaNFeResult, ConsultaLoteResult, CancelamentoNFeResult
-  const resultPattern = /<(\w+Result)[^>]*>([\s\S]*)<\/\1>/
-  const resultMatch = soapXml.match(resultPattern)
-
-  if (resultMatch) {
-    const resultName = resultMatch[1]
-    let inner = resultMatch[2].trim()
-    console.log("[v0] Encontrou elemento Result:", resultName, "conteudo length:", inner.length)
-    console.log("[v0] Result inner (primeiros 300 chars):", inner.substring(0, 300))
-
-    // 1a. Se contem CDATA, extrair o conteudo de dentro do CDATA
-    // Usar greedy match para pegar todo o CDATA (pode conter ]]> internos escapados, mas improvavel)
-    const cdataInResult = inner.match(/<!\[CDATA\[([\s\S]*)\]\]>/)
-    if (cdataInResult) {
-      console.log("[v0] Extraido conteudo de CDATA dentro do Result")
-      return cdataInResult[1].trim()
-    }
-
-    // 1b. Se contem HTML entities, decodificar
-    if (inner.includes("&lt;")) {
-      console.log("[v0] Decodificando HTML entities dentro do Result...")
-      inner = decodeHtmlEntities(inner)
-      console.log("[v0] Decodificado, primeiros 300 chars:", inner.substring(0, 300))
-    }
-
-    // 1c. Se o conteudo parece ser XML valido, retornar
-    if (inner.includes("<Retorno") || inner.includes("<Cabecalho") || inner.includes("<Sucesso") || inner.includes("<Erro") || inner.includes("<NFe")) {
-      console.log("[v0] Conteudo do Result parece ser XML de retorno valido")
-      return inner
-    }
-
-    // 1d. Se tem qualquer coisa que comeca com <, retornar
-    if (inner.startsWith("<")) {
-      console.log("[v0] Conteudo do Result comeca com <, retornando como XML")
-      return inner
-    }
-
-    console.log("[v0] Conteudo do Result nao parece XML, continuando busca...")
-  }
-
-  // METODO 2: Buscar CDATA em qualquer lugar do SOAP (pode haver multiplos, pegar o ultimo que e a resposta)
-  const allCdata = [...soapXml.matchAll(/<!\[CDATA\[([\s\S]*?)\]\]>/g)]
-  if (allCdata.length > 0) {
-    // O ultimo CDATA geralmente e a resposta (o primeiro pode ser o request ecoado)
-    const lastCdata = allCdata[allCdata.length - 1][1].trim()
-    if (lastCdata.includes("<Retorno") || lastCdata.includes("<Cabecalho") || lastCdata.includes("<Sucesso")) {
-      console.log("[v0] XML extraido do ultimo CDATA encontrado")
-      return lastCdata
-    }
-    // Se ha apenas 1 CDATA e parece XML, usar
-    if (allCdata.length === 1 && lastCdata.startsWith("<")) {
-      console.log("[v0] XML extraido do unico CDATA encontrado")
-      return lastCdata
-    }
-  }
-
-  // METODO 3: Buscar o XML de retorno diretamente (sem estar em Result/CDATA)
-  // Ordem de prioridade: RetornoEnvioLoteRPS, RetornoConsulta, RetornoCancelamentoNFe
-  const retornoPatterns = [
-    /(<RetornoEnvioLoteRPS[\s>][\s\S]*<\/RetornoEnvioLoteRPS>)/,
-    /(<RetornoConsulta[\s>][\s\S]*<\/RetornoConsulta>)/,
-    /(<RetornoCancelamentoNFe[\s>][\s\S]*<\/RetornoCancelamentoNFe>)/,
-    /(<RetornoConsultaLote[\s>][\s\S]*<\/RetornoConsultaLote>)/,
-  ]
-  for (const pattern of retornoPatterns) {
-    const match = soapXml.match(pattern)
-    if (match) {
-      console.log("[v0] XML de retorno encontrado diretamente no SOAP:", match[1].substring(0, 100))
-      return match[1]
-    }
-  }
-
-  // METODO 4: Buscar dentro do Body do SOAP
-  const bodyMatch = soapXml.match(/<(?:soap12?:)?Body[^>]*>([\s\S]*)<\/(?:soap12?:)?Body>/)
-  if (bodyMatch) {
-    let bodyContent = bodyMatch[1].trim()
-    // Remover o wrapper *Response se presente
-    const responseMatch = bodyContent.match(/<\w+Response[^>]*>([\s\S]*)<\/\w+Response>/)
-    if (responseMatch) {
-      bodyContent = responseMatch[1].trim()
-      // Verificar se e Result com entities
-      if (bodyContent.includes("&lt;")) {
-        bodyContent = decodeHtmlEntities(bodyContent)
-      }
-    }
-    if (bodyContent.includes("<Sucesso") || bodyContent.includes("<Retorno") || bodyContent.includes("<NFe")) {
-      console.log("[v0] XML extraido do Body do SOAP")
-      return bodyContent
-    }
-  }
-
-  // METODO 5: Se tem HTML entities no XML inteiro, decodificar e buscar
-  if (soapXml.includes("&lt;Retorno") || soapXml.includes("&lt;Cabecalho")) {
-    console.log("[v0] XML inteiro parece ter HTML entities, decodificando...")
-    const decoded = decodeHtmlEntities(soapXml)
-    // Buscar novamente apos decodificar
-    for (const pattern of retornoPatterns) {
-      const match = decoded.match(pattern)
-      if (match) {
-        console.log("[v0] XML de retorno encontrado apos decodificacao")
-        return match[1]
-      }
-    }
-  }
-
-  // Fallback: retornar o XML completo
-  console.log("[v0] FALLBACK: Nao foi possivel extrair XML interno, retornando XML completo")
-  console.log("[v0] XML completo (ultimos 500 chars):", soapXml.substring(soapXml.length - 500))
-  return soapXml
+function stripNamespaces(xml: string): string {
+  // Remove prefixes de tags de abertura: <ns1:Tag ... > -> <Tag ... >
+  let stripped = xml.replace(/<([\/]?)[\w-]+:/g, "<$1")
+  // Remove declaracoes xmlns: xmlns:ns1="..." ou xmlns="..."
+  stripped = stripped.replace(/\s+xmlns(?::[\w-]+)?="[^"]*"/g, "")
+  return stripped
 }
 
 function decodeHtmlEntities(str: string): string {
@@ -456,24 +334,156 @@ function decodeHtmlEntities(str: string): string {
     .replace(/&apos;/g, "'")
 }
 
+/**
+ * Extrai o XML de negocio de dentro do envelope SOAP.
+ * 
+ * A prefeitura de SP retorna o XML dentro do SOAP de varias formas:
+ * 1. CDATA dentro do *Result
+ * 2. HTML entities dentro do *Result  
+ * 3. XML direto (com ou sem namespaces)
+ * 
+ * Primeiro remove TODOS os namespace prefixes para simplificar o parsing.
+ */
+function extrairXmlInternoSoap(soapXml: string): string {
+  // PASSO 0: Remover namespace prefixes para facilitar tudo
+  const xml = stripNamespaces(soapXml)
+  
+  console.log("[v0] extrairXmlInternoSoap - XML sem namespaces length:", xml.length)
+  console.log("[v0] Contem CDATA?", xml.includes("<![CDATA["))
+  console.log("[v0] Contem &lt;?", xml.includes("&lt;"))
+  console.log("[v0] Contem Result?", /\w+Result/.test(xml))
+  console.log("[v0] XML sem namespaces (primeiros 500 chars):", xml.substring(0, 500))
+
+  // PASSO 1: Buscar elemento *Result e extrair conteudo
+  const resultMatch = xml.match(/<(\w+Result)[^>]*>([\s\S]*)<\/\1>/)
+  if (resultMatch) {
+    let inner = resultMatch[2].trim()
+    console.log("[v0] Encontrou Result:", resultMatch[1], "inner length:", inner.length)
+    console.log("[v0] Result inner (primeiros 500):", inner.substring(0, 500))
+
+    // CDATA dentro do Result
+    const cdataMatch = inner.match(/<!\[CDATA\[([\s\S]*)\]\]>/)
+    if (cdataMatch) {
+      console.log("[v0] Extraido de CDATA dentro de Result")
+      return stripNamespaces(cdataMatch[1].trim())
+    }
+
+    // HTML entities dentro do Result
+    if (inner.includes("&lt;")) {
+      inner = decodeHtmlEntities(inner)
+      console.log("[v0] Decodificou HTML entities em Result")
+    }
+
+    // Se parece XML, retornar
+    if (inner.startsWith("<") || inner.includes("<Sucesso") || inner.includes("<Retorno") || inner.includes("<Cabecalho") || inner.includes("<Erro") || inner.includes("<NFe")) {
+      console.log("[v0] Result contem XML valido")
+      return inner
+    }
+  }
+
+  // PASSO 2: Buscar CDATA em qualquer lugar
+  const allCdata = [...xml.matchAll(/<!\[CDATA\[([\s\S]*?)\]\]>/g)]
+  if (allCdata.length > 0) {
+    // Testar cada CDATA (do ultimo para o primeiro - a resposta geralmente e o ultimo)
+    for (let i = allCdata.length - 1; i >= 0; i--) {
+      const content = stripNamespaces(allCdata[i][1].trim())
+      if (content.includes("Retorno") || content.includes("Sucesso") || content.includes("Cabecalho") || content.includes("NumeroNFe") || content.includes("Erro")) {
+        console.log("[v0] Extraido de CDATA #" + i)
+        return content
+      }
+    }
+  }
+
+  // PASSO 3: Buscar tags de retorno diretamente
+  const retornoTags = ["RetornoEnvioLoteRPS", "RetornoConsulta", "RetornoCancelamentoNFe", "RetornoConsultaLote", "RetornoEnvioRPS"]
+  for (const tag of retornoTags) {
+    const pattern = new RegExp(`(<${tag}[\\s>][\\s\\S]*<\\/${tag}>)`)
+    const match = xml.match(pattern)
+    if (match) {
+      console.log("[v0] Encontrou tag", tag, "diretamente")
+      return match[1]
+    }
+  }
+
+  // PASSO 4: Buscar Body > Response > Result (com qualquer nome)
+  const bodyMatch = xml.match(/<Body[^>]*>([\s\S]*)<\/Body>/)
+  if (bodyMatch) {
+    let body = bodyMatch[1].trim()
+    console.log("[v0] Body encontrado, length:", body.length)
+
+    // Extrair de dentro de *Response
+    const respMatch = body.match(/<(\w+Response)[^>]*>([\s\S]*)<\/\1>/)
+    if (respMatch) {
+      body = respMatch[2].trim()
+      // Extrair de dentro de *Result
+      const resMatch = body.match(/<(\w+Result)[^>]*>([\s\S]*)<\/\1>/)
+      if (resMatch) {
+        body = resMatch[2].trim()
+      }
+    }
+
+    // Decodificar entities se necessario
+    if (body.includes("&lt;")) {
+      body = decodeHtmlEntities(body)
+    }
+
+    // Extrair CDATA se presente
+    const cdMatch = body.match(/<!\[CDATA\[([\s\S]*)\]\]>/)
+    if (cdMatch) {
+      body = cdMatch[1].trim()
+    }
+
+    if (body.startsWith("<") || body.includes("<Sucesso") || body.includes("<Retorno") || body.includes("<NumeroNFe")) {
+      console.log("[v0] XML extraido do Body")
+      return stripNamespaces(body)
+    }
+  }
+
+  // PASSO 5: HTML entities no XML inteiro
+  if (xml.includes("&lt;Retorno") || xml.includes("&lt;Cabecalho") || xml.includes("&lt;Sucesso")) {
+    const decoded = decodeHtmlEntities(xml)
+    for (const tag of retornoTags) {
+      const pattern = new RegExp(`(<${tag}[\\s>][\\s\\S]*<\\/${tag}>)`)
+      const match = decoded.match(pattern)
+      if (match) {
+        console.log("[v0] Encontrou", tag, "apos decodificar entities globais")
+        return match[1]
+      }
+    }
+  }
+
+  // PASSO 6: Fallback - retorna XML sem namespaces (melhor que o original)
+  console.log("[v0] FALLBACK: retornando XML completo sem namespaces")
+  console.log("[v0] Ultimos 500 chars:", xml.substring(Math.max(0, xml.length - 500)))
+  return xml
+}
+
 // Extrair mensagem de erro do XML de retorno
-function extrairErroSoap(xml: string): string {
+function extrairErroSoap(xmlOriginal: string): string {
+  // Remover namespaces para facilitar parsing
+  const xml = stripNamespaces(xmlOriginal)
+  
+  // Buscar todos os erros (pode haver multiplos)
+  const erros: string[] = []
+  const erroRegex = /<Erro>[\s\S]*?<Codigo>(\d+)<\/Codigo>[\s\S]*?<Descricao>([\s\S]*?)<\/Descricao>[\s\S]*?<\/Erro>/g
+  let match
+  while ((match = erroRegex.exec(xml)) !== null) {
+    erros.push(`Erro ${match[1]}: ${match[2].trim()}`)
+  }
+  if (erros.length > 0) return erros.join("; ")
+
+  // Buscar codigo/descricao isolados
   const codigoMatch = xml.match(/<Codigo>(\d+)<\/Codigo>/)
-  const mensagemMatch = xml.match(/<Descricao>(.*?)<\/Descricao>/s)
-
+  const mensagemMatch = xml.match(/<Descricao>([\s\S]*?)<\/Descricao>/)
   if (codigoMatch && mensagemMatch) {
-    return `Erro ${codigoMatch[1]}: ${mensagemMatch[1]}`
+    return `Erro ${codigoMatch[1]}: ${mensagemMatch[1].trim()}`
   }
 
-  const faultMatch = xml.match(/<faultstring>(.*?)<\/faultstring>/s)
-  if (faultMatch) {
-    return faultMatch[1]
-  }
+  const faultMatch = xml.match(/<faultstring>([\s\S]*?)<\/faultstring>/)
+  if (faultMatch) return faultMatch[1].trim()
 
-  const msgRetorno = xml.match(/<MensagemRetorno>(.*?)<\/MensagemRetorno>/s)
-  if (msgRetorno) {
-    return msgRetorno[1]
-  }
+  const msgRetorno = xml.match(/<MensagemRetorno>([\s\S]*?)<\/MensagemRetorno>/)
+  if (msgRetorno) return msgRetorno[1].trim()
 
   return "Erro desconhecido no retorno do webservice"
 }
@@ -502,7 +512,7 @@ function extrairErroSoap(xml: string): string {
  *      </NFe>
  *    </RetornoConsulta>
  */
-export function extrairDadosNfseRetorno(xml: string): {
+export function extrairDadosNfseRetorno(xmlOriginal: string): {
   numeroNfse?: string
   codigoVerificacao?: string
   dataEmissao?: string
@@ -510,6 +520,9 @@ export function extrairDadosNfseRetorno(xml: string): {
   erros: string[]
 } {
   const erros: string[] = []
+
+  // Sempre trabalhar sem namespaces para simplificar
+  const xml = stripNamespaces(xmlOriginal)
 
   console.log("[v0] extrairDadosNfseRetorno - XML length:", xml.length)
   console.log("[v0] extrairDadosNfseRetorno - XML (primeiros 2000 chars):", xml.substring(0, 2000))
