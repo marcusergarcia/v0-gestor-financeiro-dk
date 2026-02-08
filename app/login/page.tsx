@@ -177,7 +177,7 @@ export default function LoginPage() {
         </Card>
 
         {/* Rodapé */}
-        <p className="text-center text-sm text-gray-500">© 2024 Gestor Financeiro. Todos os direitos reservados.</p>
+        <p className="text-center text-sm text-gray-500">© 2025 Gestor Financeiro. Todos os direitos reservados.</p>
       </div>
     </div>
   )
