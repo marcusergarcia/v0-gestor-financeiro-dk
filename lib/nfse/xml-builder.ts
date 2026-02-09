@@ -6,10 +6,29 @@
 // SEM namespace (unqualified). Para isso, usamos xmlns="" nos filhos diretos
 // do elemento raiz para resetar o default namespace herdado.
 
-import { createHash } from "crypto"
+import { createHash, createSign } from "crypto"
 
 function sha1Hex(data: string): string {
   return createHash("sha1").update(data, "ascii").digest("hex")
+}
+
+/**
+ * Assina a string de assinatura do RPS com RSA-SHA1 conforme manual SP:
+ * 1. Converte a string ASCII para bytes
+ * 2. Gera o HASH (SHA-1) dos bytes
+ * 3. Assina o HASH com RSA-SHA1 usando a chave privada do certificado
+ * 4. Retorna o resultado em base64
+ *
+ * Se keyPem nao estiver disponivel, retorna apenas o SHA-1 hex (fallback).
+ */
+function assinarRps(data: string, keyPem?: string): string {
+  if (!keyPem) {
+    // Fallback: apenas SHA-1 hex (NAO aceito pela prefeitura, mas util para debug)
+    return sha1Hex(data)
+  }
+  const sign = createSign("RSA-SHA1")
+  sign.update(data, "ascii")
+  return sign.sign(keyPem, "base64")
 }
 
 export interface DadosPrestador {
@@ -70,8 +89,8 @@ export interface DadosNfse {
 // Gerar XML de envio de lote de RPS para SP
 // Schema: PedidoEnvioLoteRPS_v02.xsd
 // Estrutura: PedidoEnvioLoteRPS > Cabecalho + RPS(1..50) + ds:Signature
-export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number): string {
-  const listaRps = notas.map((nota) => gerarRpsXml(nota)).join("\n")
+export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number, keyPem?: string): string {
+  const listaRps = notas.map((nota) => gerarRpsXml(nota, keyPem)).join("\n")
 
   // Schema ativo da SP exige ValorTotalServicos e ValorTotalDeducoes no Cabecalho
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -114,7 +133,7 @@ ${partes.join("\n")}
     </EnderecoTomador>`
 }
 
-function gerarRpsXml(nota: DadosNfse): string {
+function gerarRpsXml(nota: DadosNfse, keyPem?: string): string {
   const { rps, prestador, tomador, servico } = nota
 
   // SP usa formato específico para CPF/CNPJ do tomador
@@ -161,20 +180,27 @@ function gerarRpsXml(nota: DadosNfse): string {
     cpfCnpjTomador +
     imTomador
 
-  // SHA-1 hex do hash de assinatura
   // Formato esperado (94 chars): IM(8) + Serie(5) + NumRPS(12) + Data(8) + Trib(1) + Status(1) + ISS(1) + ValServ(15) + ValDed(15) + CodServ(5) + IndTom(1) + CpfCnpj(14) + IMTom(8)
   console.log("[v0] Assinatura string length:", assinaturaStr.length, "(esperado: 94)")
   console.log("[v0] Assinatura string:", JSON.stringify(assinaturaStr))
   console.log("[v0] Assinatura partes: IM=", assinaturaStr.substring(0,8), "Serie=", JSON.stringify(assinaturaStr.substring(8,13)), "Num=", assinaturaStr.substring(13,25), "Data=", assinaturaStr.substring(25,33), "Trib=", assinaturaStr.substring(33,34), "Status=", assinaturaStr.substring(34,35), "ISS=", assinaturaStr.substring(35,36), "ValServ=", assinaturaStr.substring(36,51), "ValDed=", assinaturaStr.substring(51,66), "CodServ=", assinaturaStr.substring(66,71), "IndTom=", assinaturaStr.substring(71,72), "CpfCnpj=", assinaturaStr.substring(72,86), "IMTom=", assinaturaStr.substring(86,94))
-  const hashHex = sha1Hex(assinaturaStr)
-  console.log("[v0] SHA1 hash:", hashHex)
+
+  // Conforme manual SP (passos):
+  // 1. Montar string ASCII (feito acima)
+  // 2. Converter cadeia ASCII para bytes
+  // 3. Gerar HASH SHA-1 dos bytes
+  // 4. Assinar HASH com RSA-SHA1 usando chave privada do certificado
+  // 5. Resultado em base64 vai na tag <Assinatura>
+  const assinaturaRps = assinarRps(assinaturaStr, keyPem)
+  console.log("[v0] Assinatura RPS (primeiros 60 chars):", assinaturaRps.substring(0, 60) + "...")
+  console.log("[v0] Assinatura RPS usou RSA-SHA1:", !!keyPem)
 
   // xmlns="" reseta o namespace para unqualified (exigido pelo XSD da SP)
   // ISSRetido no XML deve ser boolean (true/false), mas no hash de assinatura usa S/N
   const issRetidoXml = servico.issRetido ? "true" : "false"
 
   return `  <RPS xmlns="">
-    <Assinatura>${hashHex}</Assinatura>
+    <Assinatura>${assinaturaRps}</Assinatura>
     <ChaveRPS>
       <InscricaoPrestador>${prestador.inscricaoMunicipal}</InscricaoPrestador>
       <SerieRPS>${rps.serie}</SerieRPS>
