@@ -127,9 +127,10 @@ function gerarRpsXml(nota: DadosNfse): string {
   const codigoServicoFormatado = servico.codigoServico.replace(/\D/g, "")
 
   // Gerar hash de assinatura do RPS conforme manual SP
-  // Formato: InscricaoPrestador(8) + SerieRPS(5) + NumeroRPS(12) + DataEmissao(8) + TributacaoRPS(1)
-  // + StatusRPS(1) + ISSRetido(1) + ValorServicos(15) + ValorDeducoes(15) + CodigoServico(5)
-  // + IndicadorCPFCNPJTomador(1) + CPFCNPJTomador(14)
+  // Formato: InscricaoPrestador(8) + SerieRPS(5) + NumeroRPS(12) + DataEmissao(YYYYMMDD=8)
+  // + TributacaoRPS(1) + StatusRPS(1) + ISSRetido(1) + ValorServicos(15) + ValorDeducoes(15)
+  // + CodigoServico(5) + IndicadorCPFCNPJTomador(1) + CPFCNPJTomador(14)
+  // + InscricaoMunicipalTomador(8)
   const tributacao = getTributacaoSP(rps.regimeTributacao, rps.optanteSimples)
   const statusRps = "N"
   const issRetidoFlag = servico.issRetido ? "S" : "N"
@@ -138,8 +139,11 @@ function gerarRpsXml(nota: DadosNfse): string {
   const codServico = codigoServicoFormatado.padStart(5, "0")
   const indicadorTomador = tomador.tipo === "PF" ? "1" : "2"
   const cpfCnpjTomador = tomador.cpfCnpj.replace(/\D/g, "").padStart(14, "0")
-  // SP exige data+hora no formato YYYYMMDDHHMMSS (14 digitos)
-  const dataFormatada = rps.dataEmissao.replace(/[-:T]/g, "").substring(0, 14)
+  // SP usa YYYYMMDD (8 digitos) na assinatura - apenas data, sem hora
+  const dataFormatada = rps.dataEmissao.substring(0, 10).replace(/-/g, "")
+  // Inscricao municipal do tomador (8 posicoes) - obrigatoria na assinatura
+  // Se nao tiver, envia "00000000"
+  const imTomador = (tomador.inscricaoMunicipal || "").replace(/\D/g, "").padStart(8, "0")
 
   const assinaturaStr =
     prestador.inscricaoMunicipal.padStart(8, "0") +
@@ -153,10 +157,13 @@ function gerarRpsXml(nota: DadosNfse): string {
     valorDeducoesStr +
     codServico +
     indicadorTomador +
-    cpfCnpjTomador
+    cpfCnpjTomador +
+    imTomador
 
   // SHA-1 hex do hash de assinatura
+  console.log("[v0] Assinatura string length:", assinaturaStr.length, "string:", assinaturaStr)
   const hashHex = sha1Hex(assinaturaStr)
+  console.log("[v0] SHA1 hash:", hashHex)
 
   // xmlns="" reseta o namespace para unqualified (exigido pelo XSD da SP)
   // ISSRetido no XML deve ser boolean (true/false), mas no hash de assinatura usa S/N
