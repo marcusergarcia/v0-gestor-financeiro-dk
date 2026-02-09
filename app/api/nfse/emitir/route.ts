@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { gerarXmlEnvioLoteRps, gerarXmlConsultaNfseRps, type DadosNfse } from "@/lib/nfse/xml-builder"
 import { enviarLoteRps, testeEnvioLoteRps, consultarNfse, extrairDadosNfseRetorno } from "@/lib/nfse/soap-client"
+import { assinarXmlNfse, extrairCertKeyDoPfx } from "@/lib/nfse/xml-signer"
 
 export async function POST(request: NextRequest) {
   const connection = await pool.getConnection()
@@ -120,8 +121,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Gerar XML
-    const xmlEnvio = gerarXmlEnvioLoteRps([dadosNfse], numeroRps)
-    console.log("[v0] XML gerado, tamanho:", xmlEnvio.length)
+    let xmlEnvio = gerarXmlEnvioLoteRps([dadosNfse], numeroRps)
+    console.log("[v0] XML gerado (sem assinatura), tamanho:", xmlEnvio.length)
+
+    // Assinar XML com certificado digital (XMLDSIG obrigatorio pela prefeitura de SP)
+    if (config.certificado_base64 && config.certificado_senha) {
+      try {
+        console.log("[v0] Assinando XML com certificado digital...")
+        const { certPem, keyPem } = extrairCertKeyDoPfx(config.certificado_base64, config.certificado_senha)
+        xmlEnvio = assinarXmlNfse(xmlEnvio, certPem, keyPem)
+        console.log("[v0] XML assinado com sucesso, tamanho:", xmlEnvio.length)
+      } catch (signError: any) {
+        console.error("[v0] Erro ao assinar XML:", signError?.message)
+        return NextResponse.json(
+          { success: false, message: "Erro ao assinar XML com certificado digital: " + (signError?.message || "Erro desconhecido") },
+          { status: 400 },
+        )
+      }
+    }
 
     // Inserir registro da nota fiscal no banco
     console.log("[v0] Inserindo nota fiscal no banco...")
