@@ -1,5 +1,10 @@
 // Gerador de XML para NFS-e São Paulo (Padrão ABRASF/SP)
 // Web Service: https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx
+//
+// IMPORTANTE: O XSD da prefeitura de SP NÃO usa elementFormDefault="qualified",
+// então todos os elementos locais (Cabecalho, RPS, Detalhe, etc.) devem estar
+// SEM namespace (unqualified). Para isso, usamos xmlns="" nos filhos diretos
+// do elemento raiz para resetar o default namespace herdado.
 
 import { createHash } from "crypto"
 
@@ -63,12 +68,16 @@ export interface DadosNfse {
 }
 
 // Gerar XML de envio de lote de RPS para SP
+// Schema: PedidoEnvioLoteRPS_v02.xsd
+// Estrutura: PedidoEnvioLoteRPS > Cabecalho + RPS(1..50) + ds:Signature
 export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number): string {
   const listaRps = notas.map((nota) => gerarRpsXml(nota)).join("\n")
 
+  // NOTA: O schema do Cabecalho só aceita: CPFCNPJRemetente, transacao, dtInicio, dtFim, QtdRPS
+  // NÃO há ValorTotalServicos nem ValorTotalDeducoes no PedidoEnvioLoteRPS
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Cabecalho Versao="1">
+  <Cabecalho xmlns="" Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${notas[0].prestador.cnpj}</CNPJ>
     </CPFCNPJRemetente>
@@ -76,15 +85,13 @@ export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number): st
     <dtInicio>${notas[0].rps.dataEmissao}</dtInicio>
     <dtFim>${notas[0].rps.dataEmissao}</dtFim>
     <QtdRPS>${notas.length}</QtdRPS>
-    <ValorTotalServicos>${somarValores(notas, "valorServicos").toFixed(2)}</ValorTotalServicos>
-    <ValorTotalDeducoes>${somarValores(notas, "valorDeducoes").toFixed(2)}</ValorTotalDeducoes>
   </Cabecalho>
-  ${listaRps}
+${listaRps}
 </PedidoEnvioLoteRPS>`
 }
 
 /**
- * Gera o elemento <EnderecoTomador> estruturado conforme schema SP (pos-2015).
+ * Gera o elemento <EnderecoTomador> estruturado conforme schema SP.
  * Sub-elementos: TipoLogradouro, Logradouro, NumeroEndereco, ComplementoEndereco, Bairro, Cidade, UF, CEP
  */
 function gerarEnderecoTomadorXml(tomador: DadosTomador): string {
@@ -109,10 +116,6 @@ ${partes.join("\n")}
 function gerarRpsXml(nota: DadosNfse): string {
   const { rps, prestador, tomador, servico } = nota
 
-  const valorIss = servico.issRetido
-    ? 0
-    : ((servico.valorServicos - (servico.valorDeducoes || 0)) * servico.aliquotaIss)
-
   // SP usa formato específico para CPF/CNPJ do tomador
   const tomadorCpfCnpj =
     tomador.tipo === "PF"
@@ -136,7 +139,7 @@ function gerarRpsXml(nota: DadosNfse): string {
   const cpfCnpjTomador = tomador.cpfCnpj.padStart(14, "0")
   const dataFormatada = rps.dataEmissao.replace(/-/g, "")
 
-  const assinaturaStr = 
+  const assinaturaStr =
     prestador.inscricaoMunicipal.padStart(8, "0") +
     rps.serie.padEnd(5, " ") +
     rps.numero.toString().padStart(12, "0") +
@@ -153,7 +156,10 @@ function gerarRpsXml(nota: DadosNfse): string {
   // SHA-1 hex do hash de assinatura
   const hashHex = sha1Hex(assinaturaStr)
 
-  return `  <RPS>
+  // xmlns="" reseta o namespace para unqualified (exigido pelo XSD da SP)
+  // ISSRetido usa "S" ou "N" (NÃO boolean true/false)
+  // NaturezaOperacao é obrigatório logo após StatusRPS
+  return `  <RPS xmlns="">
     <Assinatura>${hashHex}</Assinatura>
     <ChaveRPS>
       <InscricaoPrestador>${prestador.inscricaoMunicipal}</InscricaoPrestador>
@@ -163,7 +169,8 @@ function gerarRpsXml(nota: DadosNfse): string {
     <TipoRPS>${rps.tipo === 1 ? "RPS" : rps.tipo === 2 ? "RPS-M" : "RPS-C"}</TipoRPS>
     <DataEmissao>${rps.dataEmissao}</DataEmissao>
     <StatusRPS>N</StatusRPS>
-    <TributacaoRPS>${getTributacaoSP(rps.regimeTributacao, rps.optanteSimples)}</TributacaoRPS>
+    <NaturezaOperacao>${rps.naturezaOperacao}</NaturezaOperacao>
+    <TributacaoRPS>${tributacao}</TributacaoRPS>
     <ValorServicos>${servico.valorServicos.toFixed(2)}</ValorServicos>
     <ValorDeducoes>${(servico.valorDeducoes || 0).toFixed(2)}</ValorDeducoes>
     <ValorPIS>${(servico.valorPis || 0).toFixed(2)}</ValorPIS>
@@ -173,7 +180,7 @@ function gerarRpsXml(nota: DadosNfse): string {
     <ValorCSLL>${(servico.valorCsll || 0).toFixed(2)}</ValorCSLL>
     <CodigoServico>${codigoServicoFormatado}</CodigoServico>
     <AliquotaServicos>${(servico.aliquotaIss * 100).toFixed(4)}</AliquotaServicos>
-    <ISSRetido>${servico.issRetido ? "true" : "false"}</ISSRetido>
+    <ISSRetido>${issRetidoFlag}</ISSRetido>
     <CPFCNPJTomador>
       ${tomadorCpfCnpj}
     </CPFCNPJTomador>${tomador.inscricaoMunicipal ? `
@@ -193,12 +200,12 @@ export function gerarXmlConsultaNfseRps(
 ): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoConsultaNFe xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho Versao="1">
+  <Cabecalho xmlns="" Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
   </Cabecalho>
-  <Detalhe>
+  <Detalhe xmlns="">
     <ChaveRPS>
       <InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador>
       <SerieRPS>${serieRps}</SerieRPS>
@@ -209,6 +216,7 @@ export function gerarXmlConsultaNfseRps(
 }
 
 // Gerar XML de cancelamento de NFS-e SP
+// NOTA: AssinaturaCancelamento removida (SP rejeita tag vazia)
 export function gerarXmlCancelamentoNfse(
   prestadorCnpj: string,
   inscricaoMunicipal: string,
@@ -216,18 +224,17 @@ export function gerarXmlCancelamentoNfse(
 ): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoCancelamentoNFe xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho Versao="1">
+  <Cabecalho xmlns="" Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
     <transacao>true</transacao>
   </Cabecalho>
-  <Detalhe>
+  <Detalhe xmlns="">
     <ChaveNFe>
       <InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador>
       <NumeroNFe>${numeroNfse}</NumeroNFe>
     </ChaveNFe>
-    <AssinaturaCancelamento></AssinaturaCancelamento>
   </Detalhe>
 </PedidoCancelamentoNFe>`
 }
@@ -239,7 +246,7 @@ export function gerarXmlConsultaLote(
 ): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoConsultaLote xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho Versao="1">
+  <Cabecalho xmlns="" Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
@@ -252,7 +259,7 @@ export function gerarXmlConsultaLote(
 export function gerarXmlTesteEnvio(prestadorCnpj: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoConsultaLote xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho Versao="1">
+  <Cabecalho xmlns="" Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
@@ -296,8 +303,6 @@ function escapeXml(str: string): string {
 }
 
 // URLs dos webservices da Prefeitura de SP
-// Ref: Manual de Utilização do Web Service v2.1 - Prefeitura de SP
-// Homologação usa subdomínio "nfeh" (com H)
 export const SP_WEBSERVICE_URLS = {
   homologacao: "https://nfeh.prefeitura.sp.gov.br/ws/lotenfe.asmx",
   producao: "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx",
