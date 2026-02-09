@@ -158,8 +158,9 @@ function gerarRpsXml(nota: DadosNfse): string {
   const hashHex = sha1Hex(assinaturaStr)
 
   // xmlns="" reseta o namespace para unqualified (exigido pelo XSD da SP)
-  // ISSRetido usa "S" ou "N" (NÃO boolean true/false)
-  // NaturezaOperacao é obrigatório logo após StatusRPS
+  // ISSRetido no XML deve ser boolean (true/false), mas no hash de assinatura usa S/N
+  const issRetidoXml = servico.issRetido ? "true" : "false"
+
   return `  <RPS xmlns="">
     <Assinatura>${hashHex}</Assinatura>
     <ChaveRPS>
@@ -180,7 +181,7 @@ function gerarRpsXml(nota: DadosNfse): string {
     <ValorCSLL>${(servico.valorCsll || 0).toFixed(2)}</ValorCSLL>
     <CodigoServico>${codigoServicoFormatado}</CodigoServico>
     <AliquotaServicos>${(servico.aliquotaIss * 100).toFixed(4)}</AliquotaServicos>
-    <ISSRetido>${issRetidoFlag}</ISSRetido>
+    <ISSRetido>${issRetidoXml}</ISSRetido>
     <CPFCNPJTomador>
       ${tomadorCpfCnpj}
     </CPFCNPJTomador>${tomador.inscricaoMunicipal ? `
