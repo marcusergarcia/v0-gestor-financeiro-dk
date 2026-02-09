@@ -1,6 +1,12 @@
 // Gerador de XML para NFS-e São Paulo (Padrão ABRASF/SP)
 // Web Service: https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx
 
+import { createHash } from "crypto"
+
+function sha1Hex(data: string): string {
+  return createHash("sha1").update(data, "ascii").digest("hex")
+}
+
 export interface DadosPrestador {
   cnpj: string
   inscricaoMunicipal: string
@@ -62,7 +68,7 @@ export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number): st
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Cabecalho xmlns="" Versao="1">
+  <Cabecalho Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${notas[0].prestador.cnpj}</CNPJ>
     </CPFCNPJRemetente>
@@ -116,8 +122,39 @@ function gerarRpsXml(nota: DadosNfse): string {
   // SP exige CodigoServico apenas com digitos (ex: "1401" e nao "14.01")
   const codigoServicoFormatado = servico.codigoServico.replace(/\D/g, "")
 
-  return `  <RPS xmlns="">
-    <Assinatura></Assinatura>
+  // Gerar hash de assinatura do RPS conforme manual SP
+  // Formato: InscricaoPrestador(8) + SerieRPS(5) + NumeroRPS(12) + DataEmissao(8) + TributacaoRPS(1)
+  // + StatusRPS(1) + ISSRetido(1) + ValorServicos(15) + ValorDeducoes(15) + CodigoServico(5)
+  // + IndicadorCPFCNPJTomador(1) + CPFCNPJTomador(14)
+  const tributacao = getTributacaoSP(rps.regimeTributacao, rps.optanteSimples)
+  const statusRps = "N"
+  const issRetidoFlag = servico.issRetido ? "S" : "N"
+  const valorServicosStr = Math.round(servico.valorServicos * 100).toString().padStart(15, "0")
+  const valorDeducoesStr = Math.round((servico.valorDeducoes || 0) * 100).toString().padStart(15, "0")
+  const codServico = codigoServicoFormatado.padStart(5, "0")
+  const indicadorTomador = tomador.tipo === "PF" ? "1" : "2"
+  const cpfCnpjTomador = tomador.cpfCnpj.padStart(14, "0")
+  const dataFormatada = rps.dataEmissao.replace(/-/g, "")
+
+  const assinaturaStr = 
+    prestador.inscricaoMunicipal.padStart(8, "0") +
+    rps.serie.padEnd(5, " ") +
+    rps.numero.toString().padStart(12, "0") +
+    dataFormatada +
+    tributacao +
+    statusRps +
+    issRetidoFlag +
+    valorServicosStr +
+    valorDeducoesStr +
+    codServico +
+    indicadorTomador +
+    cpfCnpjTomador
+
+  // SHA-1 hex do hash de assinatura
+  const hashHex = sha1Hex(assinaturaStr)
+
+  return `  <RPS>
+    <Assinatura>${hashHex}</Assinatura>
     <ChaveRPS>
       <InscricaoPrestador>${prestador.inscricaoMunicipal}</InscricaoPrestador>
       <SerieRPS>${rps.serie}</SerieRPS>
@@ -156,12 +193,12 @@ export function gerarXmlConsultaNfseRps(
 ): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoConsultaNFe xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho xmlns="" Versao="1">
+  <Cabecalho Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
   </Cabecalho>
-  <Detalhe xmlns="">
+  <Detalhe>
     <ChaveRPS>
       <InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador>
       <SerieRPS>${serieRps}</SerieRPS>
@@ -179,13 +216,13 @@ export function gerarXmlCancelamentoNfse(
 ): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoCancelamentoNFe xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho xmlns="" Versao="1">
+  <Cabecalho Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
     <transacao>true</transacao>
   </Cabecalho>
-  <Detalhe xmlns="">
+  <Detalhe>
     <ChaveNFe>
       <InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador>
       <NumeroNFe>${numeroNfse}</NumeroNFe>
@@ -202,7 +239,7 @@ export function gerarXmlConsultaLote(
 ): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoConsultaLote xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho xmlns="" Versao="1">
+  <Cabecalho Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
@@ -215,7 +252,7 @@ export function gerarXmlConsultaLote(
 export function gerarXmlTesteEnvio(prestadorCnpj: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoConsultaLote xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho xmlns="" Versao="1">
+  <Cabecalho Versao="1">
     <CPFCNPJRemetente>
       <CNPJ>${prestadorCnpj}</CNPJ>
     </CPFCNPJRemetente>
