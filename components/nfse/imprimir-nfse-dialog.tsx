@@ -127,10 +127,32 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
       </html>
     `)
     printWindow.document.close()
-    // Wait a bit longer for images to load
-    setTimeout(() => {
-      printWindow.print()
-    }, 600)
+    // Wait for images to fully load before printing
+    const images = printWindow.document.querySelectorAll("img")
+    let loadedCount = 0
+    const totalImages = images.length
+
+    const tryPrint = () => {
+      loadedCount++
+      if (loadedCount >= totalImages) {
+        setTimeout(() => printWindow.print(), 200)
+      }
+    }
+
+    if (totalImages === 0) {
+      setTimeout(() => printWindow.print(), 300)
+    } else {
+      images.forEach((img) => {
+        if (img.complete) {
+          tryPrint()
+        } else {
+          img.onload = tryPrint
+          img.onerror = tryPrint
+        }
+      })
+      // Fallback: print after 2s even if images fail
+      setTimeout(() => printWindow.print(), 2000)
+    }
   }
 
   const nota = dados?.nota
@@ -216,27 +238,32 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
       <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid #1a3a6e" }}>
         <tbody>
           <tr>
-            <td style={{ width: "90px", padding: "8px 10px", verticalAlign: "middle", borderRight: "1px solid #1a3a6e" }}>
+            <td style={{ width: "80px", padding: "8px 10px", verticalAlign: "middle", borderRight: "1px solid #1a3a6e", textAlign: "center" }}>
               {/* Brasao oficial da Prefeitura de Sao Paulo */}
               <img
                 src="/images/brasao-sp.png"
                 alt="Brasao da Prefeitura de Sao Paulo"
-                style={{ display: "block", margin: "0 auto", width: "70px", height: "auto" }}
+                style={{ display: "block", margin: "0 auto", width: "60px", height: "auto" }}
                 crossOrigin="anonymous"
               />
             </td>
             <td style={{ padding: "8px 16px", verticalAlign: "middle" }}>
-              <div style={{ fontSize: "12px", fontWeight: "bold", color: "#1a3a6e", marginBottom: 2 }}>
+              <div style={{ fontSize: "11px", fontWeight: "bold", color: "#1a3a6e", marginBottom: 1 }}>
                 PREFEITURA DO MUNICIPIO DE SAO PAULO
               </div>
-              <div style={{ fontSize: "10px", color: "#1a3a6e", marginBottom: 1 }}>
-                SECRETARIA MUNICIPAL DE FINANCAS
+              <div style={{ fontSize: "10px", color: "#1a3a6e", marginBottom: 4 }}>
+                SECRETARIA MUNICIPAL DA FAZENDA
               </div>
-              <div style={{ fontSize: "16px", fontWeight: "bold", color: "#1a3a6e", marginTop: 6, letterSpacing: "0.5px" }}>
-                NFS-e - NOTA FISCAL DE SERVICOS ELETRONICA
+              <div style={{ fontSize: "14px", fontWeight: "bold", color: "#1a3a6e", letterSpacing: "0.3px" }}>
+                NOTA FISCAL ELETRONICA DE SERVICOS - NFS-e
               </div>
+              {nota.numero_rps && (
+                <div style={{ fontSize: "9px", color: "#444", marginTop: 4 }}>
+                  RPS N.{" "}{nota.numero_rps}{nota.serie_rps ? ` Serie ${nota.serie_rps}` : ""}, emitido em {formatDateBR(nota.data_emissao || nota.created_at)}
+                </div>
+              )}
             </td>
-            <td style={{ width: "200px", padding: "8px 12px", verticalAlign: "middle", borderLeft: "1px solid #1a3a6e", textAlign: "right" }}>
+            <td style={{ width: "200px", padding: "8px 12px", verticalAlign: "top", borderLeft: "1px solid #1a3a6e" }}>
               {isCancelada && (
                 <div style={{
                   background: "#dc2626",
@@ -250,64 +277,54 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
                   CANCELADA
                 </div>
               )}
-              <div style={{ fontSize: "9px", color: "#555", marginBottom: 2 }}>Numero da Nota</div>
-              <div style={{ fontSize: "20px", fontWeight: "bold", color: "#1a3a6e" }}>
-                {nota.numero_nfse || "-"}
-              </div>
-              {/* Logo da empresa */}
-              {logo && (
-                <div style={{ marginTop: 6 }}>
-                  <img
-                    src={logo}
-                    alt="Logo da empresa"
-                    style={{ maxWidth: "120px", maxHeight: "40px", objectFit: "contain", marginLeft: "auto", display: "block" }}
-                    crossOrigin="anonymous"
-                  />
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ fontSize: "8px", color: "#555", textTransform: "uppercase" }}>Numero da Nota</div>
+                <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3a6e" }}>
+                  {nota.numero_nfse ? String(nota.numero_nfse).padStart(8, "0") : "-"}
                 </div>
-              )}
+              </div>
+              <div style={{ marginBottom: 4 }}>
+                <div style={{ fontSize: "8px", color: "#555", textTransform: "uppercase" }}>Data e Hora de Emissao</div>
+                <div style={{ fontSize: "10px", fontWeight: "bold", color: "#000" }}>
+                  {formatDateTimeBR(nota.data_emissao || nota.created_at)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "8px", color: "#555", textTransform: "uppercase" }}>Codigo de Verificacao</div>
+                <div style={{ fontSize: "10px", fontWeight: "bold", color: "#000" }}>
+                  {nota.codigo_verificacao || "-"}
+                </div>
+              </div>
             </td>
           </tr>
         </tbody>
       </table>
 
-      {/* ===== DADOS DA NOTA (Data, Codigo Verificacao, etc.) ===== */}
-      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
-        <tbody>
-          <tr>
-            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "25%" }}>
-              <FieldLabel>Data e Hora da Emissao</FieldLabel>
-              <FieldValue>{formatDateTimeBR(nota.data_emissao || nota.created_at)}</FieldValue>
-            </td>
-            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "25%" }}>
-              <FieldLabel>Codigo de Verificacao</FieldLabel>
-              <FieldValue>{nota.codigo_verificacao || "-"}</FieldValue>
-            </td>
-            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "25%" }}>
-              <FieldLabel>Numero do RPS</FieldLabel>
-              <FieldValue>{nota.numero_rps ? `${nota.serie_rps || ""} - ${String(nota.numero_rps).padStart(8, "0")}` : "-"}</FieldValue>
-            </td>
-            <td style={{ ...cellStyle, width: "25%" }}>
-              <FieldLabel>Data da Competencia</FieldLabel>
-              <FieldValue>{formatDateBR(nota.data_emissao || nota.created_at)}</FieldValue>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      {/* Dados ja exibidos no cabecalho - sem duplicacao */}
 
       {/* ===== PRESTADOR DE SERVICOS ===== */}
       <SectionHeader>PRESTADOR DE SERVICOS</SectionHeader>
       <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
         <tbody>
           <tr>
-            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "50%" }}>
+            {/* Logo da empresa ao lado esquerdo do prestador, como no modelo oficial */}
+            <td rowSpan={3} style={{ width: "70px", padding: "6px 8px", verticalAlign: "middle", borderRight: "1px solid #999", textAlign: "center" }}>
+              <img
+                src={logo || "/images/logo-empresa.png"}
+                alt="Logo da empresa"
+                style={{ display: "block", margin: "0 auto", maxWidth: "55px", maxHeight: "55px", objectFit: "contain" }}
+                crossOrigin="anonymous"
+              />
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "auto" }}>
               <FieldLabel>Nome/Razao Social</FieldLabel>
               <FieldValue bold>{prestador?.razao_social || "-"}</FieldValue>
             </td>
-            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "25%" }}>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "22%" }}>
               <FieldLabel>CPF/CNPJ</FieldLabel>
               <FieldValue>{formatCpfCnpj(prestador?.cnpj || "")}</FieldValue>
             </td>
-            <td style={{ ...cellStyle, width: "25%" }}>
+            <td style={{ ...cellStyle, width: "22%" }}>
               <FieldLabel>Inscricao Municipal</FieldLabel>
               <FieldValue>{prestador?.inscricao_municipal || "-"}</FieldValue>
             </td>
@@ -393,115 +410,105 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
           <tr>
             <td style={{ padding: "10px 12px", minHeight: "80px", whiteSpace: "pre-wrap", lineHeight: 1.5, fontSize: "10px", verticalAlign: "top" }}>
               {nota.descricao_servico || "-"}
+              {nota.observacoes_tributos && (
+                <div style={{ marginTop: 8, fontSize: "9px", color: "#444" }}>
+                  {nota.observacoes_tributos}
+                </div>
+              )}
+            </td>
+          </tr>
+          {/* Retencoes federais na linha de discriminacao, como no modelo oficial */}
+          <tr>
+            <td style={{ padding: "4px 12px", borderTop: "1px solid #999" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", fontSize: "9px" }}>
+                <span><strong>INSS (R$)</strong> {formatCurrency(nota.valor_inss || 0)}</span>
+                <span><strong>IRRF (R$)</strong> {formatCurrency(nota.valor_ir || 0)}</span>
+                <span><strong>CSLL (R$)</strong> {formatCurrency(nota.valor_csll || 0)}</span>
+                <span><strong>COFINS (R$)</strong> {formatCurrency(nota.valor_cofins || 0)}</span>
+                <span><strong>PIS/PASEP (R$)</strong> {formatCurrency(nota.valor_pis || 0)}</span>
+              </div>
+            </td>
+          </tr>
+          {/* Valor total em destaque */}
+          <tr>
+            <td style={{
+              padding: "8px 12px",
+              borderTop: "2px solid #1a3a6e",
+              background: "#e8edf5",
+              textAlign: "right",
+            }}>
+              <span style={{ fontSize: "14px", fontWeight: "bold", color: "#1a3a6e" }}>
+                VALOR TOTAL DO SERVICO = {formatCurrency(nota.valor_total || valorServicos)}
+              </span>
             </td>
           </tr>
         </tbody>
       </table>
 
-      {/* ===== CODIGO DO SERVICO ===== */}
+      {/* ===== CODIGO DO SERVICO + TRIBUTOS (layout oficial) ===== */}
       <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
         <tbody>
+          {/* Codigo do servico - linha inteira */}
           <tr>
-            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "50%" }}>
+            <td colSpan={6} style={{ ...cellStyle, borderBottom: "1px solid #999" }}>
               <FieldLabel>Codigo do Servico</FieldLabel>
               <FieldValue>{nota.codigo_servico || "-"}</FieldValue>
             </td>
-            <td style={{ ...cellStyle, width: "50%" }}>
-              <FieldLabel>Local da Prestacao do Servico</FieldLabel>
-              <FieldValue>{prestador?.cidade || "SAO PAULO"} - {prestador?.uf || "SP"}</FieldValue>
-            </td>
           </tr>
-        </tbody>
-      </table>
-
-      {/* ===== VALORES / TRIBUTOS ===== */}
-      <SectionHeader>VALORES E TRIBUTOS REFERENTES A NOTA</SectionHeader>
-      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
-        <tbody>
-          {/* Linha 1 - Valor Servicos, Deducoes, Base de Calculo */}
+          {/* Linha de tributos: Deducoes, Base Calculo, Municipio, Aliquota, ISS, Credito */}
           <tr>
-            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "33.33%", textAlign: "right" }}>
-              <FieldLabel>Valor Total dos Servicos</FieldLabel>
-              <FieldValue bold>{formatCurrency(valorServicos)}</FieldValue>
-            </td>
-            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "33.33%", textAlign: "right" }}>
-              <FieldLabel>Deducoes</FieldLabel>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>Valor Total das Deducoes (R$)</FieldLabel>
               <FieldValue>{formatCurrency(valorDeducoes)}</FieldValue>
             </td>
-            <td style={{ ...cellStyle, width: "33.33%", textAlign: "right" }}>
-              <FieldLabel>Base de Calculo</FieldLabel>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>Base de Calculo (R$)</FieldLabel>
               <FieldValue bold>{formatCurrency(baseCalculo)}</FieldValue>
             </td>
-          </tr>
-          {/* Linha 2 - Aliquota, ISS, Credito */}
-          <tr>
-            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999", textAlign: "right" }}>
-              <FieldLabel>Aliquota de ISS (%)</FieldLabel>
-              <FieldValue>{aliquotaIss.toFixed(2)}%</FieldValue>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999" }}>
+              <FieldLabel>Municipio da Prestacao</FieldLabel>
+              <FieldValue>{prestador?.cidade || "Sao Paulo"}</FieldValue>
             </td>
-            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999", textAlign: "right" }}>
-              <FieldLabel>Valor do ISS</FieldLabel>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "center" }}>
+              <FieldLabel>Aliquota (%)</FieldLabel>
+              <FieldValue>{aliquotaIss.toFixed(2)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>Valor do ISS (R$)</FieldLabel>
               <FieldValue bold>{formatCurrency(valorIss)}</FieldValue>
             </td>
-            <td style={{ ...cellStyle, borderTop: "1px solid #999", textAlign: "right" }}>
-              <FieldLabel>ISS Retido</FieldLabel>
-              <FieldValue>{nota.iss_retido ? "Sim" : "Nao"}</FieldValue>
+            <td style={{ ...cellStyle, textAlign: "right" }}>
+              <FieldLabel>Credito (R$)</FieldLabel>
+              <FieldValue>{formatCurrency(valorCredito)}</FieldValue>
             </td>
           </tr>
-          {/* Linha 3 - Outras retencoes */}
+          {/* Numero inscricao da obra + ISS retido */}
           <tr>
+            <td colSpan={3} style={{ ...cellStyle, borderTop: "1px solid #999", borderRight: "1px solid #999" }}>
+              <FieldLabel>Numero Inscricao da Obra</FieldLabel>
+              <FieldValue>{nota.numero_inscricao_obra || "-"}</FieldValue>
+            </td>
             <td colSpan={3} style={{ ...cellStyle, borderTop: "1px solid #999" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
-                <div style={{ flex: 1, textAlign: "right" }}>
-                  <FieldLabel>PIS</FieldLabel>
-                  <FieldValue>{formatCurrency(nota.valor_pis || 0)}</FieldValue>
-                </div>
-                <div style={{ flex: 1, textAlign: "right" }}>
-                  <FieldLabel>COFINS</FieldLabel>
-                  <FieldValue>{formatCurrency(nota.valor_cofins || 0)}</FieldValue>
-                </div>
-                <div style={{ flex: 1, textAlign: "right" }}>
-                  <FieldLabel>IR</FieldLabel>
-                  <FieldValue>{formatCurrency(nota.valor_ir || 0)}</FieldValue>
-                </div>
-                <div style={{ flex: 1, textAlign: "right" }}>
-                  <FieldLabel>INSS</FieldLabel>
-                  <FieldValue>{formatCurrency(nota.valor_inss || 0)}</FieldValue>
-                </div>
-                <div style={{ flex: 1, textAlign: "right" }}>
-                  <FieldLabel>CSLL</FieldLabel>
-                  <FieldValue>{formatCurrency(nota.valor_csll || 0)}</FieldValue>
-                </div>
-              </div>
+              <FieldLabel>Valor Aproximado dos Tributos / Fonte</FieldLabel>
+              <FieldValue>{nota.iss_retido ? "ISS Retido na Fonte" : "-"}</FieldValue>
             </td>
           </tr>
         </tbody>
       </table>
 
-      {/* ===== VALOR TOTAL / CREDITO ===== */}
-      <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid #1a3a6e", borderTop: "none" }}>
+      {/* ===== OUTRAS INFORMACOES ===== */}
+      <SectionHeader>OUTRAS INFORMACOES</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
         <tbody>
           <tr>
-            <td style={{
-              padding: "10px 16px",
-              background: "#e8edf5",
-              width: "50%",
-              borderRight: "2px solid #1a3a6e",
-            }}>
-              <div style={{ fontSize: "9px", color: "#555", marginBottom: 2 }}>VALOR TOTAL DA NOTA (R$)</div>
-              <div style={{ fontSize: "22px", fontWeight: "bold", color: "#1a3a6e" }}>
-                {formatCurrency(nota.valor_total || valorServicos)}
-              </div>
-            </td>
-            <td style={{
-              padding: "10px 16px",
-              background: "#e8edf5",
-              width: "50%",
-            }}>
-              <div style={{ fontSize: "9px", color: "#555", marginBottom: 2 }}>VALOR DO CREDITO (R$)</div>
-              <div style={{ fontSize: "14px", fontWeight: "bold", color: "#1a3a6e" }}>
-                {formatCurrency(valorCredito)}
-              </div>
+            <td style={{ padding: "8px 12px", fontSize: "9px", lineHeight: 1.5, whiteSpace: "pre-wrap", verticalAlign: "top", minHeight: "40px" }}>
+              {nota.informacoes_complementares || nota.observacoes || (
+                <>
+                  (1) Esta NFS-e foi emitida com respaldo na Lei n. 14.097/2005;{" "}
+                  (2) Documento emitido por ME ou EPP optante pelo Simples Nacional;{" "}
+                  {nota.numero_rps && `(3) Esta NFS-e substitui o RPS N. ${nota.numero_rps}${nota.serie_rps ? ` Serie ${nota.serie_rps}` : ""}, emitido em ${formatDateBR(nota.data_emissao || nota.created_at)};`}
+                </>
+              )}
             </td>
           </tr>
         </tbody>
@@ -533,34 +540,20 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
       )}
 
       {/* ===== RODAPE ===== */}
-      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #1a3a6e", marginTop: 8 }}>
-        <tbody>
-          <tr>
-            <td style={{ padding: "8px 12px", textAlign: "center", lineHeight: 1.6, fontSize: "9px", color: "#333" }}>
-              <div>Documento emitido por ME ou EPP optante pelo Simples Nacional.</div>
-              <div>Nao gera direito a credito fiscal de IPI.</div>
-            </td>
-          </tr>
-          <tr>
-            <td style={{
-              padding: "6px 12px",
-              textAlign: "center",
-              lineHeight: 1.5,
-              fontSize: "8px",
-              color: "#555",
-              background: "#f0f4f8",
-              borderTop: "1px solid #ccd",
-            }}>
-              <div style={{ fontWeight: "bold", marginBottom: 2 }}>
-                Consulte a autenticidade desta NFS-e em: nfe.prefeitura.sp.gov.br
-              </div>
-              <div>
-                Inscricao Municipal: {prestador?.inscricao_municipal || "-"} | Numero da Nota: {nota.numero_nfse || "-"} | Codigo de Verificacao: {nota.codigo_verificacao || "-"}
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div style={{
+        marginTop: 10,
+        padding: "6px 12px",
+        textAlign: "center",
+        fontSize: "8px",
+        color: "#555",
+        lineHeight: 1.5,
+        borderTop: "1px solid #1a3a6e",
+      }}>
+        <div>Consulte a autenticidade desta NFS-e em: <strong>nfe.prefeitura.sp.gov.br</strong></div>
+        <div style={{ marginTop: 2 }}>
+          Inscricao Municipal: {prestador?.inscricao_municipal || "-"} | Numero da Nota: {nota.numero_nfse ? String(nota.numero_nfse).padStart(8, "0") : "-"} | Codigo de Verificacao: {nota.codigo_verificacao || "-"}
+        </div>
+      </div>
     </div>
   )
 }
