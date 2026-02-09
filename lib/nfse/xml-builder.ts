@@ -73,8 +73,7 @@ export interface DadosNfse {
 export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number): string {
   const listaRps = notas.map((nota) => gerarRpsXml(nota)).join("\n")
 
-  // NOTA: O schema do Cabecalho só aceita: CPFCNPJRemetente, transacao, dtInicio, dtFim, QtdRPS
-  // NÃO há ValorTotalServicos nem ValorTotalDeducoes no PedidoEnvioLoteRPS
+  // Schema ativo da SP exige ValorTotalServicos e ValorTotalDeducoes no Cabecalho
   return `<?xml version="1.0" encoding="UTF-8"?>
 <PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <Cabecalho xmlns="" Versao="1">
@@ -85,6 +84,8 @@ export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number): st
     <dtInicio>${notas[0].rps.dataEmissao}</dtInicio>
     <dtFim>${notas[0].rps.dataEmissao}</dtFim>
     <QtdRPS>${notas.length}</QtdRPS>
+    <ValorTotalServicos>${somarValores(notas, "valorServicos").toFixed(2)}</ValorTotalServicos>
+    <ValorTotalDeducoes>${somarValores(notas, "valorDeducoes").toFixed(2)}</ValorTotalDeducoes>
   </Cabecalho>
 ${listaRps}
 </PedidoEnvioLoteRPS>`
@@ -169,7 +170,6 @@ function gerarRpsXml(nota: DadosNfse): string {
     <TipoRPS>${rps.tipo === 1 ? "RPS" : rps.tipo === 2 ? "RPS-M" : "RPS-C"}</TipoRPS>
     <DataEmissao>${rps.dataEmissao}</DataEmissao>
     <StatusRPS>N</StatusRPS>
-    <NaturezaOperacao>${rps.naturezaOperacao}</NaturezaOperacao>
     <TributacaoRPS>${tributacao}</TributacaoRPS>
     <ValorServicos>${servico.valorServicos.toFixed(2)}</ValorServicos>
     <ValorDeducoes>${(servico.valorDeducoes || 0).toFixed(2)}</ValorDeducoes>
