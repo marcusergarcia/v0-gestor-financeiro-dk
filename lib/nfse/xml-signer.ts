@@ -1,80 +1,87 @@
 // Assinatura digital XML (XMLDSIG) para NFS-e São Paulo
-// A prefeitura de SP exige <Signature xmlns="http://www.w3.org/2000/09/xmldsig#"> no PedidoEnvioLoteRPS
+// Usa xml-crypto para canonicalização C14N e assinatura XMLDSIG enveloped correta.
 //
-// Implementação usando node-forge (já presente no projeto) para:
-// 1. Gerar digest SHA-1 do XML canonicalizado
-// 2. Assinar com RSA-SHA1 usando a chave privada do certificado A1
-// 3. Incluir o certificado X.509 na assinatura
+// A prefeitura de SP exige:
+// - Transforms: enveloped-signature + C14N
+// - DigestMethod: SHA-1
+// - SignatureMethod: RSA-SHA1
+// - CanonicalizationMethod: C14N
+// - Reference URI="" (documento inteiro)
+// - X509Certificate no KeyInfo
+//
+// A FAQ da SP diz sobre erro 1057:
+// "Verifique se está aplicando todas as transformações necessárias no XML
+//  antes da assinatura, seguindo todas as orientações do manual,
+//  NÃO modificando nenhum valor do XML após a assinatura,
+//  ou realizando INDENTAÇÃO no XML."
 
+import { SignedXml } from "xml-crypto"
 import forge from "node-forge"
-import { createHash, createSign } from "crypto"
 
 /**
- * Assina um XML de NFS-e com XMLDSIG (enveloped signature).
- * 
+ * Assina um XML de NFS-e com XMLDSIG (enveloped signature) usando xml-crypto.
+ *
  * @param xml - O XML completo (ex: PedidoEnvioLoteRPS) SEM a tag Signature
  * @param certPem - Certificado em formato PEM
  * @param keyPem - Chave privada em formato PEM
- * @returns XML com a tag <Signature> inserida antes do fechamento do elemento raiz
+ * @returns XML com a tag <Signature> inserida corretamente
  */
 export function assinarXmlNfse(xml: string, certPem: string, keyPem: string): string {
-  // Identificar o elemento raiz (ex: PedidoEnvioLoteRPS)
-  const rootMatch = xml.match(/<(\w+)\s[^>]*xmlns="http:\/\/www\.prefeitura\.sp\.gov\.br\/nfe"/)
-  if (!rootMatch) {
-    throw new Error("Elemento raiz com namespace da prefeitura não encontrado no XML")
-  }
-  const rootTagName = rootMatch[1]
-  const closingTag = `</${rootTagName}>`
-
-  // Remover <?xml ...?> para o processamento (será readicionado depois)
+  // Remover <?xml ...?> para o processamento - xml-crypto lida melhor sem
   const xmlDeclarationMatch = xml.match(/^(<\?xml[^?]*\?>)\s*/)
   const xmlDeclaration = xmlDeclarationMatch ? xmlDeclarationMatch[1] : '<?xml version="1.0" encoding="UTF-8"?>'
   const xmlBody = xmlDeclarationMatch ? xml.substring(xmlDeclarationMatch[0].length) : xml
 
-  // --- Passo 1: Calcular Digest do XML (sem Signature) ---
-  // Canonicalização simples: remover <?xml?>, normalizar whitespace entre tags
-  const canonicalXml = canonicalize(xmlBody)
-  const digestValue = createHash("sha1").update(canonicalXml, "utf8").digest("base64")
-
-  // --- Passo 2: Montar o bloco SignedInfo ---
-  const signedInfo = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/><Reference URI=""><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><DigestValue>${digestValue}</DigestValue></Reference></SignedInfo>`
-
-  // --- Passo 3: Assinar o SignedInfo com RSA-SHA1 ---
-  const sign = createSign("RSA-SHA1")
-  sign.update(signedInfo, "utf8")
-  const signatureValue = sign.sign(keyPem, "base64")
-
-  // --- Passo 4: Extrair certificado X.509 (base64, sem cabeçalho PEM) ---
+  // Extrair certificado X.509 (base64, sem cabeçalho PEM) para KeyInfo
   const certBase64 = certPem
     .replace(/-----BEGIN CERTIFICATE-----/g, "")
     .replace(/-----END CERTIFICATE-----/g, "")
     .replace(/[\r\n\s]/g, "")
 
-  // --- Passo 5: Montar bloco Signature completo ---
-  const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">${signedInfo}<SignatureValue>${signatureValue}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`
-
-  // --- Passo 6: Inserir Signature antes do fechamento do elemento raiz ---
-  const insertPos = xml.lastIndexOf(closingTag)
-  if (insertPos === -1) {
-    throw new Error(`Tag de fechamento ${closingTag} não encontrada no XML`)
+  // Identificar o elemento raiz para posicionar a Signature
+  const rootMatch = xmlBody.match(/^<(\w+)[\s>]/)
+  if (!rootMatch) {
+    throw new Error("Elemento raiz não encontrado no XML")
   }
+  const rootTagName = rootMatch[1]
 
-  const xmlAssinado = xml.substring(0, insertPos) + "\n" + signatureBlock + "\n" + closingTag
+  // Criar assinador xml-crypto
+  const sig = new SignedXml({
+    privateKey: keyPem,
+    publicCert: certPem,
+    signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
+    canonicalizationAlgorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+    getKeyInfoContent: () => {
+      return `<X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data>`
+    },
+  })
 
-  return xmlAssinado
-}
+  // Adicionar referência ao documento inteiro (URI="")
+  // Transforms: enveloped-signature + C14N (conforme manual SP)
+  sig.addReference({
+    xpath: `//*[local-name(.)='${rootTagName}']`,
+    transforms: [
+      "http://www.w3.org/2000/09/xmldsig#enveloped-signature",
+      "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+    ],
+    digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
+    isEmptyUri: true,
+  })
 
-/**
- * Canonicalização simples (C14N) do XML.
- * Remove declaração XML, normaliza quebras de linha.
- */
-function canonicalize(xml: string): string {
-  let c14n = xml
-  // Remover declaração XML se presente
-  c14n = c14n.replace(/<\?xml[^?]*\?>\s*/g, "")
-  // Normalizar line endings para LF
-  c14n = c14n.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
-  return c14n
+  // Computar assinatura - inserir antes do fechamento do elemento raiz
+  sig.computeSignature(xmlBody, {
+    location: {
+      reference: `//*[local-name(.)='${rootTagName}']`,
+      action: "append",
+    },
+  })
+
+  const signedXml = sig.getSignedXml()
+
+  console.log("[v0] XMLDSIG assinado com xml-crypto, length:", signedXml.length)
+
+  // Readicionar declaração XML
+  return xmlDeclaration + signedXml
 }
 
 /**
