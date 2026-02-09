@@ -307,15 +307,17 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
       <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
         <tbody>
           <tr>
-            {/* Logo da empresa ao lado esquerdo do prestador, como no modelo oficial */}
-            <td rowSpan={3} style={{ width: "70px", padding: "6px 8px", verticalAlign: "middle", borderRight: "1px solid #999", textAlign: "center" }}>
-              <img
-                src={logo || "/images/logo-empresa.png"}
-                alt="Logo da empresa"
-                style={{ display: "block", margin: "0 auto", maxWidth: "55px", maxHeight: "55px", objectFit: "contain" }}
-                crossOrigin="anonymous"
-              />
-            </td>
+            {/* Logo da empresa ao lado esquerdo do prestador (vem do sistema - Configuracoes > Logos) */}
+            {logo && (
+              <td rowSpan={3} style={{ width: "70px", padding: "6px 8px", verticalAlign: "middle", borderRight: "1px solid #999", textAlign: "center" }}>
+                <img
+                  src={logo}
+                  alt="Logo da empresa"
+                  style={{ display: "block", margin: "0 auto", maxWidth: "55px", maxHeight: "55px", objectFit: "contain" }}
+                  crossOrigin="anonymous"
+                />
+              </td>
+            )}
             <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "auto" }}>
               <FieldLabel>Nome/Razao Social</FieldLabel>
               <FieldValue bold>{prestador?.razao_social || "-"}</FieldValue>
