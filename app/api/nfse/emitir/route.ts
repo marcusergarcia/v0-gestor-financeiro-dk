@@ -143,6 +143,11 @@ export async function POST(request: NextRequest) {
     // Gerar XML (com assinatura RSA-SHA1 do RPS usando a chave privada)
     let xmlEnvio = gerarXmlEnvioLoteRps([dadosNfse], numeroRps, keyPem || undefined)
     console.log("[v0] XML gerado (com assinatura RPS, sem XMLDSIG), tamanho:", xmlEnvio.length)
+    // Log do XML RPS para debug (mostra a tag <Assinatura> e estrutura do RPS)
+    const rpsMatch = xmlEnvio.match(/<RPS[\s\S]*?<\/RPS>/)
+    if (rpsMatch) {
+      console.log("[v0] XML do RPS (primeiros 800 chars):", rpsMatch[0].substring(0, 800))
+    }
 
     // Assinar XML com certificado digital (XMLDSIG obrigatorio pela prefeitura de SP)
     if (certPem && keyPem) {

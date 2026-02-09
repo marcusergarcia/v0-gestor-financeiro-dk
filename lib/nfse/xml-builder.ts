@@ -26,9 +26,23 @@ function assinarRps(data: string, keyPem?: string): string {
     // Fallback: apenas SHA-1 hex (NAO aceito pela prefeitura, mas util para debug)
     return sha1Hex(data)
   }
-  const sign = createSign("RSA-SHA1")
-  sign.update(data, "ascii")
-  return sign.sign(keyPem, "base64")
+  try {
+    // Usar SHA1 (equivalente a OPENSSL_ALGO_SHA1 do PHP)
+    const sign = createSign("SHA1")
+    sign.update(data, "ascii")
+    const result = sign.sign(keyPem, "base64")
+    console.log("[v0] assinarRps: sucesso, resultado length:", result.length, "base64 chars")
+    // Verificar se a assinatura pode ser decodificada (sanity check)
+    const rawBytes = Buffer.from(result, "base64")
+    console.log("[v0] assinarRps: raw signature bytes:", rawBytes.length, "(esperado ~128 ou ~256 para RSA-1024/2048)")
+    // Log dos primeiros bytes da chave PEM para debug
+    const keyHeader = keyPem.substring(0, 60).replace(/\n/g, " ")
+    console.log("[v0] assinarRps: key PEM header:", keyHeader)
+    return result
+  } catch (err: any) {
+    console.error("[v0] assinarRps: ERRO ao assinar:", err?.message)
+    throw err
+  }
 }
 
 export interface DadosPrestador {
@@ -145,22 +159,37 @@ function gerarRpsXml(nota: DadosNfse, keyPem?: string): string {
   // SP exige CodigoServico apenas com digitos (ex: "1401" e nao "14.01")
   const codigoServicoFormatado = servico.codigoServico.replace(/\D/g, "")
 
-  // Gerar hash de assinatura do RPS conforme manual SP v3.3.4, secao 4.3.2
-  // "Campos para assinatura do RPS - versao 1.0" (86 posicoes sem intermediario):
-  //  1. InscricaoPrestador(8) + 2. SerieRPS(5) + 3. NumeroRPS(12) + 4. DataEmissao(8 AAAAMMDD)
-  //  5. TributacaoRPS(1) + 6. StatusRPS(1) + 7. ISSRetido(1)
-  //  8. ValorServicos(15, centavos) + 9. ValorDeducoes(15, centavos) + 10. CodigoServico(5)
-  //  11. IndicadorCPFCNPJ Tomador(1) + 12. CPFCNPJTomador(14)
-  // Opcionais (se houver intermediario):
-  //  13. IndicadorCPFCNPJ Intermediario(1) + 14. CPFCNPJIntermediario(14) + 15. ISSRetidoIntermediario(1)
+  // Gerar hash de assinatura do RPS conforme layout PMSP em producao
+  // Layout real da prefeitura de SP (testado em producao):
+  //  1. InscricaoPrestador (8)
+  //  2. SerieRPS (5, pad right espacos)
+  //  3. NumeroRPS (12, pad left zeros)
+  //  4. DataEmissao (8, AAAAMMDD)
+  //  5. TributacaoRPS (1)
+  //  6. StatusRPS (1)
+  //  7. ISSRetido (1) S/N
+  //  8. ValorServicos (15, centavos, pad left zeros)
+  //  9. ValorDeducoes (15, centavos, pad left zeros)
+  //  10. CodigoServico (5, pad left zeros)
+  //  11. IndicadorCPFCNPJ Tomador (1): 1=CPF, 2=CNPJ, 3=Nenhum
+  //  12. CPFCNPJTomador (14, pad left zeros)
+  // Total sem intermediario: 8+5+12+8+1+1+1+15+15+5+1+14 = 86
   //
-  // IMPORTANTE: NAO inclui InscricaoMunicipalTomador (campo nao existe no layout v1)
+  // Opcionais (intermediario):
+  //  13. IndicadorCPFCNPJ Intermediario (1)
+  //  14. CPFCNPJIntermediario (14)
+  //  15. ISSRetidoIntermediario (1)
   const tributacao = getTributacaoSP(rps.regimeTributacao, rps.optanteSimples)
   const statusRps = "N"
   const issRetidoFlag = servico.issRetido ? "S" : "N"
+
+  // Valor em centavos, 15 posicoes (conforme sped-nfse-prodam e manual SP)
   const valorServicosStr = Math.round(servico.valorServicos * 100).toString().padStart(15, "0")
   const valorDeducoesStr = Math.round((servico.valorDeducoes || 0) * 100).toString().padStart(15, "0")
+
+  // Codigo servico: 5 posicoes, pad left zeros (conforme sped-nfse-prodam)
   const codServico = codigoServicoFormatado.padStart(5, "0")
+
   const indicadorTomador = tomador.cpfCnpj ? (tomador.tipo === "PF" ? "1" : "2") : "3"
   const cpfCnpjTomador = tomador.cpfCnpj ? tomador.cpfCnpj.replace(/\D/g, "").padStart(14, "0") : "00000000000000"
   const dataFormatada = rps.dataEmissao.substring(0, 10).replace(/-/g, "") // "2026-02-09" -> "20260209"
@@ -179,11 +208,32 @@ function gerarRpsXml(nota: DadosNfse, keyPem?: string): string {
     codServico +                                       // 10: Codigo Servico (5)
     indicadorTomador +                                 // 11: Indicador CPF/CNPJ Tom (1)
     cpfCnpjTomador                                     // 12: CPF/CNPJ Tomador (14)
-    // Campos 13-15 (intermediario) omitidos quando nao ha intermediario
 
-  console.log("[v0] Assinatura string length:", assinaturaStr.length, "(esperado: 86 sem intermediario)")
+  // Validar comprimento da string de assinatura
+  const expectedLen = 86
+  if (assinaturaStr.length !== expectedLen) {
+    console.error("[v0] ERRO: Assinatura string tem", assinaturaStr.length, "chars, esperado:", expectedLen)
+  }
+  console.log("[v0] Assinatura string length:", assinaturaStr.length, "(esperado:", expectedLen, ")")
   console.log("[v0] Assinatura string:", JSON.stringify(assinaturaStr))
-  console.log("[v0] Assinatura partes: IM=", assinaturaStr.substring(0,8), "Serie=", JSON.stringify(assinaturaStr.substring(8,13)), "Num=", assinaturaStr.substring(13,25), "Data=", assinaturaStr.substring(25,33), "Trib=", assinaturaStr.substring(33,34), "Status=", assinaturaStr.substring(34,35), "ISS=", assinaturaStr.substring(35,36), "ValServ=", assinaturaStr.substring(36,51), "ValDed=", assinaturaStr.substring(51,66), "CodServ=", assinaturaStr.substring(66,71), "IndTom=", assinaturaStr.substring(71,72), "CpfCnpj=", assinaturaStr.substring(72,86))
+  // Decomposicao para debug
+  let pos = 0
+  const im = assinaturaStr.substring(pos, pos += 8)
+  const serie = assinaturaStr.substring(pos, pos += 5)
+  const num = assinaturaStr.substring(pos, pos += 12)
+  const data = assinaturaStr.substring(pos, pos += 8)
+  const trib = assinaturaStr.substring(pos, pos += 1)
+  const stat = assinaturaStr.substring(pos, pos += 1)
+  const iss = assinaturaStr.substring(pos, pos += 1)
+  const valServ = assinaturaStr.substring(pos, pos += 15)
+  const valDed = assinaturaStr.substring(pos, pos += 15)
+  const codS = assinaturaStr.substring(pos, pos += 5)
+  const indTom = assinaturaStr.substring(pos, pos += 1)
+  const cpfCnpj = assinaturaStr.substring(pos, pos += 14)
+  console.log("[v0] Partes: IM=", im, "Serie=", JSON.stringify(serie), "Num=", num, "Data=", data, "Trib=", trib, "Status=", stat, "ISS=", iss, "ValServ=", valServ, "ValDed=", valDed, "CodServ=", codS, "IndTom=", indTom, "CpfCnpj=", cpfCnpj)
+  // Logar SHA-1 hex para debug/comparacao
+  const sha1Debug = sha1Hex(assinaturaStr)
+  console.log("[v0] SHA-1 hex (debug):", sha1Debug)
 
   // Conforme manual SP (passos):
   // 1. Montar string ASCII (feito acima)
