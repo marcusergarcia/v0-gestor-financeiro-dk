@@ -212,7 +212,7 @@ function gerarRpsXml(nota: DadosNfse, keyPem?: string): string {
   rpsXml += `<ValorINSS>${(servico.valorInss || 0).toFixed(2)}</ValorINSS>`
   rpsXml += `<ValorIR>${(servico.valorIr || 0).toFixed(2)}</ValorIR>`
   rpsXml += `<ValorCSLL>${(servico.valorCsll || 0).toFixed(2)}</ValorCSLL>`
-  rpsXml += `<CodigoServico>${codigoServicoFormatado}</CodigoServico>`
+  rpsXml += `<CodigoServico>${codServico}</CodigoServico>`
   rpsXml += `<AliquotaServicos>${(servico.aliquotaIss * 100).toFixed(4)}</AliquotaServicos>`
   rpsXml += `<ISSRetido>${issRetidoXml}</ISSRetido>`
   rpsXml += `<CPFCNPJTomador>${tomadorCpfCnpj}</CPFCNPJTomador>`
