@@ -100,6 +100,16 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
     const printWindow = window.open("", "_blank")
     if (!printWindow) return
 
+    // Get the full URL for images so they work in the new window
+    const baseUrl = window.location.origin
+
+    // Clone content and fix relative image paths
+    let htmlContent = content.innerHTML
+    htmlContent = htmlContent.replace(
+      /src="\/images\//g,
+      `src="${baseUrl}/images/`
+    )
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -113,13 +123,14 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
           }
         </style>
       </head>
-      <body>${content.innerHTML}</body>
+      <body>${htmlContent}</body>
       </html>
     `)
     printWindow.document.close()
+    // Wait a bit longer for images to load
     setTimeout(() => {
       printWindow.print()
-    }, 300)
+    }, 600)
   }
 
   const nota = dados?.nota
@@ -202,22 +213,20 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
       lineHeight: 1.3,
     }}>
       {/* ===== CABECALHO PREFEITURA ===== */}
-      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid #1a3a6e" }}>
         <tbody>
           <tr>
-            <td style={{ width: "100px", padding: "8px 12px", verticalAlign: "middle", borderRight: "1px solid #000" }}>
-              {/* Brasao de Sao Paulo - SVG simplificado */}
-              <svg viewBox="0 0 80 90" width="70" height="80" style={{ display: "block", margin: "0 auto" }}>
-                <rect x="5" y="5" width="70" height="80" rx="3" fill="none" stroke="#1a3a6e" strokeWidth="2"/>
-                <text x="40" y="30" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#1a3a6e" fontFamily="Arial">PREFEITURA</text>
-                <text x="40" y="40" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#1a3a6e" fontFamily="Arial">DO MUNICIPIO</text>
-                <text x="40" y="50" textAnchor="middle" fontSize="8" fontWeight="bold" fill="#1a3a6e" fontFamily="Arial">DE SAO PAULO</text>
-                <text x="40" y="65" textAnchor="middle" fontSize="7" fill="#1a3a6e" fontFamily="Arial">SECRETARIA</text>
-                <text x="40" y="74" textAnchor="middle" fontSize="7" fill="#1a3a6e" fontFamily="Arial">DE FINANCAS</text>
-              </svg>
+            <td style={{ width: "90px", padding: "8px 10px", verticalAlign: "middle", borderRight: "1px solid #1a3a6e" }}>
+              {/* Brasao oficial da Prefeitura de Sao Paulo */}
+              <img
+                src="/images/brasao-sp.png"
+                alt="Brasao da Prefeitura de Sao Paulo"
+                style={{ display: "block", margin: "0 auto", width: "70px", height: "auto" }}
+                crossOrigin="anonymous"
+              />
             </td>
             <td style={{ padding: "8px 16px", verticalAlign: "middle" }}>
-              <div style={{ fontSize: "11px", fontWeight: "bold", color: "#1a3a6e", marginBottom: 2 }}>
+              <div style={{ fontSize: "12px", fontWeight: "bold", color: "#1a3a6e", marginBottom: 2 }}>
                 PREFEITURA DO MUNICIPIO DE SAO PAULO
               </div>
               <div style={{ fontSize: "10px", color: "#1a3a6e", marginBottom: 1 }}>
@@ -227,7 +236,7 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
                 NFS-e - NOTA FISCAL DE SERVICOS ELETRONICA
               </div>
             </td>
-            <td style={{ width: "200px", padding: "8px 12px", verticalAlign: "middle", borderLeft: "1px solid #000", textAlign: "right" }}>
+            <td style={{ width: "200px", padding: "8px 12px", verticalAlign: "middle", borderLeft: "1px solid #1a3a6e", textAlign: "right" }}>
               {isCancelada && (
                 <div style={{
                   background: "#dc2626",
@@ -245,6 +254,17 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
               <div style={{ fontSize: "20px", fontWeight: "bold", color: "#1a3a6e" }}>
                 {nota.numero_nfse || "-"}
               </div>
+              {/* Logo da empresa */}
+              {logo && (
+                <div style={{ marginTop: 6 }}>
+                  <img
+                    src={logo}
+                    alt="Logo da empresa"
+                    style={{ maxWidth: "120px", maxHeight: "40px", objectFit: "contain", marginLeft: "auto", display: "block" }}
+                    crossOrigin="anonymous"
+                  />
+                </div>
+              )}
             </td>
           </tr>
         </tbody>
@@ -513,24 +533,34 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
       )}
 
       {/* ===== RODAPE ===== */}
-      <div style={{
-        marginTop: 8,
-        padding: "8px 12px",
-        fontSize: "8px",
-        color: "#666",
-        textAlign: "center",
-        borderTop: "1px solid #ccc",
-        lineHeight: 1.5,
-      }}>
-        <div>Documento emitido por ME ou EPP optante pelo Simples Nacional.</div>
-        <div>Nao gera direito a credito fiscal de IPI.</div>
-        <div style={{ marginTop: 4, fontSize: "8px", color: "#999" }}>
-          NFS-e gerada em conformidade com a legislacao municipal de Sao Paulo
-        </div>
-        <div style={{ marginTop: 4, fontSize: "7px", color: "#bbb" }}>
-          Consulte a autenticidade desta NFS-e em: nfe.prefeitura.sp.gov.br - Inscricao: {prestador?.inscricao_municipal || "-"} | Numero: {nota.numero_nfse || "-"} | Cod. Verificacao: {nota.codigo_verificacao || "-"}
-        </div>
-      </div>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #1a3a6e", marginTop: 8 }}>
+        <tbody>
+          <tr>
+            <td style={{ padding: "8px 12px", textAlign: "center", lineHeight: 1.6, fontSize: "9px", color: "#333" }}>
+              <div>Documento emitido por ME ou EPP optante pelo Simples Nacional.</div>
+              <div>Nao gera direito a credito fiscal de IPI.</div>
+            </td>
+          </tr>
+          <tr>
+            <td style={{
+              padding: "6px 12px",
+              textAlign: "center",
+              lineHeight: 1.5,
+              fontSize: "8px",
+              color: "#555",
+              background: "#f0f4f8",
+              borderTop: "1px solid #ccd",
+            }}>
+              <div style={{ fontWeight: "bold", marginBottom: 2 }}>
+                Consulte a autenticidade desta NFS-e em: nfe.prefeitura.sp.gov.br
+              </div>
+              <div>
+                Inscricao Municipal: {prestador?.inscricao_municipal || "-"} | Numero da Nota: {nota.numero_nfse || "-"} | Codigo de Verificacao: {nota.codigo_verificacao || "-"}
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   )
 }

@@ -28,18 +28,28 @@ export async function GET(
     const configs = configRows as any[]
     const config = configs.length > 0 ? configs[0] : null
 
-    // Buscar logo
+    // Buscar logo de impressao da empresa (tabela logos_sistema)
     let logoBase64 = null
     try {
       const [logoRows] = await pool.execute(
-        "SELECT arquivo_base64 FROM logos WHERE tipo = 'nfse' OR tipo = 'menu' ORDER BY FIELD(tipo, 'nfse', 'menu') LIMIT 1"
+        "SELECT dados, formato FROM logos_sistema WHERE (tipo = 'impressao' OR tipo = 'menu') AND ativo = 1 ORDER BY FIELD(tipo, 'impressao', 'menu') LIMIT 1"
       )
       const logos = logoRows as any[]
       if (logos.length > 0) {
-        logoBase64 = logos[0].arquivo_base64
+        const logo = logos[0]
+        if (logo.dados) {
+          const mimeType = logo.formato === "jpg" || logo.formato === "jpeg" ? "image/jpeg"
+            : logo.formato === "gif" ? "image/gif"
+            : logo.formato === "webp" ? "image/webp"
+            : logo.formato === "svg" ? "image/svg+xml"
+            : "image/png"
+          logoBase64 = logo.dados.startsWith("data:")
+            ? logo.dados
+            : `data:${mimeType};base64,${logo.dados}`
+        }
       }
     } catch {
-      // Tabela logos pode nao existir
+      // Tabela logos_sistema pode nao existir
     }
 
     return NextResponse.json({
