@@ -139,7 +139,7 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
           @media print {
             body { padding: 0; margin: 0; }
             @page { margin: 10mm; size: A4; }
-            img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
           }
         </style>
       </head>
@@ -181,7 +181,7 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[900px] max-h-[90vh] overflow-y-auto p-0">
+      <DialogContent className="max-w-[1100px] max-h-[90vh] overflow-y-auto p-0">
         <DialogHeader className="p-4 pb-0">
           <DialogTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -251,7 +251,7 @@ function NfsePrefeituraSP({ nota, prestador, logo, brasaoBase64 }: { nota: any; 
       fontFamily: "Arial, Helvetica, sans-serif",
       fontSize: "10px",
       color: "#000",
-      maxWidth: "800px",
+      maxWidth: "1000px",
       margin: "0 auto",
       lineHeight: 1.3,
     }}>
@@ -480,10 +480,15 @@ function NfsePrefeituraSP({ nota, prestador, logo, brasaoBase64 }: { nota: any; 
             <td colSpan={6} style={{ ...cellStyle, borderBottom: "1px solid #999" }}>
               <FieldLabel>Codigo do Servico</FieldLabel>
               <FieldValue bold>{(() => {
-                const codigo = nota.codigo_servico || prestador?.codigo_servico
-                const descServico = prestador?.descricao_servico || nota.descricao_servico_padrao
+                const codigoNota = nota.codigo_servico
+                const codigoConfig = prestador?.codigo_servico
+                const descConfig = prestador?.descricao_servico
+                const codigo = codigoNota || codigoConfig
                 if (!codigo) return "-"
-                return descServico ? `${codigo} - ${descServico}` : codigo
+                // Se o codigo ja contem descricao (ex: "07498 - Conserto..."), usar direto
+                if (codigo.includes(" - ")) return codigo
+                // Senao, montar codigo + descricao do config
+                return descConfig ? `${codigo} - ${descConfig}` : codigo
               })()}</FieldValue>
             </td>
           </tr>
@@ -639,7 +644,7 @@ const cellStyle: React.CSSProperties = {
 // ============================================================
 function getPrintStyles(): string {
   return `
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
     body {
       font-family: Arial, Helvetica, sans-serif;
       font-size: 10px;
@@ -648,5 +653,7 @@ function getPrintStyles(): string {
       line-height: 1.3;
     }
     table { border-collapse: collapse; }
+    div[style*="background"] { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    td[style*="background"] { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   `
 }
