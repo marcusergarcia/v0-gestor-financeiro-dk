@@ -81,8 +81,8 @@ export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number): st
       <CNPJ>${notas[0].prestador.cnpj}</CNPJ>
     </CPFCNPJRemetente>
     <transacao>true</transacao>
-    <dtInicio>${notas[0].rps.dataEmissao}</dtInicio>
-    <dtFim>${notas[0].rps.dataEmissao}</dtFim>
+    <dtInicio>${notas[0].rps.dataEmissao.substring(0, 10)}</dtInicio>
+    <dtFim>${notas[0].rps.dataEmissao.substring(0, 10)}</dtFim>
     <QtdRPS>${notas.length}</QtdRPS>
     <ValorTotalServicos>${somarValores(notas, "valorServicos").toFixed(2)}</ValorTotalServicos>
     <ValorTotalDeducoes>${somarValores(notas, "valorDeducoes").toFixed(2)}</ValorTotalDeducoes>
@@ -137,12 +137,13 @@ function gerarRpsXml(nota: DadosNfse): string {
   const valorDeducoesStr = Math.round((servico.valorDeducoes || 0) * 100).toString().padStart(15, "0")
   const codServico = codigoServicoFormatado.padStart(5, "0")
   const indicadorTomador = tomador.tipo === "PF" ? "1" : "2"
-  const cpfCnpjTomador = tomador.cpfCnpj.padStart(14, "0")
-  const dataFormatada = rps.dataEmissao.replace(/-/g, "")
+  const cpfCnpjTomador = tomador.cpfCnpj.replace(/\D/g, "").padStart(14, "0")
+  // SP exige data+hora no formato YYYYMMDDHHMMSS (14 digitos)
+  const dataFormatada = rps.dataEmissao.replace(/[-:T]/g, "").substring(0, 14)
 
   const assinaturaStr =
     prestador.inscricaoMunicipal.padStart(8, "0") +
-    rps.serie.padEnd(5, " ") +
+    rps.serie.padStart(5, "0") +
     rps.numero.toString().padStart(12, "0") +
     dataFormatada +
     tributacao +
@@ -169,7 +170,7 @@ function gerarRpsXml(nota: DadosNfse): string {
       <NumeroRPS>${rps.numero}</NumeroRPS>
     </ChaveRPS>
     <TipoRPS>${rps.tipo === 1 ? "RPS" : rps.tipo === 2 ? "RPS-M" : "RPS-C"}</TipoRPS>
-    <DataEmissao>${rps.dataEmissao}</DataEmissao>
+    <DataEmissao>${rps.dataEmissao.substring(0, 10)}</DataEmissao>
     <StatusRPS>N</StatusRPS>
     <TributacaoRPS>${tributacao}</TributacaoRPS>
     <ValorServicos>${servico.valorServicos.toFixed(2)}</ValorServicos>

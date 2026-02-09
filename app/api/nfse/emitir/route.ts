@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         numero: numeroRps,
         serie: config.serie_rps || "11",
         tipo: config.tipo_rps || 1,
-        dataEmissao: new Date().toISOString().split("T")[0],
+        dataEmissao: new Date().toISOString().substring(0, 19), // YYYY-MM-DDTHH:mm:ss (SP exige data+hora)
         naturezaOperacao: 1, // Tributação no município
         regimeTributacao: config.regime_tributacao || 1,
         optanteSimples: config.optante_simples || 0,
