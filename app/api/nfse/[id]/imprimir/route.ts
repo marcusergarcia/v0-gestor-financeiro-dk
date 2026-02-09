@@ -28,6 +28,20 @@ export async function GET(
     const configs = configRows as any[]
     const config = configs.length > 0 ? configs[0] : null
 
+    // Buscar email e telefone do timbrado_config para complementar dados do prestador
+    try {
+      const [timbradoRows] = await pool.execute(
+        "SELECT empresa_email, empresa_telefone FROM timbrado_config WHERE ativo = 1 LIMIT 1"
+      )
+      const timbrados = timbradoRows as any[]
+      if (timbrados.length > 0 && config) {
+        if (timbrados[0].empresa_email) config.email = timbrados[0].empresa_email
+        if (timbrados[0].empresa_telefone) config.telefone = timbrados[0].empresa_telefone
+      }
+    } catch {
+      // Tabela timbrado_config pode nao existir
+    }
+
     // Buscar Logo do Sistema para a NFS-e
     let logoBase64 = null
     try {
