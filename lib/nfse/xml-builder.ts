@@ -256,27 +256,27 @@ export function gerarXmlConsultaNfseRps(
 }
 
 // Gerar XML de cancelamento de NFS-e SP
-// NOTA: AssinaturaCancelamento removida (SP rejeita tag vazia)
+// Conforme XSD PedidoCancelamentoNFe_v02:
+//   Cabecalho: CPFCNPJRemetente + transacao
+//   Detalhe: ChaveNFe (InscricaoPrestador + NumeroNFe) + AssinaturaCancelamento
+//   + Signature (XMLDSIG)
+//
+// AssinaturaCancelamento: RSA-SHA1 base64 da string:
+//   InscricaoPrestador(8) + NumeroNFe(12) = 20 chars
 export function gerarXmlCancelamentoNfse(
   prestadorCnpj: string,
   inscricaoMunicipal: string,
   numeroNfse: string,
+  keyPem?: string,
 ): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<PedidoCancelamentoNFe xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho xmlns="" Versao="1">
-    <CPFCNPJRemetente>
-      <CNPJ>${prestadorCnpj}</CNPJ>
-    </CPFCNPJRemetente>
-    <transacao>true</transacao>
-  </Cabecalho>
-  <Detalhe xmlns="">
-    <ChaveNFe>
-      <InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador>
-      <NumeroNFe>${numeroNfse}</NumeroNFe>
-    </ChaveNFe>
-  </Detalhe>
-</PedidoCancelamentoNFe>`
+  // Gerar AssinaturaCancelamento (RSA-SHA1 da string IM(8)+NumNFe(12))
+  const assinaturaStr =
+    inscricaoMunicipal.padStart(8, "0") +
+    numeroNfse.toString().padStart(12, "0")
+
+  const assinaturaCancelamento = assinarRps(assinaturaStr, keyPem)
+
+  return `<?xml version="1.0" encoding="UTF-8"?><PedidoCancelamentoNFe xmlns="http://www.prefeitura.sp.gov.br/nfe"><Cabecalho xmlns="" Versao="1"><CPFCNPJRemetente><CNPJ>${prestadorCnpj}</CNPJ></CPFCNPJRemetente><transacao>true</transacao></Cabecalho><Detalhe xmlns=""><ChaveNFe><InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador><NumeroNFe>${numeroNfse}</NumeroNFe></ChaveNFe><AssinaturaCancelamento>${assinaturaCancelamento}</AssinaturaCancelamento></Detalhe></PedidoCancelamentoNFe>`
 }
 
 // Gerar XML de consulta de lote

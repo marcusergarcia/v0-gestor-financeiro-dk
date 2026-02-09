@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db"
 import { gerarXmlCancelamentoNfse } from "@/lib/nfse/xml-builder"
+import { assinarXmlNfse, extrairCertKeyDoPfx } from "@/lib/nfse/xml-signer"
 import { cancelarNfse } from "@/lib/nfse/soap-client"
 
 export async function POST(
@@ -43,19 +44,34 @@ export async function POST(
     }
     const config = configs[0]
 
-    // Gerar XML de cancelamento
-    const xmlCancelamento = gerarXmlCancelamentoNfse(
+    // Extrair certificado para assinatura
+    let certPem = ""
+    let keyPem = ""
+    if (config.certificado_base64 && config.certificado_senha) {
+      const extracted = extrairCertKeyDoPfx(config.certificado_base64, config.certificado_senha)
+      certPem = extracted.certPem
+      keyPem = extracted.keyPem
+    }
+
+    // Gerar XML de cancelamento (com AssinaturaCancelamento RSA-SHA1)
+    let xmlCancelamento = gerarXmlCancelamentoNfse(
       config.cnpj,
       config.inscricao_municipal,
       nota.numero_nfse,
+      keyPem || undefined,
     )
+
+    // Assinar XML com XMLDSIG (obrigatorio pela prefeitura)
+    if (certPem && keyPem) {
+      xmlCancelamento = assinarXmlNfse(xmlCancelamento, certPem, keyPem)
+    }
 
     // Enviar cancelamento
     const soapResponse = await cancelarNfse(
       xmlCancelamento, config.ambiente, config.certificado_base64, config.certificado_senha
     )
 
-    // Registrar transmissão
+    // Registrar transmissao
     await connection.execute(
       `INSERT INTO nfse_transmissoes (nota_fiscal_id, tipo, xml_envio, xml_retorno, sucesso, mensagem_erro, tempo_resposta_ms)
        VALUES (?, 'cancelamento', ?, ?, ?, ?, ?)`,
