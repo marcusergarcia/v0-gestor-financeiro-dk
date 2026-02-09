@@ -23,7 +23,7 @@ export async function GET(
 
     // Buscar config do prestador
     const [configRows] = await pool.execute(
-      "SELECT razao_social, cnpj, inscricao_municipal, endereco, numero_endereco, complemento, bairro, cidade, uf, cep, codigo_servico, descricao_servico FROM nfse_config WHERE ativo = 1 LIMIT 1"
+      "SELECT razao_social, cnpj, inscricao_municipal, endereco, numero_endereco, complemento, bairro, cidade, uf, cep, codigo_servico, descricao_servico, optante_simples FROM nfse_config WHERE ativo = 1 LIMIT 1"
     )
     const configs = configRows as any[]
     const config = configs.length > 0 ? configs[0] : null
