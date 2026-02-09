@@ -28,11 +28,12 @@ export async function GET(
     const configs = configRows as any[]
     const config = configs.length > 0 ? configs[0] : null
 
-    // Buscar logo de impressao da empresa (tabela logos_sistema)
+    // Buscar logo da empresa (tabela logos_sistema)
+    // Prioridade: impressao > sistema > menu
     let logoBase64 = null
     try {
       const [logoRows] = await pool.execute(
-        "SELECT dados, formato FROM logos_sistema WHERE (tipo = 'impressao' OR tipo = 'menu') AND ativo = 1 ORDER BY FIELD(tipo, 'impressao', 'menu') LIMIT 1"
+        "SELECT dados, formato FROM logos_sistema WHERE tipo IN ('impressao', 'sistema', 'menu') AND ativo = 1 ORDER BY FIELD(tipo, 'impressao', 'sistema', 'menu') LIMIT 1"
       )
       const logos = logoRows as any[]
       if (logos.length > 0) {
