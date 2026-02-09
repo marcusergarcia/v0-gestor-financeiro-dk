@@ -374,12 +374,12 @@ export default function NotaFiscalPage() {
           <Card className="border-0 shadow-md bg-white">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <Clock className="h-5 w-5 text-amber-600" />
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <XCircle className="h-5 w-5 text-red-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-amber-700">{stats.pendentes}</p>
-                  <p className="text-xs text-gray-500">Pendentes</p>
+                  <p className="text-2xl font-bold text-red-700">{stats.canceladas}</p>
+                  <p className="text-xs text-gray-500">Canceladas</p>
                 </div>
               </div>
             </CardContent>
@@ -387,11 +387,11 @@ export default function NotaFiscalPage() {
           <Card className="border-0 shadow-md bg-white">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-red-600" />
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-red-700">{stats.erros}</p>
+                  <p className="text-2xl font-bold text-amber-700">{stats.erros}</p>
                   <p className="text-xs text-gray-500">Erros</p>
                 </div>
               </div>
