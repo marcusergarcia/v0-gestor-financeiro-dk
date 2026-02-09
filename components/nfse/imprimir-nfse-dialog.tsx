@@ -70,7 +70,25 @@ function formatCep(value: string): string {
 export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseDialogProps) {
   const [loading, setLoading] = useState(false)
   const [dados, setDados] = useState<any>(null)
+  const [brasaoBase64, setBrasaoBase64] = useState<string | null>(null)
   const printRef = useRef<HTMLDivElement>(null)
+
+  // Convert brasao image to base64 so it works consistently in both modal and print window
+  useEffect(() => {
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        ctx.drawImage(img, 0, 0)
+        setBrasaoBase64(canvas.toDataURL("image/png"))
+      }
+    }
+    img.src = "/images/brasao-sp.png"
+  }, [])
 
   useEffect(() => {
     if (open && notaId) {
@@ -103,7 +121,7 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
     // Get the full URL for images so they work in the new window
     const baseUrl = window.location.origin
 
-    // Clone content and fix relative image paths
+    // Clone content and fix relative image paths (skip data: URIs which are already base64)
     let htmlContent = content.innerHTML
     htmlContent = htmlContent.replace(
       /src="\/images\//g,
@@ -117,9 +135,11 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
         <title>NFS-e ${dados?.nota?.numero_nfse || ""}</title>
         <style>
           ${getPrintStyles()}
+          img { max-width: 100%; }
           @media print {
             body { padding: 0; margin: 0; }
             @page { margin: 10mm; size: A4; }
+            img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           }
         </style>
       </head>
@@ -135,7 +155,7 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
     const tryPrint = () => {
       loadedCount++
       if (loadedCount >= totalImages) {
-        setTimeout(() => printWindow.print(), 200)
+        setTimeout(() => printWindow.print(), 300)
       }
     }
 
@@ -150,8 +170,8 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
           img.onerror = tryPrint
         }
       })
-      // Fallback: print after 2s even if images fail
-      setTimeout(() => printWindow.print(), 2000)
+      // Fallback: print after 3s even if images fail
+      setTimeout(() => printWindow.print(), 3000)
     }
   }
 
@@ -189,7 +209,7 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
         ) : nota ? (
           <div className="p-4 pt-2">
             <div ref={printRef}>
-              <NfsePrefeituraSP nota={nota} prestador={prestador} logo={logo} />
+              <NfsePrefeituraSP nota={nota} prestador={prestador} logo={logo} brasaoBase64={brasaoBase64} />
             </div>
           </div>
         ) : (
@@ -203,7 +223,7 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
 // ============================================================
 // Componente que renderiza o layout oficial da Prefeitura de SP
 // ============================================================
-function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any; logo: string | null }) {
+function NfsePrefeituraSP({ nota, prestador, logo, brasaoBase64 }: { nota: any; prestador: any; logo: string | null; brasaoBase64: string | null }) {
   const isCancelada = nota.status === "cancelada"
 
   const enderecoTomador = [
@@ -241,7 +261,7 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
             <td style={{ width: "80px", padding: "8px 10px", verticalAlign: "middle", borderRight: "1px solid #1a3a6e", textAlign: "center" }}>
               {/* Brasao oficial da Prefeitura de Sao Paulo */}
               <img
-                src="/images/brasao-sp.png"
+                src={brasaoBase64 || "/images/brasao-sp.png"}
                 alt="Brasao da Prefeitura de Sao Paulo"
                 style={{ display: "block", margin: "0 auto", width: "60px", height: "auto" }}
                 crossOrigin="anonymous"
@@ -454,7 +474,7 @@ function NfsePrefeituraSP({ nota, prestador, logo }: { nota: any; prestador: any
           <tr>
             <td colSpan={6} style={{ ...cellStyle, borderBottom: "1px solid #999" }}>
               <FieldLabel>Codigo do Servico</FieldLabel>
-              <FieldValue>{nota.codigo_servico || "-"}</FieldValue>
+              <FieldValue>{nota.codigo_servico || prestador?.codigo_servico || "-"}</FieldValue>
             </td>
           </tr>
           {/* Linha de tributos: Deducoes, Base Calculo, Municipio, Aliquota, ISS, Credito */}
