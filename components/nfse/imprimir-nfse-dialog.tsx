@@ -244,6 +244,7 @@ function NfsePrefeituraSP({ nota, prestador, logo, brasaoBase64 }: { nota: any; 
   const aliquotaIss = (nota.aliquota_iss || 0) * 100
   const valorIss = nota.valor_iss || 0
   const valorCredito = 0 // Credito nao disponivel no sistema
+  const isOptanteSimples = prestador?.optante_simples === 1 || prestador?.optante_simples === "1"
 
   return (
     <div style={{
@@ -432,9 +433,13 @@ function NfsePrefeituraSP({ nota, prestador, logo, brasaoBase64 }: { nota: any; 
           <tr>
             <td style={{ padding: "10px 12px", minHeight: "80px", whiteSpace: "pre-wrap", lineHeight: 1.5, fontSize: "10px", verticalAlign: "top" }}>
               {nota.descricao_servico || "-"}
-              {nota.observacoes_tributos && (
+              {nota.observacoes_tributos ? (
                 <div style={{ marginTop: 8, fontSize: "9px", color: "#444" }}>
                   {nota.observacoes_tributos}
+                </div>
+              ) : (
+                <div style={{ marginTop: 8, fontSize: "9px" }}>
+                  {`\n- Conforme Lei 12.741/2012, o percentual total de impostos incidentes neste serviço prestado é de aproximadamente ${aliquotaIss.toFixed(2)}%`}
                 </div>
               )}
             </td>
@@ -470,11 +475,16 @@ function NfsePrefeituraSP({ nota, prestador, logo, brasaoBase64 }: { nota: any; 
       {/* ===== CODIGO DO SERVICO + TRIBUTOS (layout oficial) ===== */}
       <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
         <tbody>
-          {/* Codigo do servico - linha inteira */}
+          {/* Codigo do servico - linha inteira com descricao (ex: 07498 - Conserto, restauracao...) */}
           <tr>
             <td colSpan={6} style={{ ...cellStyle, borderBottom: "1px solid #999" }}>
               <FieldLabel>Codigo do Servico</FieldLabel>
-              <FieldValue>{nota.codigo_servico || prestador?.codigo_servico || "-"}</FieldValue>
+              <FieldValue bold>{(() => {
+                const codigo = nota.codigo_servico || prestador?.codigo_servico
+                const descServico = prestador?.descricao_servico || nota.descricao_servico_padrao
+                if (!codigo) return "-"
+                return descServico ? `${codigo} - ${descServico}` : codigo
+              })()}</FieldValue>
             </td>
           </tr>
           {/* Linha de tributos: Deducoes, Base Calculo, Municipio, Aliquota, ISS, Credito */}
@@ -485,19 +495,19 @@ function NfsePrefeituraSP({ nota, prestador, logo, brasaoBase64 }: { nota: any; 
             </td>
             <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
               <FieldLabel>Base de Calculo (R$)</FieldLabel>
-              <FieldValue bold>{formatCurrency(baseCalculo)}</FieldValue>
+              <FieldValue bold>{isOptanteSimples ? "*" : formatCurrency(baseCalculo)}</FieldValue>
             </td>
             <td style={{ ...cellStyle, borderRight: "1px solid #999" }}>
               <FieldLabel>Municipio da Prestacao</FieldLabel>
-              <FieldValue>{prestador?.cidade || "Sao Paulo"}</FieldValue>
+              <FieldValue>{prestador?.cidade || "SAO PAULO"}</FieldValue>
             </td>
             <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "center" }}>
               <FieldLabel>Aliquota (%)</FieldLabel>
-              <FieldValue>{aliquotaIss.toFixed(2)}</FieldValue>
+              <FieldValue>{isOptanteSimples ? "*" : aliquotaIss.toFixed(2)}</FieldValue>
             </td>
             <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
               <FieldLabel>Valor do ISS (R$)</FieldLabel>
-              <FieldValue bold>{formatCurrency(valorIss)}</FieldValue>
+              <FieldValue bold>{isOptanteSimples ? "*" : formatCurrency(valorIss)}</FieldValue>
             </td>
             <td style={{ ...cellStyle, textAlign: "right" }}>
               <FieldLabel>Credito (R$)</FieldLabel>
