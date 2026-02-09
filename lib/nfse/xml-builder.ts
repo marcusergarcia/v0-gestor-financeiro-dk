@@ -6,10 +6,28 @@
 // SEM namespace (unqualified). Para isso, usamos xmlns="" nos filhos diretos
 // do elemento raiz para resetar o default namespace herdado.
 
-import { createHash } from "crypto"
+import { createHash, createSign } from "crypto"
 
 function sha1Hex(data: string): string {
   return createHash("sha1").update(data, "ascii").digest("hex")
+}
+
+/**
+ * Assina a string de assinatura do RPS com RSA-SHA1 conforme manual SP:
+ * 1. Converte a string ASCII para bytes
+ * 2. Gera o HASH (SHA-1) dos bytes
+ * 3. Assina o HASH com RSA-SHA1 usando a chave privada do certificado
+ * 4. Retorna o resultado em base64
+ *
+ * Se keyPem nao estiver disponivel, retorna apenas o SHA-1 hex (fallback).
+ */
+function assinarRps(data: string, keyPem?: string): string {
+  if (!keyPem) {
+    return sha1Hex(data)
+  }
+  const sign = createSign("SHA1")
+  sign.update(data, "ascii")
+  return sign.sign(keyPem, "base64")
 }
 
 export interface DadosPrestador {
@@ -70,24 +88,13 @@ export interface DadosNfse {
 // Gerar XML de envio de lote de RPS para SP
 // Schema: PedidoEnvioLoteRPS_v02.xsd
 // Estrutura: PedidoEnvioLoteRPS > Cabecalho + RPS(1..50) + ds:Signature
-export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number): string {
-  const listaRps = notas.map((nota) => gerarRpsXml(nota)).join("\n")
+export function gerarXmlEnvioLoteRps(notas: DadosNfse[], numeroLote: number, keyPem?: string): string {
+  const listaRps = notas.map((nota) => gerarRpsXml(nota, keyPem)).join("")
 
-  // NOTA: O schema do Cabecalho só aceita: CPFCNPJRemetente, transacao, dtInicio, dtFim, QtdRPS
-  // NÃO há ValorTotalServicos nem ValorTotalDeducoes no PedidoEnvioLoteRPS
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <Cabecalho xmlns="" Versao="1">
-    <CPFCNPJRemetente>
-      <CNPJ>${notas[0].prestador.cnpj}</CNPJ>
-    </CPFCNPJRemetente>
-    <transacao>true</transacao>
-    <dtInicio>${notas[0].rps.dataEmissao}</dtInicio>
-    <dtFim>${notas[0].rps.dataEmissao}</dtFim>
-    <QtdRPS>${notas.length}</QtdRPS>
-  </Cabecalho>
-${listaRps}
-</PedidoEnvioLoteRPS>`
+  // IMPORTANTE: XML sem indentacao (minificado) conforme FAQ SP sobre erro 1057:
+  // "nao modificando nenhum valor do XML apos a assinatura, ou realizando indentacao no XML"
+  // A canonicalizacao C14N e sensivel a whitespace, entao geramos sem indentacao.
+  return `<?xml version="1.0" encoding="UTF-8"?><PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Cabecalho xmlns="" Versao="1"><CPFCNPJRemetente><CNPJ>${notas[0].prestador.cnpj}</CNPJ></CPFCNPJRemetente><transacao>true</transacao><dtInicio>${notas[0].rps.dataEmissao.substring(0, 10)}</dtInicio><dtFim>${notas[0].rps.dataEmissao.substring(0, 10)}</dtFim><QtdRPS>${notas.length}</QtdRPS><ValorTotalServicos>${somarValores(notas, "valorServicos").toFixed(2)}</ValorTotalServicos><ValorTotalDeducoes>${somarValores(notas, "valorDeducoes").toFixed(2)}</ValorTotalDeducoes></Cabecalho>${listaRps}</PedidoEnvioLoteRPS>`
 }
 
 /**
@@ -98,22 +105,19 @@ function gerarEnderecoTomadorXml(tomador: DadosTomador): string {
   const temEndereco = tomador.endereco || tomador.numero || tomador.bairro || tomador.cidade || tomador.cep
   if (!temEndereco) return ""
 
-  const partes: string[] = []
-  if (tomador.endereco) partes.push(`      <Logradouro>${escapeXml(tomador.endereco)}</Logradouro>`)
-  if (tomador.numero) partes.push(`      <NumeroEndereco>${escapeXml(tomador.numero)}</NumeroEndereco>`)
-  if (tomador.complemento) partes.push(`      <ComplementoEndereco>${escapeXml(tomador.complemento)}</ComplementoEndereco>`)
-  if (tomador.bairro) partes.push(`      <Bairro>${escapeXml(tomador.bairro)}</Bairro>`)
-  if (tomador.cidade) partes.push(`      <Cidade>${tomador.codigoMunicipio || "3550308"}</Cidade>`)
-  if (tomador.uf) partes.push(`      <UF>${tomador.uf}</UF>`)
-  if (tomador.cep) partes.push(`      <CEP>${tomador.cep.replace(/\D/g, "")}</CEP>`)
-
-  return `
-    <EnderecoTomador>
-${partes.join("\n")}
-    </EnderecoTomador>`
+  let xml = "<EnderecoTomador>"
+  if (tomador.endereco) xml += `<Logradouro>${escapeXml(tomador.endereco)}</Logradouro>`
+  if (tomador.numero) xml += `<NumeroEndereco>${escapeXml(tomador.numero)}</NumeroEndereco>`
+  if (tomador.complemento) xml += `<ComplementoEndereco>${escapeXml(tomador.complemento)}</ComplementoEndereco>`
+  if (tomador.bairro) xml += `<Bairro>${escapeXml(tomador.bairro)}</Bairro>`
+  if (tomador.cidade) xml += `<Cidade>${tomador.codigoMunicipio || "3550308"}</Cidade>`
+  if (tomador.uf) xml += `<UF>${tomador.uf}</UF>`
+  if (tomador.cep) xml += `<CEP>${tomador.cep.replace(/\D/g, "")}</CEP>`
+  xml += "</EnderecoTomador>"
+  return xml
 }
 
-function gerarRpsXml(nota: DadosNfse): string {
+function gerarRpsXml(nota: DadosNfse, keyPem?: string): string {
   const { rps, prestador, tomador, servico } = nota
 
   // SP usa formato específico para CPF/CNPJ do tomador
@@ -125,70 +129,106 @@ function gerarRpsXml(nota: DadosNfse): string {
   // SP exige CodigoServico apenas com digitos (ex: "1401" e nao "14.01")
   const codigoServicoFormatado = servico.codigoServico.replace(/\D/g, "")
 
-  // Gerar hash de assinatura do RPS conforme manual SP
-  // Formato: InscricaoPrestador(8) + SerieRPS(5) + NumeroRPS(12) + DataEmissao(8) + TributacaoRPS(1)
-  // + StatusRPS(1) + ISSRetido(1) + ValorServicos(15) + ValorDeducoes(15) + CodigoServico(5)
-  // + IndicadorCPFCNPJTomador(1) + CPFCNPJTomador(14)
+  // Gerar hash de assinatura do RPS conforme layout PMSP em producao
+  // Layout real da prefeitura de SP (testado em producao):
+  //  1. InscricaoPrestador (8)
+  //  2. SerieRPS (5, pad right espacos)
+  //  3. NumeroRPS (12, pad left zeros)
+  //  4. DataEmissao (8, AAAAMMDD)
+  //  5. TributacaoRPS (1)
+  //  6. StatusRPS (1)
+  //  7. ISSRetido (1) S/N
+  //  8. ValorServicos (15, centavos, pad left zeros)
+  //  9. ValorDeducoes (15, centavos, pad left zeros)
+  //  10. CodigoServico (5, pad left zeros)
+  //  11. IndicadorCPFCNPJ Tomador (1): 1=CPF, 2=CNPJ, 3=Nenhum
+  //  12. CPFCNPJTomador (14, pad left zeros)
+  // Total sem intermediario: 8+5+12+8+1+1+1+15+15+5+1+14 = 86
+  //
+  // Opcionais (intermediario):
+  //  13. IndicadorCPFCNPJ Intermediario (1)
+  //  14. CPFCNPJIntermediario (14)
+  //  15. ISSRetidoIntermediario (1)
   const tributacao = getTributacaoSP(rps.regimeTributacao, rps.optanteSimples)
   const statusRps = "N"
   const issRetidoFlag = servico.issRetido ? "S" : "N"
+
+  // Valor em centavos, 15 posicoes (conforme sped-nfse-prodam e manual SP)
   const valorServicosStr = Math.round(servico.valorServicos * 100).toString().padStart(15, "0")
   const valorDeducoesStr = Math.round((servico.valorDeducoes || 0) * 100).toString().padStart(15, "0")
+
+  // Codigo servico: 5 posicoes, pad left zeros (conforme sped-nfse-prodam)
   const codServico = codigoServicoFormatado.padStart(5, "0")
-  const indicadorTomador = tomador.tipo === "PF" ? "1" : "2"
-  const cpfCnpjTomador = tomador.cpfCnpj.padStart(14, "0")
-  const dataFormatada = rps.dataEmissao.replace(/-/g, "")
 
+  const indicadorTomador = tomador.cpfCnpj ? (tomador.tipo === "PF" ? "1" : "2") : "3"
+  const cpfCnpjTomador = tomador.cpfCnpj ? tomador.cpfCnpj.replace(/\D/g, "").padStart(14, "0") : "00000000000000"
+  const dataFormatada = rps.dataEmissao.substring(0, 10).replace(/-/g, "") // "2026-02-09" -> "20260209"
+
+  // Campos 1-12 (86 posicoes - base obrigatoria)
   const assinaturaStr =
-    prestador.inscricaoMunicipal.padStart(8, "0") +
-    rps.serie.padEnd(5, " ") +
-    rps.numero.toString().padStart(12, "0") +
-    dataFormatada +
-    tributacao +
-    statusRps +
-    issRetidoFlag +
-    valorServicosStr +
-    valorDeducoesStr +
-    codServico +
-    indicadorTomador +
-    cpfCnpjTomador
+    prestador.inscricaoMunicipal.padStart(8, "0") +  // 1: IM Prestador (8)
+    rps.serie.padEnd(5, " ") +                        // 2: Serie RPS (5)
+    rps.numero.toString().padStart(12, "0") +          // 3: Numero RPS (12)
+    dataFormatada +                                    // 4: Data (8)
+    tributacao +                                       // 5: Tributacao (1)
+    statusRps +                                        // 6: Status (1)
+    issRetidoFlag +                                    // 7: ISS Retido (1)
+    valorServicosStr +                                 // 8: Valor Servicos (15)
+    valorDeducoesStr +                                 // 9: Valor Deducoes (15)
+    codServico +                                       // 10: Codigo Servico (5)
+    indicadorTomador +                                 // 11: Indicador CPF/CNPJ Tom (1)
+    cpfCnpjTomador                                     // 12: CPF/CNPJ Tomador (14)
 
-  // SHA-1 hex do hash de assinatura
-  const hashHex = sha1Hex(assinaturaStr)
+  // Validar comprimento
+  if (assinaturaStr.length !== 86) {
+    console.error("[v0] ERRO: Assinatura string tem", assinaturaStr.length, "chars, esperado: 86")
+  }
+  console.log("[v0] Assinatura string:", JSON.stringify(assinaturaStr), "length:", assinaturaStr.length)
+
+  // Assinar com RSA-SHA1 (resultado em base64 vai na tag <Assinatura>)
+  const assinaturaRps = assinarRps(assinaturaStr, keyPem)
 
   // xmlns="" reseta o namespace para unqualified (exigido pelo XSD da SP)
-  // ISSRetido usa "S" ou "N" (NÃO boolean true/false)
-  // NaturezaOperacao é obrigatório logo após StatusRPS
-  return `  <RPS xmlns="">
-    <Assinatura>${hashHex}</Assinatura>
-    <ChaveRPS>
-      <InscricaoPrestador>${prestador.inscricaoMunicipal}</InscricaoPrestador>
-      <SerieRPS>${rps.serie}</SerieRPS>
-      <NumeroRPS>${rps.numero}</NumeroRPS>
-    </ChaveRPS>
-    <TipoRPS>${rps.tipo === 1 ? "RPS" : rps.tipo === 2 ? "RPS-M" : "RPS-C"}</TipoRPS>
-    <DataEmissao>${rps.dataEmissao}</DataEmissao>
-    <StatusRPS>N</StatusRPS>
-    <NaturezaOperacao>${rps.naturezaOperacao}</NaturezaOperacao>
-    <TributacaoRPS>${tributacao}</TributacaoRPS>
-    <ValorServicos>${servico.valorServicos.toFixed(2)}</ValorServicos>
-    <ValorDeducoes>${(servico.valorDeducoes || 0).toFixed(2)}</ValorDeducoes>
-    <ValorPIS>${(servico.valorPis || 0).toFixed(2)}</ValorPIS>
-    <ValorCOFINS>${(servico.valorCofins || 0).toFixed(2)}</ValorCOFINS>
-    <ValorINSS>${(servico.valorInss || 0).toFixed(2)}</ValorINSS>
-    <ValorIR>${(servico.valorIr || 0).toFixed(2)}</ValorIR>
-    <ValorCSLL>${(servico.valorCsll || 0).toFixed(2)}</ValorCSLL>
-    <CodigoServico>${codigoServicoFormatado}</CodigoServico>
-    <AliquotaServicos>${(servico.aliquotaIss * 100).toFixed(4)}</AliquotaServicos>
-    <ISSRetido>${issRetidoFlag}</ISSRetido>
-    <CPFCNPJTomador>
-      ${tomadorCpfCnpj}
-    </CPFCNPJTomador>${tomador.inscricaoMunicipal ? `
-    <InscricaoMunicipalTomador>${tomador.inscricaoMunicipal}</InscricaoMunicipalTomador>` : ""}${tomador.razaoSocial ? `
-    <RazaoSocialTomador>${escapeXml(tomador.razaoSocial)}</RazaoSocialTomador>` : ""}${gerarEnderecoTomadorXml(tomador)}${tomador.email ? `
-    <EmailTomador>${escapeXml(tomador.email)}</EmailTomador>` : ""}
-    <Discriminacao>${escapeXml(servico.descricao)}</Discriminacao>
-  </RPS>`
+  // ISSRetido no XML deve ser boolean (true/false), mas no hash de assinatura usa S/N
+  const issRetidoXml = servico.issRetido ? "true" : "false"
+  const tipoRps = rps.tipo === 1 ? "RPS" : rps.tipo === 2 ? "RPS-M" : "RPS-C"
+
+  // XML MINIFICADO (sem indentacao) - obrigatorio para nao quebrar a assinatura XMLDSIG
+  let rpsXml = `<RPS xmlns="">`
+  rpsXml += `<Assinatura>${assinaturaRps}</Assinatura>`
+  rpsXml += `<ChaveRPS>`
+  rpsXml += `<InscricaoPrestador>${prestador.inscricaoMunicipal}</InscricaoPrestador>`
+  rpsXml += `<SerieRPS>${rps.serie}</SerieRPS>`
+  rpsXml += `<NumeroRPS>${rps.numero}</NumeroRPS>`
+  rpsXml += `</ChaveRPS>`
+  rpsXml += `<TipoRPS>${tipoRps}</TipoRPS>`
+  rpsXml += `<DataEmissao>${rps.dataEmissao.substring(0, 10)}</DataEmissao>`
+  rpsXml += `<StatusRPS>N</StatusRPS>`
+  rpsXml += `<TributacaoRPS>${tributacao}</TributacaoRPS>`
+  rpsXml += `<ValorServicos>${servico.valorServicos.toFixed(2)}</ValorServicos>`
+  rpsXml += `<ValorDeducoes>${(servico.valorDeducoes || 0).toFixed(2)}</ValorDeducoes>`
+  rpsXml += `<ValorPIS>${(servico.valorPis || 0).toFixed(2)}</ValorPIS>`
+  rpsXml += `<ValorCOFINS>${(servico.valorCofins || 0).toFixed(2)}</ValorCOFINS>`
+  rpsXml += `<ValorINSS>${(servico.valorInss || 0).toFixed(2)}</ValorINSS>`
+  rpsXml += `<ValorIR>${(servico.valorIr || 0).toFixed(2)}</ValorIR>`
+  rpsXml += `<ValorCSLL>${(servico.valorCsll || 0).toFixed(2)}</ValorCSLL>`
+  rpsXml += `<CodigoServico>${codServico}</CodigoServico>`
+  rpsXml += `<AliquotaServicos>${(servico.aliquotaIss * 100).toFixed(4)}</AliquotaServicos>`
+  rpsXml += `<ISSRetido>${issRetidoXml}</ISSRetido>`
+  rpsXml += `<CPFCNPJTomador>${tomadorCpfCnpj}</CPFCNPJTomador>`
+  if (tomador.inscricaoMunicipal) {
+    rpsXml += `<InscricaoMunicipalTomador>${tomador.inscricaoMunicipal}</InscricaoMunicipalTomador>`
+  }
+  if (tomador.razaoSocial) {
+    rpsXml += `<RazaoSocialTomador>${escapeXml(tomador.razaoSocial)}</RazaoSocialTomador>`
+  }
+  rpsXml += gerarEnderecoTomadorXml(tomador)
+  if (tomador.email) {
+    rpsXml += `<EmailTomador>${escapeXml(tomador.email)}</EmailTomador>`
+  }
+  rpsXml += `<Discriminacao>${escapeXml(servico.descricao)}</Discriminacao>`
+  rpsXml += `</RPS>`
+  return rpsXml
 }
 
 // Gerar XML de consulta de NFS-e por RPS
@@ -216,27 +256,27 @@ export function gerarXmlConsultaNfseRps(
 }
 
 // Gerar XML de cancelamento de NFS-e SP
-// NOTA: AssinaturaCancelamento removida (SP rejeita tag vazia)
+// Conforme XSD PedidoCancelamentoNFe_v02:
+//   Cabecalho: CPFCNPJRemetente + transacao
+//   Detalhe: ChaveNFe (InscricaoPrestador + NumeroNFe) + AssinaturaCancelamento
+//   + Signature (XMLDSIG)
+//
+// AssinaturaCancelamento: RSA-SHA1 base64 da string:
+//   InscricaoPrestador(8) + NumeroNFe(12) = 20 chars
 export function gerarXmlCancelamentoNfse(
   prestadorCnpj: string,
   inscricaoMunicipal: string,
   numeroNfse: string,
+  keyPem?: string,
 ): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<PedidoCancelamentoNFe xmlns="http://www.prefeitura.sp.gov.br/nfe">
-  <Cabecalho xmlns="" Versao="1">
-    <CPFCNPJRemetente>
-      <CNPJ>${prestadorCnpj}</CNPJ>
-    </CPFCNPJRemetente>
-    <transacao>true</transacao>
-  </Cabecalho>
-  <Detalhe xmlns="">
-    <ChaveNFe>
-      <InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador>
-      <NumeroNFe>${numeroNfse}</NumeroNFe>
-    </ChaveNFe>
-  </Detalhe>
-</PedidoCancelamentoNFe>`
+  // Gerar AssinaturaCancelamento (RSA-SHA1 da string IM(8)+NumNFe(12))
+  const assinaturaStr =
+    inscricaoMunicipal.padStart(8, "0") +
+    numeroNfse.toString().padStart(12, "0")
+
+  const assinaturaCancelamento = assinarRps(assinaturaStr, keyPem)
+
+  return `<?xml version="1.0" encoding="UTF-8"?><PedidoCancelamentoNFe xmlns="http://www.prefeitura.sp.gov.br/nfe"><Cabecalho xmlns="" Versao="1"><CPFCNPJRemetente><CNPJ>${prestadorCnpj}</CNPJ></CPFCNPJRemetente><transacao>true</transacao></Cabecalho><Detalhe xmlns=""><ChaveNFe><InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador><NumeroNFe>${numeroNfse}</NumeroNFe></ChaveNFe><AssinaturaCancelamento>${assinaturaCancelamento}</AssinaturaCancelamento></Detalhe></PedidoCancelamentoNFe>`
 }
 
 // Gerar XML de consulta de lote

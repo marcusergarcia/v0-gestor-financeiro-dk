@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
         numero: numeroRps,
         serie: config.serie_rps || "11",
         tipo: config.tipo_rps || 1,
-        dataEmissao: new Date().toISOString().split("T")[0],
+        dataEmissao: new Date().toISOString().substring(0, 19), // YYYY-MM-DDTHH:mm:ss (SP exige data+hora)
         naturezaOperacao: 1, // Tributação no município
         regimeTributacao: config.regime_tributacao || 1,
         optanteSimples: config.optante_simples || 0,
@@ -120,17 +120,36 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    // Gerar XML
-    let xmlEnvio = gerarXmlEnvioLoteRps([dadosNfse], numeroRps)
-    console.log("[v0] XML gerado (sem assinatura), tamanho:", xmlEnvio.length)
-
-    // Assinar XML com certificado digital (XMLDSIG obrigatorio pela prefeitura de SP)
+    // Extrair certificado e chave privada do PFX (necessario para AMBAS as assinaturas)
+    // 1. Assinatura do RPS (RSA-SHA1 da string de 86/94 chars) -> vai na tag <Assinatura>
+    // 2. Assinatura do XML (XMLDSIG enveloped) -> vai na tag <Signature>
+    let certPem = ""
+    let keyPem = ""
     if (config.certificado_base64 && config.certificado_senha) {
       try {
-        console.log("[v0] Assinando XML com certificado digital...")
-        const { certPem, keyPem } = extrairCertKeyDoPfx(config.certificado_base64, config.certificado_senha)
+        const extracted = extrairCertKeyDoPfx(config.certificado_base64, config.certificado_senha)
+        certPem = extracted.certPem
+        keyPem = extracted.keyPem
+        console.log("[v0] Certificado extraido para assinatura RPS e XML")
+      } catch (extractError: any) {
+        console.error("[v0] Erro ao extrair certificado:", extractError?.message)
+        return NextResponse.json(
+          { success: false, message: "Erro ao extrair certificado digital: " + (extractError?.message || "Erro desconhecido") },
+          { status: 400 },
+        )
+      }
+    }
+
+    // Gerar XML (com assinatura RSA-SHA1 do RPS usando a chave privada)
+    let xmlEnvio = gerarXmlEnvioLoteRps([dadosNfse], numeroRps, keyPem || undefined)
+    console.log("[v0] XML gerado (com assinatura RPS, sem XMLDSIG), tamanho:", xmlEnvio.length)
+
+    // Assinar XML com certificado digital (XMLDSIG obrigatorio pela prefeitura de SP)
+    if (certPem && keyPem) {
+      try {
+        console.log("[v0] Assinando XML com XMLDSIG (certificado digital)...")
         xmlEnvio = assinarXmlNfse(xmlEnvio, certPem, keyPem)
-        console.log("[v0] XML assinado com sucesso, tamanho:", xmlEnvio.length)
+        console.log("[v0] XML assinado com sucesso (XMLDSIG), tamanho:", xmlEnvio.length)
       } catch (signError: any) {
         console.error("[v0] Erro ao assinar XML:", signError?.message)
         return NextResponse.json(
