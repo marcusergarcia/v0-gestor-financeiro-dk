@@ -139,16 +139,16 @@ function gerarRpsXml(nota: DadosNfse): string {
   const codServico = codigoServicoFormatado.padStart(5, "0")
   const indicadorTomador = tomador.tipo === "PF" ? "1" : "2"
   const cpfCnpjTomador = tomador.cpfCnpj.replace(/\D/g, "").padStart(14, "0")
-  // SP usa YYYYMMDDHHMMSS (14 digitos) na assinatura - data + hora
-  // Remove todos separadores: "-", ":", "T" => "20260209015323"
-  const dataFormatada = rps.dataEmissao.replace(/[-:T]/g, "").substring(0, 14)
+  // SP usa YYYYMMDD (8 digitos) na assinatura - apenas data, sem hora
+  // Ref: Manual NFS-e SP v2 - campo DataEmissaoRPS no hash usa formato AAAAMMDD
+  const dataFormatada = rps.dataEmissao.substring(0, 10).replace(/-/g, "") // "2026-02-09" -> "20260209"
   // Inscricao municipal do tomador (8 posicoes) - obrigatoria na assinatura
   // Se nao tiver, envia "00000000"
   const imTomador = (tomador.inscricaoMunicipal || "").replace(/\D/g, "").padStart(8, "0")
 
   const assinaturaStr =
     prestador.inscricaoMunicipal.padStart(8, "0") +
-    rps.serie.padStart(5, "0") +
+    rps.serie.padEnd(5, " ") +
     rps.numero.toString().padStart(12, "0") +
     dataFormatada +
     tributacao +
@@ -162,7 +162,10 @@ function gerarRpsXml(nota: DadosNfse): string {
     imTomador
 
   // SHA-1 hex do hash de assinatura
-  console.log("[v0] Assinatura string length:", assinaturaStr.length, "string:", assinaturaStr)
+  // Formato esperado (94 chars): IM(8) + Serie(5) + NumRPS(12) + Data(8) + Trib(1) + Status(1) + ISS(1) + ValServ(15) + ValDed(15) + CodServ(5) + IndTom(1) + CpfCnpj(14) + IMTom(8)
+  console.log("[v0] Assinatura string length:", assinaturaStr.length, "(esperado: 94)")
+  console.log("[v0] Assinatura string:", JSON.stringify(assinaturaStr))
+  console.log("[v0] Assinatura partes: IM=", assinaturaStr.substring(0,8), "Serie=", JSON.stringify(assinaturaStr.substring(8,13)), "Num=", assinaturaStr.substring(13,25), "Data=", assinaturaStr.substring(25,33), "Trib=", assinaturaStr.substring(33,34), "Status=", assinaturaStr.substring(34,35), "ISS=", assinaturaStr.substring(35,36), "ValServ=", assinaturaStr.substring(36,51), "ValDed=", assinaturaStr.substring(51,66), "CodServ=", assinaturaStr.substring(66,71), "IndTom=", assinaturaStr.substring(71,72), "CpfCnpj=", assinaturaStr.substring(72,86), "IMTom=", assinaturaStr.substring(86,94))
   const hashHex = sha1Hex(assinaturaStr)
   console.log("[v0] SHA1 hash:", hashHex)
 
