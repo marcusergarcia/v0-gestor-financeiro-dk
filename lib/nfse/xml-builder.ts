@@ -139,8 +139,9 @@ function gerarRpsXml(nota: DadosNfse): string {
   const codServico = codigoServicoFormatado.padStart(5, "0")
   const indicadorTomador = tomador.tipo === "PF" ? "1" : "2"
   const cpfCnpjTomador = tomador.cpfCnpj.replace(/\D/g, "").padStart(14, "0")
-  // SP usa YYYYMMDD (8 digitos) na assinatura - apenas data, sem hora
-  const dataFormatada = rps.dataEmissao.substring(0, 10).replace(/-/g, "")
+  // SP usa YYYYMMDDHHMMSS (14 digitos) na assinatura - data + hora
+  // Remove todos separadores: "-", ":", "T" => "20260209015323"
+  const dataFormatada = rps.dataEmissao.replace(/[-:T]/g, "").substring(0, 14)
   // Inscricao municipal do tomador (8 posicoes) - obrigatoria na assinatura
   // Se nao tiver, envia "00000000"
   const imTomador = (tomador.inscricaoMunicipal || "").replace(/\D/g, "").padStart(8, "0")
