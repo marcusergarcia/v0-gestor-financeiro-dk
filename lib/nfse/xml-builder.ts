@@ -145,45 +145,45 @@ function gerarRpsXml(nota: DadosNfse, keyPem?: string): string {
   // SP exige CodigoServico apenas com digitos (ex: "1401" e nao "14.01")
   const codigoServicoFormatado = servico.codigoServico.replace(/\D/g, "")
 
-  // Gerar hash de assinatura do RPS conforme manual SP
-  // Formato: InscricaoPrestador(8) + SerieRPS(5) + NumeroRPS(12) + DataEmissao(YYYYMMDD=8)
-  // + TributacaoRPS(1) + StatusRPS(1) + ISSRetido(1) + ValorServicos(15) + ValorDeducoes(15)
-  // + CodigoServico(5) + IndicadorCPFCNPJTomador(1) + CPFCNPJTomador(14)
-  // + InscricaoMunicipalTomador(8)
+  // Gerar hash de assinatura do RPS conforme manual SP v3.3.4, secao 4.3.2
+  // "Campos para assinatura do RPS - versao 1.0" (86 posicoes sem intermediario):
+  //  1. InscricaoPrestador(8) + 2. SerieRPS(5) + 3. NumeroRPS(12) + 4. DataEmissao(8 AAAAMMDD)
+  //  5. TributacaoRPS(1) + 6. StatusRPS(1) + 7. ISSRetido(1)
+  //  8. ValorServicos(15, centavos) + 9. ValorDeducoes(15, centavos) + 10. CodigoServico(5)
+  //  11. IndicadorCPFCNPJ Tomador(1) + 12. CPFCNPJTomador(14)
+  // Opcionais (se houver intermediario):
+  //  13. IndicadorCPFCNPJ Intermediario(1) + 14. CPFCNPJIntermediario(14) + 15. ISSRetidoIntermediario(1)
+  //
+  // IMPORTANTE: NAO inclui InscricaoMunicipalTomador (campo nao existe no layout v1)
   const tributacao = getTributacaoSP(rps.regimeTributacao, rps.optanteSimples)
   const statusRps = "N"
   const issRetidoFlag = servico.issRetido ? "S" : "N"
   const valorServicosStr = Math.round(servico.valorServicos * 100).toString().padStart(15, "0")
   const valorDeducoesStr = Math.round((servico.valorDeducoes || 0) * 100).toString().padStart(15, "0")
   const codServico = codigoServicoFormatado.padStart(5, "0")
-  const indicadorTomador = tomador.tipo === "PF" ? "1" : "2"
-  const cpfCnpjTomador = tomador.cpfCnpj.replace(/\D/g, "").padStart(14, "0")
-  // SP usa YYYYMMDD (8 digitos) na assinatura - apenas data, sem hora
-  // Ref: Manual NFS-e SP v2 - campo DataEmissaoRPS no hash usa formato AAAAMMDD
+  const indicadorTomador = tomador.cpfCnpj ? (tomador.tipo === "PF" ? "1" : "2") : "3"
+  const cpfCnpjTomador = tomador.cpfCnpj ? tomador.cpfCnpj.replace(/\D/g, "").padStart(14, "0") : "00000000000000"
   const dataFormatada = rps.dataEmissao.substring(0, 10).replace(/-/g, "") // "2026-02-09" -> "20260209"
-  // Inscricao municipal do tomador (8 posicoes) - obrigatoria na assinatura
-  // Se nao tiver, envia "00000000"
-  const imTomador = (tomador.inscricaoMunicipal || "").replace(/\D/g, "").padStart(8, "0")
 
+  // Campos 1-12 (86 posicoes - base obrigatoria)
   const assinaturaStr =
-    prestador.inscricaoMunicipal.padStart(8, "0") +
-    rps.serie.padEnd(5, " ") +
-    rps.numero.toString().padStart(12, "0") +
-    dataFormatada +
-    tributacao +
-    statusRps +
-    issRetidoFlag +
-    valorServicosStr +
-    valorDeducoesStr +
-    codServico +
-    indicadorTomador +
-    cpfCnpjTomador +
-    imTomador
+    prestador.inscricaoMunicipal.padStart(8, "0") +  // 1: IM Prestador (8)
+    rps.serie.padEnd(5, " ") +                        // 2: Serie RPS (5)
+    rps.numero.toString().padStart(12, "0") +          // 3: Numero RPS (12)
+    dataFormatada +                                    // 4: Data (8)
+    tributacao +                                       // 5: Tributacao (1)
+    statusRps +                                        // 6: Status (1)
+    issRetidoFlag +                                    // 7: ISS Retido (1)
+    valorServicosStr +                                 // 8: Valor Servicos (15)
+    valorDeducoesStr +                                 // 9: Valor Deducoes (15)
+    codServico +                                       // 10: Codigo Servico (5)
+    indicadorTomador +                                 // 11: Indicador CPF/CNPJ Tom (1)
+    cpfCnpjTomador                                     // 12: CPF/CNPJ Tomador (14)
+    // Campos 13-15 (intermediario) omitidos quando nao ha intermediario
 
-  // Formato esperado (94 chars): IM(8) + Serie(5) + NumRPS(12) + Data(8) + Trib(1) + Status(1) + ISS(1) + ValServ(15) + ValDed(15) + CodServ(5) + IndTom(1) + CpfCnpj(14) + IMTom(8)
-  console.log("[v0] Assinatura string length:", assinaturaStr.length, "(esperado: 94)")
+  console.log("[v0] Assinatura string length:", assinaturaStr.length, "(esperado: 86 sem intermediario)")
   console.log("[v0] Assinatura string:", JSON.stringify(assinaturaStr))
-  console.log("[v0] Assinatura partes: IM=", assinaturaStr.substring(0,8), "Serie=", JSON.stringify(assinaturaStr.substring(8,13)), "Num=", assinaturaStr.substring(13,25), "Data=", assinaturaStr.substring(25,33), "Trib=", assinaturaStr.substring(33,34), "Status=", assinaturaStr.substring(34,35), "ISS=", assinaturaStr.substring(35,36), "ValServ=", assinaturaStr.substring(36,51), "ValDed=", assinaturaStr.substring(51,66), "CodServ=", assinaturaStr.substring(66,71), "IndTom=", assinaturaStr.substring(71,72), "CpfCnpj=", assinaturaStr.substring(72,86), "IMTom=", assinaturaStr.substring(86,94))
+  console.log("[v0] Assinatura partes: IM=", assinaturaStr.substring(0,8), "Serie=", JSON.stringify(assinaturaStr.substring(8,13)), "Num=", assinaturaStr.substring(13,25), "Data=", assinaturaStr.substring(25,33), "Trib=", assinaturaStr.substring(33,34), "Status=", assinaturaStr.substring(34,35), "ISS=", assinaturaStr.substring(35,36), "ValServ=", assinaturaStr.substring(36,51), "ValDed=", assinaturaStr.substring(51,66), "CodServ=", assinaturaStr.substring(66,71), "IndTom=", assinaturaStr.substring(71,72), "CpfCnpj=", assinaturaStr.substring(72,86))
 
   // Conforme manual SP (passos):
   // 1. Montar string ASCII (feito acima)
