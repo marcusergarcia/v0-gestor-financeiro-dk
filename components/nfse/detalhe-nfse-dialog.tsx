@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
-import { Loader2, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, Code } from "lucide-react"
+import { Loader2, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, Code, Printer } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
@@ -19,6 +19,7 @@ interface DetalheNfseDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   notaId: number | null
+  onPrint?: (notaId: number) => void
 }
 
 function formatDateBR(dateStr: string | null): string {
@@ -36,7 +37,7 @@ function formatDateBR(dateStr: string | null): string {
   }
 }
 
-export function DetalheNfseDialog({ open, onOpenChange, notaId }: DetalheNfseDialogProps) {
+export function DetalheNfseDialog({ open, onOpenChange, notaId, onPrint }: DetalheNfseDialogProps) {
   const [loading, setLoading] = useState(false)
   const [consultando, setConsultando] = useState(false)
   const [nota, setNota] = useState<any>(null)
@@ -143,10 +144,24 @@ export function DetalheNfseDialog({ open, onOpenChange, notaId }: DetalheNfseDia
                   </p>
                 )}
               </div>
-              <div className="text-right">
+              <div className="text-right space-y-1">
                 <p className="text-2xl font-bold text-emerald-700">{formatCurrency(nota.valor_total)}</p>
                 {nota.data_emissao && (
                   <p className="text-xs text-gray-500">Emitida em: {formatDateBR(nota.data_emissao)}</p>
+                )}
+                {(nota.status === "emitida" || nota.status === "cancelada") && onPrint && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      onOpenChange(false)
+                      onPrint(nota.id || notaId)
+                    }}
+                    className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                  >
+                    <Printer className="h-4 w-4 mr-1" />
+                    Imprimir
+                  </Button>
                 )}
               </div>
             </div>

@@ -27,11 +27,12 @@ import {
   Clock,
   AlertCircle,
   Loader2,
-  Filter,
   FileCheck,
   DollarSign,
   Send,
   RefreshCw,
+  Printer,
+  Trash2,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
@@ -39,6 +40,7 @@ import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/utils"
 import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
 import { DetalheNfseDialog } from "@/components/nfse/detalhe-nfse-dialog"
+import { ImprimirNfseDialog } from "@/components/nfse/imprimir-nfse-dialog"
 import Link from "next/link"
 
 interface NotaFiscal {
@@ -79,6 +81,8 @@ export default function NotaFiscalPage() {
   const [emitirOpen, setEmitirOpen] = useState(false)
   const [detalheOpen, setDetalheOpen] = useState(false)
   const [notaSelecionada, setNotaSelecionada] = useState<number | null>(null)
+  const [imprimirOpen, setImprimirOpen] = useState(false)
+  const [notaImprimir, setNotaImprimir] = useState<number | null>(null)
   const [cancelarOpen, setCancelarOpen] = useState(false)
   const [notaCancelar, setNotaCancelar] = useState<NotaFiscal | null>(null)
   const [motivoCancelamento, setMotivoCancelamento] = useState("")
@@ -594,6 +598,20 @@ export default function NotaFiscalPage() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
+                            {(nota.status === "emitida" || nota.status === "cancelada") && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                onClick={() => {
+                                  setNotaImprimir(nota.id)
+                                  setImprimirOpen(true)
+                                }}
+                                title="Imprimir NFS-e"
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            )}
                             {nota.status === "emitida" && (
                               <Button
                                 variant="ghost"
@@ -652,6 +670,16 @@ export default function NotaFiscalPage() {
         open={detalheOpen}
         onOpenChange={setDetalheOpen}
         notaId={notaSelecionada}
+        onPrint={(id) => {
+          setNotaImprimir(id)
+          setImprimirOpen(true)
+        }}
+      />
+
+      <ImprimirNfseDialog
+        open={imprimirOpen}
+        onOpenChange={setImprimirOpen}
+        notaId={notaImprimir}
       />
 
       {/* Dialog de Cancelamento */}
