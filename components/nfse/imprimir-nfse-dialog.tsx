@@ -181,7 +181,7 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[2100px] w-[95vw] max-h-[80vh] overflow-y-auto p-0">
+      <DialogContent className="max-w-[98vw] w-[98vw] max-h-[70vh] overflow-y-auto p-0">
         <DialogHeader className="p-4 pb-0">
           <DialogTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -251,7 +251,7 @@ function NfsePrefeituraSP({ nota, prestador, logo, brasaoBase64 }: { nota: any; 
       fontFamily: "Arial, Helvetica, sans-serif",
       fontSize: "10px",
       color: "#000",
-      maxWidth: "1500px",
+      maxWidth: "100%",
       margin: "0 auto",
       lineHeight: 1.3,
     }}>
