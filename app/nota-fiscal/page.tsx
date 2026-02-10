@@ -67,8 +67,6 @@ interface NotaFiscal {
   cliente_nome: string | null
   mensagem_erro: string | null
   boletos_asaas_count?: number
-  boleto_bankslip_url?: string | null
-  boleto_invoice_url?: string | null
   boletos_total_count?: number
 }
 
@@ -632,11 +630,7 @@ export default function NotaFiscalPage() {
                                   size="icon"
                                   className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
                                   onClick={() => {
-                                    if (nota.boleto_bankslip_url) {
-                                      window.open(nota.boleto_bankslip_url, "_blank")
-                                    } else if (nota.boleto_invoice_url) {
-                                      window.open(nota.boleto_invoice_url, "_blank")
-                                    } else if (nota.numero_nfse) {
+                                    if (nota.numero_nfse) {
                                       setVisualizarBoletosNumero(String(nota.numero_nfse))
                                       setVisualizarBoletosOpen(true)
                                     }

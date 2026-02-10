@@ -172,11 +172,7 @@ export function DetalheNfseDialog({ open, onOpenChange, notaId, onPrint, onBolet
                       variant="outline"
                       onClick={() => {
                         onOpenChange(false)
-                        if (nota.boleto_bankslip_url) {
-                          window.open(nota.boleto_bankslip_url, "_blank")
-                        } else if (nota.boleto_invoice_url) {
-                          window.open(nota.boleto_invoice_url, "_blank")
-                        } else if (onViewBoletos && nota.numero_nfse) {
+                        if (onViewBoletos && nota.numero_nfse) {
                           onViewBoletos(String(nota.numero_nfse))
                         }
                       }}
