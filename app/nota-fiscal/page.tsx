@@ -53,10 +53,12 @@ interface NotaFiscal {
   origem: string
   origem_id: number | null
   origem_numero: string | null
+  cliente_id: number | null
   tomador_razao_social: string
   tomador_cpf_cnpj: string
   valor_servicos: number
   valor_total: number
+  descricao_servico: string | null
   status: string
   data_emissao: string | null
   created_at: string
