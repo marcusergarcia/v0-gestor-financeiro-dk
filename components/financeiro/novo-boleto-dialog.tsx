@@ -86,28 +86,35 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
       hoje.setDate(hoje.getDate() + 7)
       const dataInicial = hoje.toISOString().split("T")[0]
       setPrimeiroVencimento(dataInicial)
-      setDataNota(new Date().toISOString().split("T")[0])
       // Validar a data inicial
       validarVencimento(dataInicial)
 
       // Pre-preencher dados da nota fiscal se disponivel
       if (notaFiscal) {
+        // Valor
         if (notaFiscal.valor_total || notaFiscal.valor_servicos) {
           setValorTotal(String(notaFiscal.valor_total || notaFiscal.valor_servicos))
         }
+        // Numero da nota
         if (notaFiscal.numero_nfse) {
           setNumeroNota(String(notaFiscal.numero_nfse))
         }
-        if (notaFiscal.data_emissao) {
-          const dataEmissao = new Date(notaFiscal.data_emissao).toISOString().split("T")[0]
-          setDataNota(dataEmissao)
+        // Data da nota - usar data_emissao, ou created_at como fallback
+        const dataOrigem = notaFiscal.data_emissao || notaFiscal.created_at
+        if (dataOrigem) {
+          const dataParsed = new Date(dataOrigem).toISOString().split("T")[0]
+          setDataNota(dataParsed)
+        } else {
+          setDataNota(new Date().toISOString().split("T")[0])
         }
+        // Descricao do servico da nota
         if (notaFiscal.descricao_servico) {
           setDescricaoBoletoCustom(notaFiscal.descricao_servico)
         }
         // Pre-selecionar o cliente a partir dos dados da nota
         if (notaFiscal.cliente_id) {
-          fetch(`/api/clientes/${notaFiscal.cliente_id}`)
+          const clienteId = String(notaFiscal.cliente_id)
+          fetch(`/api/clientes/${clienteId}`)
             .then((res) => res.json())
             .then((data) => {
               if (data && data.id) {
@@ -124,12 +131,18 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
                   cidade: data.cidade,
                   estado: data.estado,
                   cep: data.cep,
+                  tem_contrato: data.tem_contrato,
                 }
                 setCliente(clienteNota)
+                // Buscar info de contrato do cliente
+                buscarInfoCliente(String(data.id))
               }
             })
             .catch((err) => console.error("Erro ao buscar cliente da nota:", err))
         }
+      } else {
+        // Sem nota fiscal, usar data de hoje
+        setDataNota(new Date().toISOString().split("T")[0])
       }
     }
   }, [open, notaFiscal])
