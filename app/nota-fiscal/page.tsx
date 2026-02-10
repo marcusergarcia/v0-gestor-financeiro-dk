@@ -33,6 +33,7 @@ import {
   RefreshCw,
   Printer,
   Trash2,
+  Receipt,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
@@ -42,6 +43,7 @@ import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
 import { DetalheNfseDialog } from "@/components/nfse/detalhe-nfse-dialog"
 import { ImprimirNfseDialog } from "@/components/nfse/imprimir-nfse-dialog"
 import { NovoBoletoDialog } from "@/components/financeiro/novo-boleto-dialog"
+import { VisualizarBoletosDialog } from "@/components/financeiro/visualizar-boletos-dialog"
 import Link from "next/link"
 
 interface NotaFiscal {
@@ -94,6 +96,10 @@ export default function NotaFiscalPage() {
   const [logoMenu, setLogoMenu] = useState<string>("")
   const [boletoOpen, setBoletoOpen] = useState(false)
   const [notaParaBoleto, setNotaParaBoleto] = useState<NotaFiscal | null>(null)
+  const [visualizarBoletosOpen, setVisualizarBoletosOpen] = useState(false)
+  const [visualizarBoletosNumero, setVisualizarBoletosNumero] = useState("")
+  // Mapa: numero_nfse -> { temBoleto: boolean, aguardandoPagamento: boolean }
+  const [boletoStatusMap, setBoletoStatusMap] = useState<Record<string, { temBoleto: boolean; aguardandoPagamento: boolean }>>({})
 
   const { toast } = useToast()
 
@@ -142,7 +148,9 @@ export default function NotaFiscalPage() {
       const result = await response.json()
 
       if (result.success) {
-        setNotas(result.data || [])
+        const notasData = result.data || []
+        setNotas(notasData)
+        fetchBoletoStatus(notasData)
       } else {
         // Se der erro (tabelas não existem), mostrar lista vazia
         setNotas([])
@@ -151,6 +159,21 @@ export default function NotaFiscalPage() {
       setNotas([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchBoletoStatus = async (notasList: NotaFiscal[]) => {
+    try {
+      const emitidas = notasList.filter((n) => n.status === "emitida" && n.numero_nfse)
+      if (emitidas.length === 0) return
+
+      const response = await fetch("/api/boletos/status-por-nota")
+      const result = await response.json()
+      if (result.success && result.data) {
+        setBoletoStatusMap(result.data)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar status dos boletos:", error)
     }
   }
 
@@ -617,20 +640,49 @@ export default function NotaFiscalPage() {
                                 <Printer className="h-4 w-4" />
                               </Button>
                             )}
-                            {nota.status === "emitida" && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                onClick={() => {
-                                  setNotaParaBoleto(nota)
-                                  setBoletoOpen(true)
-                                }}
-                                title="Gerar Boleto"
-                              >
-                                <DollarSign className="h-4 w-4" />
-                              </Button>
-                            )}
+                            {nota.status === "emitida" && (() => {
+                              const nfseNum = String(nota.numero_nfse || "")
+                              const boletoInfo = boletoStatusMap[nfseNum]
+
+                              if (boletoInfo?.temBoleto && boletoInfo.aguardandoPagamento) {
+                                // Boleto enviado ao Asaas e aguardando pagamento - mostrar imprimir
+                                return (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                                    onClick={() => {
+                                      setVisualizarBoletosNumero(nfseNum)
+                                      setVisualizarBoletosOpen(true)
+                                    }}
+                                    title="Imprimir Boleto / Parcelas"
+                                  >
+                                    <Receipt className="h-4 w-4" />
+                                  </Button>
+                                )
+                              }
+
+                              if (boletoInfo?.temBoleto) {
+                                // Boleto existe mas nao esta aguardando pagamento - nao mostrar nada
+                                return null
+                              }
+
+                              // Sem boleto - mostrar gerar boleto
+                              return (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  onClick={() => {
+                                    setNotaParaBoleto(nota)
+                                    setBoletoOpen(true)
+                                  }}
+                                  title="Gerar Boleto"
+                                >
+                                  <DollarSign className="h-4 w-4" />
+                                </Button>
+                              )
+                            })()}
                             {nota.status === "emitida" && (
                               <Button
                                 variant="ghost"
@@ -717,6 +769,12 @@ export default function NotaFiscalPage() {
           setNotaParaBoleto(null)
           fetchNotas()
         }}
+      />
+
+      <VisualizarBoletosDialog
+        open={visualizarBoletosOpen}
+        onOpenChange={setVisualizarBoletosOpen}
+        numeroBase={visualizarBoletosNumero}
       />
 
       {/* Dialog de Cancelamento */}
