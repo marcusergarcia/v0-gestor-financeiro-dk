@@ -181,24 +181,22 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[98vw] w-[98vw] max-h-[70vh] overflow-y-auto p-0">
-        <DialogHeader className="p-4 pb-0">
+      <DialogContent className="max-w-5xl w-[80vw] max-h-[80vh] overflow-y-auto p-0">
+        <DialogHeader className="p-4 pb-0 pr-14">
           <DialogTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Printer className="h-5 w-5 text-emerald-600" />
               Imprimir NFS-e
             </span>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={handlePrint}
-                disabled={loading || !dados}
-                className="bg-emerald-600 hover:bg-emerald-700 text-foreground"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Imprimir
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              onClick={handlePrint}
+              disabled={loading || !dados}
+              className="bg-emerald-600 hover:bg-emerald-700 text-foreground"
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
