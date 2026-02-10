@@ -41,6 +41,7 @@ import { formatCurrency } from "@/lib/utils"
 import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
 import { DetalheNfseDialog } from "@/components/nfse/detalhe-nfse-dialog"
 import { ImprimirNfseDialog } from "@/components/nfse/imprimir-nfse-dialog"
+import { NovoBoletoDialog } from "@/components/financeiro/novo-boleto-dialog"
 import Link from "next/link"
 
 interface NotaFiscal {
@@ -89,6 +90,8 @@ export default function NotaFiscalPage() {
   const [cancelando, setCancelando] = useState(false)
   const [consultandoId, setConsultandoId] = useState<number | null>(null)
   const [logoMenu, setLogoMenu] = useState<string>("")
+  const [boletoOpen, setBoletoOpen] = useState(false)
+  const [notaParaBoleto, setNotaParaBoleto] = useState<NotaFiscal | null>(null)
 
   const { toast } = useToast()
 
@@ -616,6 +619,20 @@ export default function NotaFiscalPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => {
+                                  setNotaParaBoleto(nota)
+                                  setBoletoOpen(true)
+                                }}
+                                title="Gerar Boleto"
+                              >
+                                <DollarSign className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {nota.status === "emitida" && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                                 onClick={() => {
                                   setNotaCancelar(nota)
@@ -674,12 +691,30 @@ export default function NotaFiscalPage() {
           setNotaImprimir(id)
           setImprimirOpen(true)
         }}
+        onBoleto={(nota) => {
+          setNotaParaBoleto(nota)
+          setBoletoOpen(true)
+        }}
       />
 
       <ImprimirNfseDialog
         open={imprimirOpen}
         onOpenChange={setImprimirOpen}
         notaId={notaImprimir}
+      />
+
+      <NovoBoletoDialog
+        open={boletoOpen}
+        onOpenChange={(open) => {
+          setBoletoOpen(open)
+          if (!open) setNotaParaBoleto(null)
+        }}
+        notaFiscal={notaParaBoleto}
+        onSuccess={() => {
+          setBoletoOpen(false)
+          setNotaParaBoleto(null)
+          fetchNotas()
+        }}
       />
 
       {/* Dialog de Cancelamento */}
