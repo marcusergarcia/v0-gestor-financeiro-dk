@@ -116,26 +116,28 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
           const clienteId = String(notaFiscal.cliente_id)
           fetch(`/api/clientes/${clienteId}`)
             .then((res) => res.json())
-            .then((data) => {
-              if (data && data.id) {
+            .then((result) => {
+              // A API retorna { success: true, data: {...} }
+              const clienteData = result.data || result
+              if (clienteData && clienteData.id) {
                 const clienteNota: Cliente = {
-                  id: String(data.id),
-                  codigo: data.codigo,
-                  nome: data.nome,
-                  cnpj: data.cnpj,
-                  cpf: data.cpf,
-                  email: data.email,
-                  telefone: data.telefone,
-                  endereco: data.endereco,
-                  bairro: data.bairro,
-                  cidade: data.cidade,
-                  estado: data.estado,
-                  cep: data.cep,
-                  tem_contrato: data.tem_contrato,
+                  id: String(clienteData.id),
+                  codigo: clienteData.codigo,
+                  nome: clienteData.nome,
+                  cnpj: clienteData.cnpj,
+                  cpf: clienteData.cpf,
+                  email: clienteData.email,
+                  telefone: clienteData.telefone,
+                  endereco: clienteData.endereco,
+                  bairro: clienteData.bairro,
+                  cidade: clienteData.cidade,
+                  estado: clienteData.estado,
+                  cep: clienteData.cep,
+                  tem_contrato: clienteData.tem_contrato,
                 }
                 setCliente(clienteNota)
                 // Buscar info de contrato do cliente
-                buscarInfoCliente(String(data.id))
+                buscarInfoCliente(String(clienteData.id))
               }
             })
             .catch((err) => console.error("Erro ao buscar cliente da nota:", err))
@@ -149,43 +151,32 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
 
   const buscarInfoCliente = async (clienteId: string) => {
     try {
-      console.log("Buscando informações do cliente:", clienteId)
-
       const clienteResponse = await fetch(`/api/clientes/${clienteId}`)
       if (clienteResponse.ok) {
-        const clienteData = await clienteResponse.json()
-        console.log("Dados do cliente:", clienteData)
+        const clienteResult = await clienteResponse.json()
+        const clienteData = clienteResult.data || clienteResult
 
         if (clienteData.tem_contrato && clienteData.dia_contrato) {
-          console.log("Cliente tem contrato com dia:", clienteData.dia_contrato)
           setContratoInfo({
             tem_contrato: true,
             dia_contrato: clienteData.dia_contrato,
           })
         } else {
-          console.log("Cliente não tem contrato definido, buscando contrato de conservação...")
 
           const conservacaoResponse = await fetch(`/api/contratos-conservacao/cliente/${clienteId}`)
 
           if (conservacaoResponse.ok) {
             const conservacaoResult = await conservacaoResponse.json()
-            console.log("Resultado contrato conservação:", conservacaoResult)
 
             if (conservacaoResult.success && conservacaoResult.data && conservacaoResult.data.dia_vencimento) {
-              console.log(
-                "Contrato de conservação encontrado com dia_vencimento:",
-                conservacaoResult.data.dia_vencimento,
-              )
               setContratoInfo({
                 tem_contrato: true,
                 dia_contrato: conservacaoResult.data.dia_vencimento,
               })
             } else {
-              console.log("Nenhum contrato de conservação encontrado")
               setContratoInfo({ tem_contrato: false })
             }
           } else {
-            console.log("Erro ao buscar contrato de conservação")
             setContratoInfo({ tem_contrato: false })
           }
         }
@@ -281,7 +272,6 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
   }
 
   const handleClienteChange = (clienteSelecionado: Cliente | null) => {
-    console.log("Cliente selecionado no dialog:", clienteSelecionado)
     setCliente(clienteSelecionado)
   }
 
@@ -375,7 +365,6 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
           juros_mes_percentual: Number.parseFloat(jurosMesPercentual),
         }))
 
-        console.log("Parcelas geradas:", parcelasPreview)
         setParcelas(parcelasPreview)
         setPreviewOpen(true)
         setLoading(false)
