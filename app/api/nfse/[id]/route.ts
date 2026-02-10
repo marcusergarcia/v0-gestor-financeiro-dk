@@ -9,10 +9,10 @@ export async function GET(
   try {
     const [notaRows] = await pool.execute(
       `SELECT nf.*, c.nome as cliente_nome, c.codigo as cliente_codigo,
-        (SELECT COUNT(*) FROM boletos b WHERE b.numero_nota = nf.numero_nfse AND b.asaas_id IS NOT NULL) as boletos_asaas_count,
-        (SELECT b.asaas_bankslip_url FROM boletos b WHERE b.numero_nota = nf.numero_nfse AND b.asaas_id IS NOT NULL LIMIT 1) as boleto_bankslip_url,
-        (SELECT b.asaas_invoice_url FROM boletos b WHERE b.numero_nota = nf.numero_nfse AND b.asaas_id IS NOT NULL LIMIT 1) as boleto_invoice_url,
-        (SELECT COUNT(*) FROM boletos b WHERE b.numero_nota = nf.numero_nfse) as boletos_total_count
+        (SELECT COUNT(*) FROM boletos b WHERE (b.numero_nota = nf.numero_nfse OR b.numero_nota LIKE CONCAT(nf.numero_nfse, '-%')) AND b.asaas_id IS NOT NULL) as boletos_asaas_count,
+        (SELECT b.asaas_bankslip_url FROM boletos b WHERE (b.numero_nota = nf.numero_nfse OR b.numero_nota LIKE CONCAT(nf.numero_nfse, '-%')) AND b.asaas_id IS NOT NULL ORDER BY b.id LIMIT 1) as boleto_bankslip_url,
+        (SELECT b.asaas_invoice_url FROM boletos b WHERE (b.numero_nota = nf.numero_nfse OR b.numero_nota LIKE CONCAT(nf.numero_nfse, '-%')) AND b.asaas_id IS NOT NULL ORDER BY b.id LIMIT 1) as boleto_invoice_url,
+        (SELECT COUNT(*) FROM boletos b WHERE (b.numero_nota = nf.numero_nfse OR b.numero_nota LIKE CONCAT(nf.numero_nfse, '-%'))) as boletos_total_count
        FROM notas_fiscais nf
        LEFT JOIN clientes c ON nf.cliente_id = c.id
        WHERE nf.id = ?`,

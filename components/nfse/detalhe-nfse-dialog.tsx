@@ -166,7 +166,7 @@ export function DetalheNfseDialog({ open, onOpenChange, notaId, onPrint, onBolet
                       Imprimir
                     </Button>
                   )}
-                  {nota.status === "emitida" && nota.boletos_asaas_count > 0 ? (
+                  {nota.status === "emitida" && Number(nota.boletos_asaas_count || 0) > 0 ? (
                     <Button
                       size="sm"
                       variant="outline"
