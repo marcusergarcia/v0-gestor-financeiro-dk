@@ -181,7 +181,7 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[98vw] w-[98vw] max-h-[70vh] overflow-y-auto p-0">
+      <DialogContent className="max-w-5xl w-[80vw] max-h-[80vh] overflow-y-auto p-0">
         <DialogHeader className="p-4 pb-0">
           <DialogTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
