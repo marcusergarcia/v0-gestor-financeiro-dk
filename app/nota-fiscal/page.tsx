@@ -33,6 +33,7 @@ import {
   RefreshCw,
   Printer,
   Trash2,
+  Receipt,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
@@ -42,6 +43,7 @@ import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
 import { DetalheNfseDialog } from "@/components/nfse/detalhe-nfse-dialog"
 import { ImprimirNfseDialog } from "@/components/nfse/imprimir-nfse-dialog"
 import { NovoBoletoDialog } from "@/components/financeiro/novo-boleto-dialog"
+import { VisualizarBoletosDialog } from "@/components/financeiro/visualizar-boletos-dialog"
 import Link from "next/link"
 
 interface NotaFiscal {
@@ -64,6 +66,10 @@ interface NotaFiscal {
   created_at: string
   cliente_nome: string | null
   mensagem_erro: string | null
+  boletos_asaas_count?: number
+  boleto_bankslip_url?: string | null
+  boleto_invoice_url?: string | null
+  boletos_total_count?: number
 }
 
 function formatDateBR(dateStr: string | null): string {
@@ -94,6 +100,8 @@ export default function NotaFiscalPage() {
   const [logoMenu, setLogoMenu] = useState<string>("")
   const [boletoOpen, setBoletoOpen] = useState(false)
   const [notaParaBoleto, setNotaParaBoleto] = useState<NotaFiscal | null>(null)
+  const [visualizarBoletosOpen, setVisualizarBoletosOpen] = useState(false)
+  const [visualizarBoletosNumero, setVisualizarBoletosNumero] = useState("")
 
   const { toast } = useToast()
 
@@ -618,18 +626,54 @@ export default function NotaFiscalPage() {
                               </Button>
                             )}
                             {nota.status === "emitida" && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                onClick={() => {
-                                  setNotaParaBoleto(nota)
-                                  setBoletoOpen(true)
-                                }}
-                                title="Gerar Boleto"
-                              >
-                                <DollarSign className="h-4 w-4" />
-                              </Button>
+                              Number(nota.boletos_asaas_count || 0) > 0 ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                                  onClick={() => {
+                                    if (nota.boleto_bankslip_url) {
+                                      window.open(nota.boleto_bankslip_url, "_blank")
+                                    } else if (nota.boleto_invoice_url) {
+                                      window.open(nota.boleto_invoice_url, "_blank")
+                                    } else if (nota.numero_nfse) {
+                                      setVisualizarBoletosNumero(String(nota.numero_nfse))
+                                      setVisualizarBoletosOpen(true)
+                                    }
+                                  }}
+                                  title="Imprimir Boleto"
+                                >
+                                  <Receipt className="h-4 w-4" />
+                                </Button>
+                              ) : Number(nota.boletos_total_count || 0) > 0 ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                  onClick={() => {
+                                    if (nota.numero_nfse) {
+                                      setVisualizarBoletosNumero(String(nota.numero_nfse))
+                                      setVisualizarBoletosOpen(true)
+                                    }
+                                  }}
+                                  title="Boleto criado - enviar ao Asaas"
+                                >
+                                  <DollarSign className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  onClick={() => {
+                                    setNotaParaBoleto(nota)
+                                    setBoletoOpen(true)
+                                  }}
+                                  title="Gerar Boleto"
+                                >
+                                  <DollarSign className="h-4 w-4" />
+                                </Button>
+                              )
                             )}
                             {nota.status === "emitida" && (
                               <Button
@@ -697,6 +741,10 @@ export default function NotaFiscalPage() {
           setNotaParaBoleto(nota)
           setBoletoOpen(true)
         }}
+        onViewBoletos={(numeroNfse) => {
+          setVisualizarBoletosNumero(numeroNfse)
+          setVisualizarBoletosOpen(true)
+        }}
       />
 
       <ImprimirNfseDialog
@@ -717,6 +765,12 @@ export default function NotaFiscalPage() {
           setNotaParaBoleto(null)
           fetchNotas()
         }}
+      />
+
+      <VisualizarBoletosDialog
+        open={visualizarBoletosOpen}
+        onOpenChange={setVisualizarBoletosOpen}
+        numeroBase={visualizarBoletosNumero}
       />
 
       {/* Dialog de Cancelamento */}

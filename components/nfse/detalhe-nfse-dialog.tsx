@@ -21,6 +21,7 @@ interface DetalheNfseDialogProps {
   notaId: number | null
   onPrint?: (notaId: number) => void
   onBoleto?: (nota: any) => void
+  onViewBoletos?: (numeroNfse: string) => void
 }
 
 function formatDateBR(dateStr: string | null): string {
@@ -38,7 +39,7 @@ function formatDateBR(dateStr: string | null): string {
   }
 }
 
-export function DetalheNfseDialog({ open, onOpenChange, notaId, onPrint, onBoleto }: DetalheNfseDialogProps) {
+export function DetalheNfseDialog({ open, onOpenChange, notaId, onPrint, onBoleto, onViewBoletos }: DetalheNfseDialogProps) {
   const [loading, setLoading] = useState(false)
   const [consultando, setConsultando] = useState(false)
   const [nota, setNota] = useState<any>(null)
@@ -165,7 +166,26 @@ export function DetalheNfseDialog({ open, onOpenChange, notaId, onPrint, onBolet
                       Imprimir
                     </Button>
                   )}
-                  {nota.status === "emitida" && onBoleto && (
+                  {nota.status === "emitida" && nota.boletos_asaas_count > 0 ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        onOpenChange(false)
+                        if (nota.boleto_bankslip_url) {
+                          window.open(nota.boleto_bankslip_url, "_blank")
+                        } else if (nota.boleto_invoice_url) {
+                          window.open(nota.boleto_invoice_url, "_blank")
+                        } else if (onViewBoletos && nota.numero_nfse) {
+                          onViewBoletos(String(nota.numero_nfse))
+                        }
+                      }}
+                      className="text-teal-600 border-teal-300 hover:bg-teal-50"
+                    >
+                      <Printer className="h-4 w-4 mr-1" />
+                      Imprimir Boleto
+                    </Button>
+                  ) : nota.status === "emitida" && onBoleto ? (
                     <Button
                       size="sm"
                       variant="outline"
@@ -178,7 +198,7 @@ export function DetalheNfseDialog({ open, onOpenChange, notaId, onPrint, onBolet
                       <DollarSign className="h-4 w-4 mr-1" />
                       Gerar Boleto
                     </Button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>
