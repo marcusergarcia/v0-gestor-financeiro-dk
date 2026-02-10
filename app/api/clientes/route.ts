@@ -84,6 +84,60 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
 
+    // Verificar duplicidade de CNPJ
+    if (data.cnpj && data.cnpj.trim()) {
+      const cnpjExistente = await query(
+        "SELECT id, nome, codigo FROM clientes WHERE cnpj = ? AND (status IS NULL OR status != 'inativo') LIMIT 1",
+        [data.cnpj.toUpperCase().replace(/[^\d]/g, "")]
+      )
+      if (cnpjExistente && cnpjExistente.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `CNPJ ja cadastrado para o cliente "${cnpjExistente[0].nome}" (Codigo: ${cnpjExistente[0].codigo || "N/A"})`,
+            field: "cnpj",
+          },
+          { status: 409 },
+        )
+      }
+    }
+
+    // Verificar duplicidade de CPF
+    if (data.cpf && data.cpf.trim()) {
+      const cpfExistente = await query(
+        "SELECT id, nome, codigo FROM clientes WHERE cpf = ? AND (status IS NULL OR status != 'inativo') LIMIT 1",
+        [data.cpf.toUpperCase().replace(/[^\d]/g, "")]
+      )
+      if (cpfExistente && cpfExistente.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `CPF ja cadastrado para o cliente "${cpfExistente[0].nome}" (Codigo: ${cpfExistente[0].codigo || "N/A"})`,
+            field: "cpf",
+          },
+          { status: 409 },
+        )
+      }
+    }
+
+    // Verificar duplicidade de codigo
+    if (data.codigo && data.codigo.trim()) {
+      const codigoExistente = await query(
+        "SELECT id, nome FROM clientes WHERE codigo = ? AND (status IS NULL OR status != 'inativo') LIMIT 1",
+        [data.codigo.toUpperCase()]
+      )
+      if (codigoExistente && codigoExistente.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Codigo ja cadastrado para o cliente "${codigoExistente[0].nome}"`,
+            field: "codigo",
+          },
+          { status: 409 },
+        )
+      }
+    }
+
     const insertQuery = `
       INSERT INTO clientes (
         codigo, nome, cnpj, cpf, email, telefone, endereco, bairro,
@@ -93,7 +147,7 @@ export async function POST(request: NextRequest) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `
 
-    const result = await query(insertQuery, [
+    const params = [
       data.codigo?.toUpperCase() || null,
       data.nome?.toUpperCase(),
       data.cnpj?.toUpperCase() || null,
@@ -111,24 +165,55 @@ export async function POST(request: NextRequest) {
       data.rg_sindico?.toUpperCase() || null,
       data.cpf_sindico?.toUpperCase() || null,
       data.zelador?.toUpperCase() || null,
-      data.tem_contrato || 0,
+      data.tem_contrato ? 1 : 0,
       data.dia_contrato || null,
       data.observacoes?.toUpperCase() || null,
       data.nome_adm?.toUpperCase() || null,
       data.contato_adm?.toUpperCase() || null,
       data.telefone_adm || null,
       data.email_adm?.toLowerCase() || null,
-    ])
+    ]
 
-    console.log(`✅ Cliente criado: ${data.nome} (ID: ${result.insertId})`)
+    const result = await query(insertQuery, params)
 
     return NextResponse.json({
       success: true,
       message: "Cliente criado com sucesso",
       data: { id: result.insertId, ...data },
     })
-  } catch (error) {
-    console.error("❌ Erro ao criar cliente:", error)
-    return NextResponse.json({ success: false, message: "Erro interno do servidor" }, { status: 500 })
+  } catch (error: any) {
+    console.error("Erro ao criar cliente:", error?.message || error)
+
+    // Tratar erro de duplicidade do MySQL (ER_DUP_ENTRY)
+    if (error?.code === "ER_DUP_ENTRY" || error?.errno === 1062) {
+      const msg = error?.message || ""
+      if (msg.includes("cnpj")) {
+        return NextResponse.json(
+          { success: false, message: "CNPJ ja cadastrado para outro cliente", field: "cnpj" },
+          { status: 409 },
+        )
+      }
+      if (msg.includes("cpf")) {
+        return NextResponse.json(
+          { success: false, message: "CPF ja cadastrado para outro cliente", field: "cpf" },
+          { status: 409 },
+        )
+      }
+      if (msg.includes("codigo")) {
+        return NextResponse.json(
+          { success: false, message: "Codigo ja cadastrado para outro cliente", field: "codigo" },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json(
+        { success: false, message: "Registro duplicado. Verifique CNPJ, CPF ou Codigo." },
+        { status: 409 },
+      )
+    }
+
+    return NextResponse.json(
+      { success: false, message: "Erro interno do servidor" },
+      { status: 500 },
+    )
   }
 }

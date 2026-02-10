@@ -141,22 +141,29 @@ export default function NovoClientePage() {
     }
   }
 
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitError(null)
 
     if (!formData.nome.trim()) {
+      const msg = "Nome e obrigatorio"
+      setSubmitError(msg)
       toast({
-        title: "Erro",
-        description: "Nome é obrigatório",
+        title: "Erro de validacao",
+        description: msg,
         variant: "destructive",
       })
       return
     }
 
     if (!formData.cnpj && !formData.cpf) {
+      const msg = "CNPJ ou CPF e obrigatorio para gerar o codigo"
+      setSubmitError(msg)
       toast({
-        title: "Erro",
-        description: "CNPJ ou CPF é obrigatório para gerar o código",
+        title: "Erro de validacao",
+        description: msg,
         variant: "destructive",
       })
       return
@@ -165,15 +172,17 @@ export default function NovoClientePage() {
     setLoading(true)
 
     try {
+      const payload = {
+        ...formData,
+        dia_contrato: formData.dia_contrato ? Number.parseInt(formData.dia_contrato) : null,
+      }
+
       const response = await fetch("/api/clientes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          ...formData,
-          dia_contrato: formData.dia_contrato ? Number.parseInt(formData.dia_contrato) : null,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const result = await response.json()
@@ -185,17 +194,26 @@ export default function NovoClientePage() {
         })
         router.push("/clientes")
       } else {
+        // Montar titulo adequado baseado no campo duplicado
+        let titulo = "Erro ao salvar"
+        if (result.field === "cnpj") titulo = "CNPJ ja cadastrado"
+        else if (result.field === "cpf") titulo = "CPF ja cadastrado"
+        else if (result.field === "codigo") titulo = "Codigo ja cadastrado"
+
+        const msg = result.message || "Erro ao criar cliente"
+        setSubmitError(msg)
         toast({
-          title: "Erro",
-          description: result.message || "Erro ao criar cliente",
+          title: titulo,
+          description: msg,
           variant: "destructive",
         })
       }
-    } catch (error) {
-      console.error("Erro ao criar cliente:", error)
+    } catch (error: any) {
+      const msg = "Erro de conexao. Tente novamente."
+      setSubmitError(msg)
       toast({
-        title: "Erro",
-        description: "Erro de conexão. Tente novamente.",
+        title: "Erro de conexao",
+        description: msg,
         variant: "destructive",
       })
     } finally {
@@ -578,7 +596,27 @@ export default function NovoClientePage() {
             </CardContent>
           </Card>
 
-          {/* Botões de Ação */}
+          {/* Erro visível */}
+          {submitError && (
+            <div className="p-4 bg-red-50 border border-red-300 rounded-lg flex items-start gap-3">
+              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-sm font-bold">!</div>
+              <div>
+                <p className="font-medium text-red-800">Erro ao salvar cliente</p>
+                <p className="text-sm text-red-600 mt-1">{submitError}</p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-auto text-red-500 hover:text-red-700"
+                onClick={() => setSubmitError(null)}
+              >
+                Fechar
+              </Button>
+            </div>
+          )}
+
+          {/* Botoes de Acao */}
           <div className="flex justify-end gap-4 pt-4">
             <Button type="button" variant="outline" onClick={handleVoltar}>
               Cancelar

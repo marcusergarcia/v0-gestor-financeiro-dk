@@ -39,9 +39,20 @@ export default function LoginPage() {
       const logoResult = await logoResponse.json()
 
       if (logoResult.success && logoResult.data) {
-        const logoMenuData = logoResult.data.find((logo: any) => logo.tipo === "menu")
-        if (logoMenuData && logoMenuData.caminho) {
-          setLogoMenu(logoMenuData.caminho)
+        // Primeiro tenta logo "menu", senao usa logo "sistema"
+        const logoMenuData = logoResult.data.find((logo: any) => logo.tipo === "menu" && logo.ativo)
+        const logoSistemaData = logoResult.data.find((logo: any) => logo.tipo === "sistema" && logo.ativo)
+        const logoData = logoMenuData || logoSistemaData
+
+        if (logoData) {
+          if (logoData.caminho) {
+            setLogoMenu(logoData.caminho)
+          } else if (logoData.dados) {
+            const logoSrc = logoData.dados.startsWith("data:")
+              ? logoData.dados
+              : `data:image/${logoData.formato || "png"};base64,${logoData.dados}`
+            setLogoMenu(logoSrc)
+          }
         }
       }
     } catch (error) {
@@ -177,7 +188,7 @@ export default function LoginPage() {
         </Card>
 
         {/* Rodapé */}
-        <p className="text-center text-sm text-gray-500">© 2024 Gestor Financeiro. Todos os direitos reservados.</p>
+        <p className="text-center text-sm text-gray-500">© 2025 Gestor Financeiro. Todos os direitos reservados.</p>
       </div>
     </div>
   )
