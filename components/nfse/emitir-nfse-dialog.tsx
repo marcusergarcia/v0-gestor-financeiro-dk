@@ -233,7 +233,7 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1650px] w-[95vw] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-[98vw] w-[98vw] max-h-[70vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-emerald-600" />
