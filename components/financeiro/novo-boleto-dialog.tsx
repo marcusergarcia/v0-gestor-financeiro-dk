@@ -60,7 +60,12 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
   } | null>(null)
   const [validandoVencimento, setValidandoVencimento] = useState(false)
 
+  const [descricaoBoletoCustom, setDescricaoBoletoCustom] = useState("")
+
   const gerarDescricao = (): string => {
+    // Se tiver descricao customizada vinda da nota fiscal, usar ela
+    if (descricaoBoletoCustom) return descricaoBoletoCustom
+
     if (!numeroNota.trim()) return ""
 
     const partes: string[] = ["NOTA FISCAL", numeroNota.trim()]
@@ -84,8 +89,50 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
       setDataNota(new Date().toISOString().split("T")[0])
       // Validar a data inicial
       validarVencimento(dataInicial)
+
+      // Pre-preencher dados da nota fiscal se disponivel
+      if (notaFiscal) {
+        if (notaFiscal.valor_total || notaFiscal.valor_servicos) {
+          setValorTotal(String(notaFiscal.valor_total || notaFiscal.valor_servicos))
+        }
+        if (notaFiscal.numero_nfse) {
+          setNumeroNota(String(notaFiscal.numero_nfse))
+        }
+        if (notaFiscal.data_emissao) {
+          const dataEmissao = new Date(notaFiscal.data_emissao).toISOString().split("T")[0]
+          setDataNota(dataEmissao)
+        }
+        if (notaFiscal.descricao_servico) {
+          setDescricaoBoletoCustom(notaFiscal.descricao_servico)
+        }
+        // Pre-selecionar o cliente a partir dos dados da nota
+        if (notaFiscal.cliente_id) {
+          fetch(`/api/clientes/${notaFiscal.cliente_id}`)
+            .then((res) => res.json())
+            .then((data) => {
+              if (data && data.id) {
+                const clienteNota: Cliente = {
+                  id: String(data.id),
+                  codigo: data.codigo,
+                  nome: data.nome,
+                  cnpj: data.cnpj,
+                  cpf: data.cpf,
+                  email: data.email,
+                  telefone: data.telefone,
+                  endereco: data.endereco,
+                  bairro: data.bairro,
+                  cidade: data.cidade,
+                  estado: data.estado,
+                  cep: data.cep,
+                }
+                setCliente(clienteNota)
+              }
+            })
+            .catch((err) => console.error("Erro ao buscar cliente da nota:", err))
+        }
+      }
     }
-  }, [open])
+  }, [open, notaFiscal])
 
   const buscarInfoCliente = async (clienteId: string) => {
     try {
@@ -414,6 +461,7 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
     setJurosMesPercentual("2.00")
     setDesconto("0.00")
     setVencimentoAlerta(null)
+    setDescricaoBoletoCustom("")
   }
 
   const handleClose = () => {
@@ -695,19 +743,23 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
               </Select>
             </div>
 
-            {numeroNota.trim() && (
+            {(numeroNota.trim() || descricaoBoletoCustom) && (
               <div className="space-y-2">
                 <Label htmlFor="descricao-produto" className="text-sm font-semibold text-gray-700">
                   Descrição do Boleto
                 </Label>
-                <Input
+                <Textarea
                   id="descricao-produto"
-                  value={gerarDescricao()}
-                  readOnly
-                  disabled
-                  className="border-gray-200 bg-gray-50 text-gray-700 cursor-not-allowed"
+                  value={descricaoBoletoCustom || gerarDescricao()}
+                  onChange={(e) => setDescricaoBoletoCustom(e.target.value)}
+                  rows={3}
+                  className="border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
                 />
-                <p className="text-xs text-gray-500">Esta descrição será enviada automaticamente ao Asaas</p>
+                <p className="text-xs text-gray-500">
+                  {descricaoBoletoCustom
+                    ? "Descricao preenchida a partir da nota fiscal (editavel)"
+                    : "Esta descricao sera enviada automaticamente ao Asaas"}
+                </p>
               </div>
             )}
 
