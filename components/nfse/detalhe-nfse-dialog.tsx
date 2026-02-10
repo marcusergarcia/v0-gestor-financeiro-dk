@@ -11,7 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
-import { Loader2, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, Code, Printer } from "lucide-react"
+import { Loader2, FileText, Clock, CheckCircle2, XCircle, AlertCircle, RefreshCw, Code, Printer, DollarSign } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
@@ -20,6 +20,7 @@ interface DetalheNfseDialogProps {
   onOpenChange: (open: boolean) => void
   notaId: number | null
   onPrint?: (notaId: number) => void
+  onBoleto?: (nota: any) => void
 }
 
 function formatDateBR(dateStr: string | null): string {
@@ -37,7 +38,7 @@ function formatDateBR(dateStr: string | null): string {
   }
 }
 
-export function DetalheNfseDialog({ open, onOpenChange, notaId, onPrint }: DetalheNfseDialogProps) {
+export function DetalheNfseDialog({ open, onOpenChange, notaId, onPrint, onBoleto }: DetalheNfseDialogProps) {
   const [loading, setLoading] = useState(false)
   const [consultando, setConsultando] = useState(false)
   const [nota, setNota] = useState<any>(null)
@@ -149,20 +150,36 @@ export function DetalheNfseDialog({ open, onOpenChange, notaId, onPrint }: Detal
                 {nota.data_emissao && (
                   <p className="text-xs text-gray-500">Emitida em: {formatDateBR(nota.data_emissao)}</p>
                 )}
-                {(nota.status === "emitida" || nota.status === "cancelada") && onPrint && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      onOpenChange(false)
-                      onPrint(nota.id || notaId)
-                    }}
-                    className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
-                  >
-                    <Printer className="h-4 w-4 mr-1" />
-                    Imprimir
-                  </Button>
-                )}
+                <div className="flex flex-col gap-1">
+                  {(nota.status === "emitida" || nota.status === "cancelada") && onPrint && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        onOpenChange(false)
+                        onPrint(nota.id || notaId)
+                      }}
+                      className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                    >
+                      <Printer className="h-4 w-4 mr-1" />
+                      Imprimir
+                    </Button>
+                  )}
+                  {nota.status === "emitida" && onBoleto && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        onOpenChange(false)
+                        onBoleto(nota)
+                      }}
+                      className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                    >
+                      <DollarSign className="h-4 w-4 mr-1" />
+                      Gerar Boleto
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
