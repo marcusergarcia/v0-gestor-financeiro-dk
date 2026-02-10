@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Loader2, Printer, Download } from "lucide-react"
+import { Loader2, Printer } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 
 interface ImprimirNfseDialogProps {
@@ -30,6 +30,22 @@ function formatDateBR(dateStr: string | null): string {
   }
 }
 
+function formatDateTimeBR(dateStr: string | null): string {
+  if (!dateStr) return "-"
+  try {
+    return new Date(dateStr).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+  } catch {
+    return dateStr
+  }
+}
+
 function formatCpfCnpj(value: string): string {
   if (!value) return "-"
   const clean = value.replace(/\D/g, "")
@@ -42,10 +58,37 @@ function formatCpfCnpj(value: string): string {
   return value
 }
 
+function formatCep(value: string): string {
+  if (!value) return ""
+  const clean = value.replace(/\D/g, "")
+  if (clean.length === 8) {
+    return clean.replace(/(\d{5})(\d{3})/, "$1-$2")
+  }
+  return value
+}
+
 export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseDialogProps) {
   const [loading, setLoading] = useState(false)
   const [dados, setDados] = useState<any>(null)
+  const [brasaoBase64, setBrasaoBase64] = useState<string | null>(null)
   const printRef = useRef<HTMLDivElement>(null)
+
+  // Convert brasao image to base64 so it works consistently in both modal and print window
+  useEffect(() => {
+    const img = new Image()
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const ctx = canvas.getContext("2d")
+      if (ctx) {
+        ctx.drawImage(img, 0, 0)
+        setBrasaoBase64(canvas.toDataURL("image/png"))
+      }
+    }
+    img.src = "/images/brasao-sp.png"
+  }, [])
 
   useEffect(() => {
     if (open && notaId) {
@@ -75,48 +118,61 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
     const printWindow = window.open("", "_blank")
     if (!printWindow) return
 
+    // Get the full URL for images so they work in the new window
+    const baseUrl = window.location.origin
+
+    // Clone content and fix relative image paths (skip data: URIs which are already base64)
+    let htmlContent = content.innerHTML
+    htmlContent = htmlContent.replace(
+      /src="\/images\//g,
+      `src="${baseUrl}/images/`
+    )
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
         <title>NFS-e ${dados?.nota?.numero_nfse || ""}</title>
         <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #333; padding: 20px; }
-          .nfse-container { max-width: 800px; margin: 0 auto; border: 2px solid #333; }
-          .nfse-header { display: flex; align-items: center; border-bottom: 2px solid #333; padding: 12px 16px; gap: 16px; }
-          .nfse-header img { max-height: 60px; max-width: 120px; object-fit: contain; }
-          .nfse-header-info { flex: 1; }
-          .nfse-header-info h1 { font-size: 16px; margin-bottom: 2px; }
-          .nfse-header-info p { font-size: 10px; color: #555; }
-          .nfse-title { background: #1a5c2e; color: white; text-align: center; padding: 6px; font-size: 14px; font-weight: bold; letter-spacing: 1px; }
-          .nfse-numero { display: flex; justify-content: space-between; border-bottom: 1px solid #ccc; padding: 8px 16px; background: #f8f8f8; }
-          .nfse-numero span { font-weight: bold; }
-          .nfse-section { border-bottom: 1px solid #ccc; padding: 8px 16px; }
-          .nfse-section-title { font-size: 10px; font-weight: bold; text-transform: uppercase; color: #1a5c2e; margin-bottom: 6px; border-bottom: 1px solid #e0e0e0; padding-bottom: 2px; }
-          .nfse-grid { display: grid; gap: 4px 16px; }
-          .nfse-grid-2 { grid-template-columns: 1fr 1fr; }
-          .nfse-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
-          .nfse-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
-          .nfse-field label { font-size: 9px; color: #777; text-transform: uppercase; display: block; }
-          .nfse-field span { font-size: 11px; font-weight: 500; }
-          .nfse-discriminacao { white-space: pre-wrap; font-size: 11px; line-height: 1.5; padding: 6px 0; }
-          .nfse-valores-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-          .nfse-total { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: #f0f7f0; border-top: 2px solid #1a5c2e; }
-          .nfse-total-label { font-size: 12px; font-weight: bold; color: #1a5c2e; }
-          .nfse-total-value { font-size: 18px; font-weight: bold; color: #1a5c2e; }
-          .nfse-footer { padding: 6px 16px; text-align: center; font-size: 9px; color: #999; border-top: 1px solid #e0e0e0; }
-          .nfse-status-cancelada { background: #fef2f2; border: 1px solid #ef4444; color: #dc2626; text-align: center; padding: 8px; font-size: 14px; font-weight: bold; margin: 8px 16px; }
-          @media print { body { padding: 0; } .nfse-container { border: 1px solid #333; } }
+          ${getPrintStyles()}
+          img { max-width: 100%; }
+          @media print {
+            body { padding: 0; margin: 0; }
+            @page { margin: 10mm; size: A4; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+          }
         </style>
       </head>
-      <body>${content.innerHTML}</body>
+      <body>${htmlContent}</body>
       </html>
     `)
     printWindow.document.close()
-    setTimeout(() => {
-      printWindow.print()
-    }, 300)
+    // Wait for images to fully load before printing
+    const images = printWindow.document.querySelectorAll("img")
+    let loadedCount = 0
+    const totalImages = images.length
+
+    const tryPrint = () => {
+      loadedCount++
+      if (loadedCount >= totalImages) {
+        setTimeout(() => printWindow.print(), 300)
+      }
+    }
+
+    if (totalImages === 0) {
+      setTimeout(() => printWindow.print(), 300)
+    } else {
+      images.forEach((img) => {
+        if (img.complete) {
+          tryPrint()
+        } else {
+          img.onload = tryPrint
+          img.onerror = tryPrint
+        }
+      })
+      // Fallback: print after 3s even if images fail
+      setTimeout(() => printWindow.print(), 3000)
+    }
   }
 
   const nota = dados?.nota
@@ -125,24 +181,22 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[900px] max-h-[90vh] overflow-y-auto p-0">
-        <DialogHeader className="p-4 pb-0">
+      <DialogContent className="max-w-5xl w-[80vw] max-h-[80vh] overflow-y-auto p-0">
+        <DialogHeader className="p-4 pb-0 pr-14">
           <DialogTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Printer className="h-5 w-5 text-emerald-600" />
               Imprimir NFS-e
             </span>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={handlePrint}
-                disabled={loading || !dados}
-                className="bg-emerald-600 hover:bg-emerald-700 text-foreground"
-              >
-                <Printer className="h-4 w-4 mr-2" />
-                Imprimir
-              </Button>
-            </div>
+            <Button
+              size="sm"
+              onClick={handlePrint}
+              disabled={loading || !dados}
+              className="bg-emerald-600 hover:bg-emerald-700 text-foreground"
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
+            </Button>
           </DialogTitle>
         </DialogHeader>
 
@@ -153,195 +207,7 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
         ) : nota ? (
           <div className="p-4 pt-2">
             <div ref={printRef}>
-              <div className="nfse-container" style={{ maxWidth: 800, margin: "0 auto", border: "2px solid #333", fontFamily: "Arial, Helvetica, sans-serif", fontSize: 11, color: "#333" }}>
-                {/* Header */}
-                <div style={{ display: "flex", alignItems: "center", borderBottom: "2px solid #333", padding: "12px 16px", gap: 16 }}>
-                  {logo && (
-                    <img
-                      src={logo}
-                      alt="Logo"
-                      style={{ maxHeight: 60, maxWidth: 120, objectFit: "contain" }}
-                      crossOrigin="anonymous"
-                    />
-                  )}
-                  <div style={{ flex: 1 }}>
-                    <h1 style={{ fontSize: 16, marginBottom: 2, fontWeight: "bold" }}>{prestador?.razao_social || "Prestador"}</h1>
-                    <p style={{ fontSize: 10, color: "#555" }}>CNPJ: {formatCpfCnpj(prestador?.cnpj || "")}</p>
-                    <p style={{ fontSize: 10, color: "#555" }}>IM: {prestador?.inscricao_municipal || "-"}</p>
-                    {prestador?.endereco && (
-                      <p style={{ fontSize: 10, color: "#555" }}>
-                        {[prestador.endereco, prestador.numero_endereco, prestador.complemento, prestador.bairro, prestador.cidade, prestador.uf].filter(Boolean).join(", ")}
-                        {prestador.cep ? ` - CEP: ${prestador.cep}` : ""}
-                      </p>
-                    )}
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <p style={{ fontSize: 9, color: "#777" }}>Prefeitura de Sao Paulo</p>
-                    <p style={{ fontSize: 9, color: "#777" }}>Secretaria de Financas</p>
-                  </div>
-                </div>
-
-                {/* Title */}
-                <div style={{ background: "#1a5c2e", color: "white", textAlign: "center", padding: 6, fontSize: 14, fontWeight: "bold", letterSpacing: 1 }}>
-                  NOTA FISCAL DE SERVICOS ELETRONICA - NFS-e
-                </div>
-
-                {/* Status cancelada */}
-                {nota.status === "cancelada" && (
-                  <div style={{ background: "#fef2f2", border: "1px solid #ef4444", color: "#dc2626", textAlign: "center", padding: 8, fontSize: 14, fontWeight: "bold", margin: "8px 16px" }}>
-                    NOTA FISCAL CANCELADA
-                    {nota.data_cancelamento && ` em ${formatDateBR(nota.data_cancelamento)}`}
-                  </div>
-                )}
-
-                {/* Numero e Data */}
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #ccc", padding: "8px 16px", background: "#f8f8f8" }}>
-                  <div>
-                    <span style={{ fontSize: 9, color: "#777" }}>NUMERO DA NFS-e: </span>
-                    <span style={{ fontWeight: "bold", fontSize: 14 }}>{nota.numero_nfse || "-"}</span>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: 9, color: "#777" }}>DATA DE EMISSAO: </span>
-                    <span style={{ fontWeight: "bold" }}>{formatDateBR(nota.data_emissao || nota.created_at)}</span>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: 9, color: "#777" }}>COD. VERIFICACAO: </span>
-                    <span style={{ fontWeight: "bold" }}>{nota.codigo_verificacao || "-"}</span>
-                  </div>
-                </div>
-
-                {/* RPS */}
-                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #ccc", padding: "4px 16px", fontSize: 10 }}>
-                  <span>RPS: {nota.serie_rps}.{String(nota.numero_rps).padStart(8, "0")}</span>
-                  <span>Competencia: {formatDateBR(nota.data_emissao || nota.created_at)}</span>
-                </div>
-
-                {/* Tomador */}
-                <div style={{ borderBottom: "1px solid #ccc", padding: "8px 16px" }}>
-                  <div style={{ fontSize: 10, fontWeight: "bold", textTransform: "uppercase", color: "#1a5c2e", marginBottom: 6, borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>
-                    Tomador de Servicos
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 16px" }}>
-                    <div>
-                      <label style={{ fontSize: 9, color: "#777", display: "block" }}>NOME/RAZAO SOCIAL</label>
-                      <span style={{ fontWeight: 500 }}>{nota.tomador_razao_social || "-"}</span>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 9, color: "#777", display: "block" }}>CPF/CNPJ</label>
-                      <span style={{ fontWeight: 500 }}>{formatCpfCnpj(nota.tomador_cpf_cnpj || "")}</span>
-                    </div>
-                    {nota.tomador_email && (
-                      <div>
-                        <label style={{ fontSize: 9, color: "#777", display: "block" }}>EMAIL</label>
-                        <span style={{ fontWeight: 500 }}>{nota.tomador_email}</span>
-                      </div>
-                    )}
-                    {nota.tomador_endereco && (
-                      <div style={{ gridColumn: nota.tomador_email ? "auto" : "span 2" }}>
-                        <label style={{ fontSize: 9, color: "#777", display: "block" }}>ENDERECO</label>
-                        <span style={{ fontWeight: 500 }}>
-                          {[nota.tomador_endereco, nota.tomador_numero, nota.tomador_bairro, nota.tomador_cidade, nota.tomador_uf].filter(Boolean).join(", ")}
-                          {nota.tomador_cep ? ` - CEP: ${nota.tomador_cep}` : ""}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Servico */}
-                <div style={{ borderBottom: "1px solid #ccc", padding: "8px 16px" }}>
-                  <div style={{ fontSize: 10, fontWeight: "bold", textTransform: "uppercase", color: "#1a5c2e", marginBottom: 6, borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>
-                    Discriminacao dos Servicos
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "4px 16px", marginBottom: 6 }}>
-                    <div>
-                      <label style={{ fontSize: 9, color: "#777", display: "block" }}>CODIGO DO SERVICO</label>
-                      <span style={{ fontWeight: 500 }}>{nota.codigo_servico || "-"}</span>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 9, color: "#777", display: "block" }}>ALIQUOTA ISS</label>
-                      <span style={{ fontWeight: 500 }}>{((nota.aliquota_iss || 0) * 100).toFixed(2)}%</span>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 9, color: "#777", display: "block" }}>ISS RETIDO</label>
-                      <span style={{ fontWeight: 500 }}>{nota.iss_retido ? "Sim" : "Nao"}</span>
-                    </div>
-                  </div>
-                  <div style={{ whiteSpace: "pre-wrap", fontSize: 11, lineHeight: 1.5, padding: "6px 0" }}>
-                    {nota.descricao_servico || "-"}
-                  </div>
-                </div>
-
-                {/* Valores */}
-                <div style={{ borderBottom: "1px solid #ccc", padding: "8px 16px" }}>
-                  <div style={{ fontSize: 10, fontWeight: "bold", textTransform: "uppercase", color: "#1a5c2e", marginBottom: 6, borderBottom: "1px solid #e0e0e0", paddingBottom: 2 }}>
-                    Valores
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4 }}>
-                    <div>
-                      <label style={{ fontSize: 9, color: "#777", display: "block" }}>VALOR SERVICOS</label>
-                      <span style={{ fontWeight: 500 }}>{formatCurrency(nota.valor_servicos)}</span>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 9, color: "#777", display: "block" }}>DEDUCOES</label>
-                      <span style={{ fontWeight: 500 }}>{formatCurrency(nota.valor_deducoes || 0)}</span>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 9, color: "#777", display: "block" }}>BASE DE CALCULO</label>
-                      <span style={{ fontWeight: 500 }}>{formatCurrency((nota.valor_servicos || 0) - (nota.valor_deducoes || 0))}</span>
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 9, color: "#777", display: "block" }}>VALOR ISS</label>
-                      <span style={{ fontWeight: 500 }}>{formatCurrency(nota.valor_iss || 0)}</span>
-                    </div>
-                    {(nota.valor_pis > 0 || nota.valor_cofins > 0 || nota.valor_ir > 0 || nota.valor_inss > 0 || nota.valor_csll > 0) && (
-                      <>
-                        {nota.valor_pis > 0 && (
-                          <div>
-                            <label style={{ fontSize: 9, color: "#777", display: "block" }}>PIS</label>
-                            <span style={{ fontWeight: 500 }}>{formatCurrency(nota.valor_pis)}</span>
-                          </div>
-                        )}
-                        {nota.valor_cofins > 0 && (
-                          <div>
-                            <label style={{ fontSize: 9, color: "#777", display: "block" }}>COFINS</label>
-                            <span style={{ fontWeight: 500 }}>{formatCurrency(nota.valor_cofins)}</span>
-                          </div>
-                        )}
-                        {nota.valor_inss > 0 && (
-                          <div>
-                            <label style={{ fontSize: 9, color: "#777", display: "block" }}>INSS</label>
-                            <span style={{ fontWeight: 500 }}>{formatCurrency(nota.valor_inss)}</span>
-                          </div>
-                        )}
-                        {nota.valor_ir > 0 && (
-                          <div>
-                            <label style={{ fontSize: 9, color: "#777", display: "block" }}>IR</label>
-                            <span style={{ fontWeight: 500 }}>{formatCurrency(nota.valor_ir)}</span>
-                          </div>
-                        )}
-                        {nota.valor_csll > 0 && (
-                          <div>
-                            <label style={{ fontSize: 9, color: "#777", display: "block" }}>CSLL</label>
-                            <span style={{ fontWeight: 500 }}>{formatCurrency(nota.valor_csll)}</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Total */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", background: "#f0f7f0", borderTop: "2px solid #1a5c2e" }}>
-                  <span style={{ fontSize: 12, fontWeight: "bold", color: "#1a5c2e" }}>VALOR TOTAL DA NOTA</span>
-                  <span style={{ fontSize: 18, fontWeight: "bold", color: "#1a5c2e" }}>{formatCurrency(nota.valor_total)}</span>
-                </div>
-
-                {/* Footer */}
-                <div style={{ padding: "6px 16px", textAlign: "center", fontSize: 9, color: "#999", borderTop: "1px solid #e0e0e0" }}>
-                  Documento gerado pelo sistema de gestao financeira | NFS-e emitida conforme legislacao municipal
-                </div>
-              </div>
+              <NfsePrefeituraSP nota={nota} prestador={prestador} logo={logo} brasaoBase64={brasaoBase64} />
             </div>
           </div>
         ) : (
@@ -350,4 +216,442 @@ export function ImprimirNfseDialog({ open, onOpenChange, notaId }: ImprimirNfseD
       </DialogContent>
     </Dialog>
   )
+}
+
+// ============================================================
+// Componente que renderiza o layout oficial da Prefeitura de SP
+// ============================================================
+function NfsePrefeituraSP({ nota, prestador, logo, brasaoBase64 }: { nota: any; prestador: any; logo: string | null; brasaoBase64: string | null }) {
+  const isCancelada = nota.status === "cancelada"
+
+  const enderecoTomador = [
+    nota.tomador_endereco,
+    nota.tomador_numero,
+    nota.tomador_complemento,
+  ].filter(Boolean).join(", ")
+
+  const enderecoPrestador = [
+    prestador?.endereco,
+    prestador?.numero_endereco,
+    prestador?.complemento,
+  ].filter(Boolean).join(", ")
+
+  const valorServicos = nota.valor_servicos || 0
+  const valorDeducoes = nota.valor_deducoes || 0
+  const baseCalculo = valorServicos - valorDeducoes
+  const aliquotaIss = (nota.aliquota_iss || 0) * 100
+  const valorIss = nota.valor_iss || 0
+  const valorCredito = 0 // Credito nao disponivel no sistema
+  const isOptanteSimples = prestador?.optante_simples === 1 || prestador?.optante_simples === "1"
+
+  return (
+    <div style={{
+      fontFamily: "Arial, Helvetica, sans-serif",
+      fontSize: "10px",
+      color: "#000",
+      maxWidth: "100%",
+      margin: "0 auto",
+      lineHeight: 1.3,
+    }}>
+      {/* ===== CABECALHO PREFEITURA ===== */}
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid #1a3a6e" }}>
+        <tbody>
+          <tr>
+            <td style={{ width: "80px", padding: "8px 10px", verticalAlign: "middle", borderRight: "1px solid #1a3a6e", textAlign: "center" }}>
+              {/* Brasao oficial da Prefeitura de Sao Paulo */}
+              <img
+                src={brasaoBase64 || "/images/brasao-sp.png"}
+                alt="Brasao da Prefeitura de Sao Paulo"
+                style={{ display: "block", margin: "0 auto", width: "60px", height: "auto" }}
+                crossOrigin="anonymous"
+              />
+            </td>
+            <td style={{ padding: "8px 16px", verticalAlign: "middle" }}>
+              <div style={{ fontSize: "11px", fontWeight: "bold", color: "#1a3a6e", marginBottom: 1 }}>
+                PREFEITURA DO MUNICIPIO DE SAO PAULO
+              </div>
+              <div style={{ fontSize: "10px", color: "#1a3a6e", marginBottom: 4 }}>
+                SECRETARIA MUNICIPAL DA FAZENDA
+              </div>
+              <div style={{ fontSize: "14px", fontWeight: "bold", color: "#1a3a6e", letterSpacing: "0.3px" }}>
+                NOTA FISCAL ELETRONICA DE SERVICOS - NFS-e
+              </div>
+              {nota.numero_rps && (
+                <div style={{ fontSize: "9px", color: "#444", marginTop: 4 }}>
+                  RPS N.{" "}{nota.numero_rps}{nota.serie_rps ? ` Serie ${nota.serie_rps}` : ""}, emitido em {formatDateBR(nota.data_emissao || nota.created_at)}
+                </div>
+              )}
+            </td>
+            <td style={{ width: "200px", padding: "8px 12px", verticalAlign: "top", borderLeft: "1px solid #1a3a6e" }}>
+              {isCancelada && (
+                <div style={{
+                  background: "#dc2626",
+                  color: "#fff",
+                  fontWeight: "bold",
+                  fontSize: "11px",
+                  padding: "3px 10px",
+                  marginBottom: 6,
+                  textAlign: "center",
+                }}>
+                  CANCELADA
+                </div>
+              )}
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ fontSize: "8px", color: "#555", textTransform: "uppercase" }}>Numero da Nota</div>
+                <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1a3a6e" }}>
+                  {nota.numero_nfse ? String(nota.numero_nfse).padStart(8, "0") : "-"}
+                </div>
+              </div>
+              <div style={{ marginBottom: 4 }}>
+                <div style={{ fontSize: "8px", color: "#555", textTransform: "uppercase" }}>Data e Hora de Emissao</div>
+                <div style={{ fontSize: "10px", fontWeight: "bold", color: "#000" }}>
+                  {formatDateTimeBR(nota.data_emissao || nota.created_at)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "8px", color: "#555", textTransform: "uppercase" }}>Codigo de Verificacao</div>
+                <div style={{ fontSize: "10px", fontWeight: "bold", color: "#000" }}>
+                  {nota.codigo_verificacao || "-"}
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Dados ja exibidos no cabecalho - sem duplicacao */}
+
+      {/* ===== PRESTADOR DE SERVICOS ===== */}
+      <SectionHeader>PRESTADOR DE SERVICOS</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          <tr>
+            {/* Logo da empresa ao lado esquerdo do prestador (vem do sistema - Configuracoes > Logos) */}
+            {logo && (
+              <td rowSpan={3} style={{ width: "70px", padding: "6px 8px", verticalAlign: "middle", borderRight: "1px solid #999", textAlign: "center" }}>
+                <img
+                  src={logo}
+                  alt="Logo da empresa"
+                  style={{ display: "block", margin: "0 auto", maxWidth: "55px", maxHeight: "55px", objectFit: "contain" }}
+                  crossOrigin="anonymous"
+                />
+              </td>
+            )}
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "auto" }}>
+              <FieldLabel>Nome/Razao Social</FieldLabel>
+              <FieldValue bold>{prestador?.razao_social || "-"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "22%" }}>
+              <FieldLabel>CPF/CNPJ</FieldLabel>
+              <FieldValue>{formatCpfCnpj(prestador?.cnpj || "")}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, width: "22%" }}>
+              <FieldLabel>Inscricao Municipal</FieldLabel>
+              <FieldValue>{prestador?.inscricao_municipal || "-"}</FieldValue>
+            </td>
+          </tr>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>Endereco</FieldLabel>
+              <FieldValue>{enderecoPrestador || "-"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>Municipio</FieldLabel>
+              <FieldValue>{prestador?.cidade || "SAO PAULO"} - {prestador?.uf || "SP"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderTop: "1px solid #999" }}>
+              <FieldLabel>CEP</FieldLabel>
+              <FieldValue>{formatCep(prestador?.cep || "")}</FieldValue>
+            </td>
+          </tr>
+          {(prestador?.email || prestador?.telefone) && (
+            <tr>
+              <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+                <FieldLabel>E-mail</FieldLabel>
+                <FieldValue>{prestador?.email || "-"}</FieldValue>
+              </td>
+              <td colSpan={2} style={{ ...cellStyle, borderTop: "1px solid #999" }}>
+                <FieldLabel>Telefone</FieldLabel>
+                <FieldValue>{prestador?.telefone || "-"}</FieldValue>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {/* ===== TOMADOR DE SERVICOS ===== */}
+      <SectionHeader>TOMADOR DE SERVICOS</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "50%" }}>
+              <FieldLabel>Nome/Razao Social</FieldLabel>
+              <FieldValue bold>{nota.tomador_razao_social || "-"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "25%" }}>
+              <FieldLabel>CPF/CNPJ</FieldLabel>
+              <FieldValue>{formatCpfCnpj(nota.tomador_cpf_cnpj || "")}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, width: "25%" }}>
+              <FieldLabel>Inscricao Municipal</FieldLabel>
+              <FieldValue>{nota.tomador_inscricao_municipal || "-"}</FieldValue>
+            </td>
+          </tr>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>Endereco</FieldLabel>
+              <FieldValue>{enderecoTomador || "-"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>Municipio</FieldLabel>
+              <FieldValue>{nota.tomador_cidade || "-"}{nota.tomador_uf ? ` - ${nota.tomador_uf}` : ""}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderTop: "1px solid #999" }}>
+              <FieldLabel>CEP</FieldLabel>
+              <FieldValue>{formatCep(nota.tomador_cep || "")}</FieldValue>
+            </td>
+          </tr>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>E-mail</FieldLabel>
+              <FieldValue>{nota.tomador_email || "-"}</FieldValue>
+            </td>
+            <td colSpan={2} style={{ ...cellStyle, borderTop: "1px solid #999" }}>
+              <FieldLabel>Bairro</FieldLabel>
+              <FieldValue>{nota.tomador_bairro || "-"}</FieldValue>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== DISCRIMINACAO DOS SERVICOS ===== */}
+      <SectionHeader>DISCRIMINACAO DOS SERVICOS</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          <tr>
+            <td style={{ padding: "10px 12px", minHeight: "80px", whiteSpace: "pre-wrap", lineHeight: 1.5, fontSize: "10px", verticalAlign: "top" }}>
+              {nota.descricao_servico || "-"}
+              {nota.observacoes_tributos ? (
+                <div style={{ marginTop: 8, fontSize: "9px", color: "#444" }}>
+                  {nota.observacoes_tributos}
+                </div>
+              ) : (
+                <div style={{ marginTop: 8, fontSize: "9px" }}>
+                  {`\n- Conforme Lei 12.741/2012, o percentual total de impostos incidentes neste serviço prestado é de aproximadamente ${aliquotaIss.toFixed(2)}%`}
+                </div>
+              )}
+            </td>
+          </tr>
+          {/* Retencoes federais na linha de discriminacao, como no modelo oficial */}
+          <tr>
+            <td style={{ padding: "4px 12px", borderTop: "1px solid #999" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", fontSize: "9px" }}>
+                <span><strong>INSS (R$)</strong> {formatCurrency(nota.valor_inss || 0)}</span>
+                <span><strong>IRRF (R$)</strong> {formatCurrency(nota.valor_ir || 0)}</span>
+                <span><strong>CSLL (R$)</strong> {formatCurrency(nota.valor_csll || 0)}</span>
+                <span><strong>COFINS (R$)</strong> {formatCurrency(nota.valor_cofins || 0)}</span>
+                <span><strong>PIS/PASEP (R$)</strong> {formatCurrency(nota.valor_pis || 0)}</span>
+              </div>
+            </td>
+          </tr>
+          {/* Valor total em destaque */}
+          <tr>
+            <td style={{
+              padding: "8px 12px",
+              borderTop: "2px solid #1a3a6e",
+              background: "#e8edf5",
+              textAlign: "right",
+            }}>
+              <span style={{ fontSize: "14px", fontWeight: "bold", color: "#1a3a6e" }}>
+                VALOR TOTAL DO SERVICO = {formatCurrency(nota.valor_total || valorServicos)}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== CODIGO DO SERVICO + TRIBUTOS (layout oficial) ===== */}
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          {/* Codigo do servico - linha inteira com descricao (ex: 07498 - Conserto, restauracao...) */}
+          <tr>
+            <td colSpan={6} style={{ ...cellStyle, borderBottom: "1px solid #999" }}>
+              <FieldLabel>Codigo do Servico</FieldLabel>
+              <FieldValue bold>{(() => {
+                const codigoNota = nota.codigo_servico
+                const codigoConfig = prestador?.codigo_servico
+                const descConfig = prestador?.descricao_servico
+                const codigo = codigoNota || codigoConfig
+                if (!codigo) return "-"
+                // Se o codigo ja contem descricao (ex: "07498 - Conserto..."), usar direto
+                if (codigo.includes(" - ")) return codigo
+                // Senao, montar codigo + descricao do config
+                return descConfig ? `${codigo} - ${descConfig}` : codigo
+              })()}</FieldValue>
+            </td>
+          </tr>
+          {/* Linha de tributos: Deducoes, Base Calculo, Municipio, Aliquota, ISS, Credito */}
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>Valor Total das Deducoes (R$)</FieldLabel>
+              <FieldValue>{formatCurrency(valorDeducoes)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>Base de Calculo (R$)</FieldLabel>
+              <FieldValue bold>{isOptanteSimples ? "*" : formatCurrency(baseCalculo)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999" }}>
+              <FieldLabel>Municipio da Prestacao</FieldLabel>
+              <FieldValue>{prestador?.cidade || "SAO PAULO"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "center" }}>
+              <FieldLabel>Aliquota (%)</FieldLabel>
+              <FieldValue>{isOptanteSimples ? "*" : aliquotaIss.toFixed(2)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>Valor do ISS (R$)</FieldLabel>
+              <FieldValue bold>{isOptanteSimples ? "*" : formatCurrency(valorIss)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, textAlign: "right" }}>
+              <FieldLabel>Credito (R$)</FieldLabel>
+              <FieldValue>{formatCurrency(valorCredito)}</FieldValue>
+            </td>
+          </tr>
+          {/* Numero inscricao da obra + ISS retido */}
+          <tr>
+            <td colSpan={3} style={{ ...cellStyle, borderTop: "1px solid #999", borderRight: "1px solid #999" }}>
+              <FieldLabel>Numero Inscricao da Obra</FieldLabel>
+              <FieldValue>{nota.numero_inscricao_obra || "-"}</FieldValue>
+            </td>
+            <td colSpan={3} style={{ ...cellStyle, borderTop: "1px solid #999" }}>
+              <FieldLabel>Valor Aproximado dos Tributos / Fonte</FieldLabel>
+              <FieldValue>{nota.iss_retido ? "ISS Retido na Fonte" : "-"}</FieldValue>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== OUTRAS INFORMACOES ===== */}
+      <SectionHeader>OUTRAS INFORMACOES</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          <tr>
+            <td style={{ padding: "8px 12px", fontSize: "9px", lineHeight: 1.5, whiteSpace: "pre-wrap", verticalAlign: "top", minHeight: "40px" }}>
+              {nota.informacoes_complementares || nota.observacoes || (
+                <>
+                  (1) Esta NFS-e foi emitida com respaldo na Lei n. 14.097/2005;{" "}
+                  (2) Documento emitido por ME ou EPP optante pelo Simples Nacional;{" "}
+                  {nota.numero_rps && `(3) Esta NFS-e substitui o RPS N. ${nota.numero_rps}${nota.serie_rps ? ` Serie ${nota.serie_rps}` : ""}, emitido em ${formatDateBR(nota.data_emissao || nota.created_at)};`}
+                </>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== CANCELAMENTO ===== */}
+      {isCancelada && (
+        <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid #dc2626", marginTop: 4 }}>
+          <tbody>
+            <tr>
+              <td style={{ padding: "8px 16px", background: "#fef2f2", textAlign: "center" }}>
+                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#dc2626", marginBottom: 2 }}>
+                  NOTA FISCAL CANCELADA
+                </div>
+                {nota.data_cancelamento && (
+                  <div style={{ fontSize: "10px", color: "#991b1b" }}>
+                    Data do cancelamento: {formatDateTimeBR(nota.data_cancelamento)}
+                  </div>
+                )}
+                {nota.motivo_cancelamento && (
+                  <div style={{ fontSize: "10px", color: "#991b1b", marginTop: 2 }}>
+                    Motivo: {nota.motivo_cancelamento}
+                  </div>
+                )}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {/* ===== RODAPE ===== */}
+      <div style={{
+        marginTop: 10,
+        padding: "6px 12px",
+        textAlign: "center",
+        fontSize: "8px",
+        color: "#555",
+        lineHeight: 1.5,
+        borderTop: "1px solid #1a3a6e",
+      }}>
+        <div>Consulte a autenticidade desta NFS-e em: <strong>nfe.prefeitura.sp.gov.br</strong></div>
+        <div style={{ marginTop: 2 }}>
+          Inscricao Municipal: {prestador?.inscricao_municipal || "-"} | Numero da Nota: {nota.numero_nfse ? String(nota.numero_nfse).padStart(8, "0") : "-"} | Codigo de Verificacao: {nota.codigo_verificacao || "-"}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// Sub-componentes auxiliares para o layout oficial
+// ============================================================
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      background: "#1a3a6e",
+      color: "#fff",
+      fontSize: "9px",
+      fontWeight: "bold",
+      padding: "4px 12px",
+      letterSpacing: "0.5px",
+      textTransform: "uppercase",
+      border: "1px solid #1a3a6e",
+      borderBottom: "none",
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: "8px", color: "#666", marginBottom: 1, textTransform: "uppercase" }}>
+      {children}
+    </div>
+  )
+}
+
+function FieldValue({ children, bold }: { children: React.ReactNode; bold?: boolean }) {
+  return (
+    <div style={{ fontSize: "10px", fontWeight: bold ? "bold" : "normal", color: "#000" }}>
+      {children}
+    </div>
+  )
+}
+
+// Estilos compartilhados
+const cellStyle: React.CSSProperties = {
+  padding: "5px 12px",
+  verticalAlign: "top",
+}
+
+// ============================================================
+// CSS para impressao
+// ============================================================
+function getPrintStyles(): string {
+  return `
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10px;
+      color: #000;
+      padding: 10px;
+      line-height: 1.3;
+    }
+    table { border-collapse: collapse; }
+    div[style*="background"] { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    td[style*="background"] { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  `
 }

@@ -233,7 +233,7 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl w-[80vw] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-emerald-600" />
@@ -256,7 +256,7 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Tomador (Cliente) */}
           <div>
             <h3 className="font-semibold text-gray-800 flex items-center gap-2 mb-3">
@@ -299,7 +299,7 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
 
               <Separator />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <div className="space-y-2">
                   <Label>Tipo</Label>
                   <Select
@@ -323,9 +323,6 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
                     placeholder={form.tomador_tipo === "PJ" ? "00.000.000/0000-00" : "000.000.000-00"}
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Razao Social / Nome *</Label>
                   <Input
@@ -344,8 +341,8 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="space-y-2 md:col-span-2">
+              <div className="grid grid-cols-6 gap-3">
+                <div className="space-y-2 col-span-2">
                   <Label>Endereco</Label>
                   <Input
                     value={form.tomador_endereco}
@@ -361,9 +358,6 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
                     placeholder="00000-000"
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="space-y-2">
                   <Label>Bairro</Label>
                   <Input
@@ -386,6 +380,9 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
                     maxLength={2}
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-3">
                 <div className="space-y-2">
                   <Label>Inscr. Municipal</Label>
                   <Input
@@ -413,7 +410,7 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
                   value={form.descricao_servico}
                   onChange={(e) => updateForm("descricao_servico", e.target.value)}
                   placeholder="Descricao detalhada do servico prestado"
-                  rows={4}
+                  rows={3}
                 />
               </div>
             </div>
@@ -428,7 +425,7 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
               Valores
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3 items-end">
               <div className="space-y-2">
                 <Label>Valor dos Servicos (R$) *</Label>
                 <Input
@@ -451,7 +448,7 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
               </div>
               <div className="space-y-2">
                 <Label>ISS Retido pelo Tomador</Label>
-                <div className="flex items-center gap-3 pt-2">
+                <div className="flex items-center gap-3 h-9 px-3 border rounded-md bg-background">
                   <Switch
                     checked={form.iss_retido}
                     onCheckedChange={(checked) => updateForm("iss_retido", checked)}
@@ -461,15 +458,16 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
                   </span>
                 </div>
               </div>
+              {form.valor_servicos > 0 && (
+                <div className="p-2 bg-emerald-50 rounded-lg text-center">
+                  <p className="text-sm font-medium text-emerald-800">
+                    Total: {formatCurrency(form.valor_servicos)}
+                  </p>
+                </div>
+              )}
             </div>
 
-            {form.valor_servicos > 0 && (
-              <div className="mt-3 p-3 bg-emerald-50 rounded-lg">
-                <p className="text-sm font-medium text-emerald-800">
-                  Valor Total da Nota: {formatCurrency(form.valor_servicos)}
-                </p>
-              </div>
-            )}
+
           </div>
         </div>
 

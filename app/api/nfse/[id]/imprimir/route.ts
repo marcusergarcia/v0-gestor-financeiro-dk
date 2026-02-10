@@ -23,23 +23,47 @@ export async function GET(
 
     // Buscar config do prestador
     const [configRows] = await pool.execute(
-      "SELECT razao_social, cnpj, inscricao_municipal, endereco, numero_endereco, complemento, bairro, cidade, uf, cep, codigo_servico, descricao_servico FROM nfse_config WHERE ativo = 1 LIMIT 1"
+      "SELECT razao_social, cnpj, inscricao_municipal, endereco, numero_endereco, complemento, bairro, cidade, uf, cep, codigo_servico, descricao_servico, optante_simples FROM nfse_config WHERE ativo = 1 LIMIT 1"
     )
     const configs = configRows as any[]
     const config = configs.length > 0 ? configs[0] : null
 
-    // Buscar logo
+    // Buscar email e telefone do timbrado_config para complementar dados do prestador
+    try {
+      const [timbradoRows] = await pool.execute(
+        "SELECT empresa_email, empresa_telefone FROM timbrado_config WHERE ativo = 1 LIMIT 1"
+      )
+      const timbrados = timbradoRows as any[]
+      if (timbrados.length > 0 && config) {
+        if (timbrados[0].empresa_email) config.email = timbrados[0].empresa_email
+        if (timbrados[0].empresa_telefone) config.telefone = timbrados[0].empresa_telefone
+      }
+    } catch {
+      // Tabela timbrado_config pode nao existir
+    }
+
+    // Buscar Logo do Sistema para a NFS-e
     let logoBase64 = null
     try {
       const [logoRows] = await pool.execute(
-        "SELECT arquivo_base64 FROM logos WHERE tipo = 'nfse' OR tipo = 'menu' ORDER BY FIELD(tipo, 'nfse', 'menu') LIMIT 1"
+        "SELECT dados, formato FROM logos_sistema WHERE tipo = 'sistema' AND ativo = 1 LIMIT 1"
       )
       const logos = logoRows as any[]
       if (logos.length > 0) {
-        logoBase64 = logos[0].arquivo_base64
+        const logo = logos[0]
+        if (logo.dados) {
+          const mimeType = logo.formato === "jpg" || logo.formato === "jpeg" ? "image/jpeg"
+            : logo.formato === "gif" ? "image/gif"
+            : logo.formato === "webp" ? "image/webp"
+            : logo.formato === "svg" ? "image/svg+xml"
+            : "image/png"
+          logoBase64 = logo.dados.startsWith("data:")
+            ? logo.dados
+            : `data:${mimeType};base64,${logo.dados}`
+        }
       }
     } catch {
-      // Tabela logos pode nao existir
+      // Tabela logos_sistema pode nao existir
     }
 
     return NextResponse.json({

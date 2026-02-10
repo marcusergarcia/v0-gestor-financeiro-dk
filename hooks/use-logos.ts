@@ -40,6 +40,9 @@ export async function preloadLogos(): Promise<Logos> {
         impressao: null,
       }
 
+      let sistemaLogoSrc: string | null = null
+      let menuLogoSrc: string | null = null
+
       result.data.forEach((logo: any) => {
         if (!logo.ativo || !logo.dados) return
 
@@ -51,15 +54,19 @@ export async function preloadLogos(): Promise<Logos> {
           case "sistema":
           case "favicon":
             logos.favicon = logoSrc
+            sistemaLogoSrc = logoSrc
             break
           case "menu":
-            logos.menu = logoSrc
+            menuLogoSrc = logoSrc
             break
           case "impressao":
             logos.impressao = logoSrc
             break
         }
       })
+
+      // Para o menu/sidebar: usa logo "menu" se existir, senao usa logo "sistema"
+      logos.menu = menuLogoSrc || sistemaLogoSrc
 
       cachedLogos = logos
       loadingPromise = null

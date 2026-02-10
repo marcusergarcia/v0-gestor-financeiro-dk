@@ -71,13 +71,33 @@ export async function POST(request: NextRequest) {
     const valorIss = issRetidoBool ? 0 : (valorServicos - (valor_deducoes || 0)) * aliquota
     const valorTotal = valorServicos
 
+    // Gerar data de emissao no fuso horario de Sao Paulo (UTC-3)
+    // A Vercel roda em UTC, entao new Date().toISOString() pode retornar o dia seguinte
+    // quando em SP ainda e o dia anterior (ex: 22h SP = 01h UTC do dia seguinte).
+    // A prefeitura de SP rejeita datas futuras (Erro 313 e 107).
+    const agora = new Date()
+    const spFormatter = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    })
+    const spParts = spFormatter.formatToParts(agora)
+    const getPart = (type: string) => spParts.find((p) => p.type === type)?.value || ""
+    const dataEmissaoSP = `${getPart("year")}-${getPart("month")}-${getPart("day")}T${getPart("hour")}:${getPart("minute")}:${getPart("second")}`
+    console.log("[v0] Data emissao SP (fuso America/Sao_Paulo):", dataEmissaoSP, "| UTC:", agora.toISOString())
+
     // Montar dados da NFS-e
     const dadosNfse: DadosNfse = {
       rps: {
         numero: numeroRps,
         serie: config.serie_rps || "11",
         tipo: config.tipo_rps || 1,
-        dataEmissao: new Date().toISOString().substring(0, 19), // YYYY-MM-DDTHH:mm:ss (SP exige data+hora)
+        dataEmissao: dataEmissaoSP, // YYYY-MM-DDTHH:mm:ss no fuso de SP
         naturezaOperacao: 1, // Tributação no município
         regimeTributacao: config.regime_tributacao || 1,
         optanteSimples: config.optante_simples || 0,
