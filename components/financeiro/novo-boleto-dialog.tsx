@@ -62,7 +62,7 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
 
   const [descricaoBoletoCustom, setDescricaoBoletoCustom] = useState("")
 
-  const gerarDescricao = (): string => {
+  const gerarDescricao = (numeroParcela?: number): string => {
     // Se tiver descricao customizada vinda da nota fiscal, usar ela
     if (descricaoBoletoCustom) return descricaoBoletoCustom
 
@@ -75,7 +75,8 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
       partes.push(dataFormatada)
     }
 
-    partes.push(`Parcelas 1/${numeroParcelas}`)
+    const parcAtual = numeroParcela || 1
+    partes.push(`Parcelas ${parcAtual}/${numeroParcelas}`)
 
     return partes.join(" - ")
   }
@@ -360,7 +361,7 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
           valor: index === numParcelas - 1 ? valorUltimaParcela : valorParcela,
           vencimento: data,
           status: calcularStatus(data),
-          descricao: gerarDescricao(),
+          descricao: gerarDescricao(index + 1),
           multa_percentual: Number.parseFloat(multaPercentual),
           juros_mes_percentual: Number.parseFloat(jurosMesPercentual),
         }))
