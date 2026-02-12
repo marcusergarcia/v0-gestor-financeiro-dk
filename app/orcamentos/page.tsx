@@ -47,9 +47,21 @@ interface Orcamento {
   data_criacao: string
   detalhes_servico?: string
   valor_total: number
+  valor_mao_obra?: number
+  valor_material?: number
   subtotal_mdo?: number
   situacao: string
   tipo_servico: string
+  distancia_km?: number
+  valor_boleto?: number
+  prazo_dias?: number
+  juros_am?: number
+  imposto_servico?: number
+  imposto_material?: number
+  desconto_mdo_percent?: number
+  desconto_mdo_valor?: number
+  parcelamento_mdo?: number
+  parcelamento_material?: number
 }
 
 export default function OrcamentosPage() {
@@ -60,11 +72,13 @@ export default function OrcamentosPage() {
   const [situacaoFilter, setSituacaoFilter] = useState("todos")
   const [nfseDialogOpen, setNfseDialogOpen] = useState(false)
   const [nfseOrcamento, setNfseOrcamento] = useState<Orcamento | null>(null)
+  const [valorPorKm, setValorPorKm] = useState(1.5)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchOrcamentos()
     loadLogoMenu()
+    loadValorPorKm()
   }, [])
 
   const loadLogoMenu = async () => {
@@ -80,6 +94,44 @@ export default function OrcamentosPage() {
     } catch (error) {
       console.error("Erro ao carregar logo do menu:", error)
     }
+  }
+
+  const loadValorPorKm = async () => {
+    try {
+      const response = await fetch("/api/configuracoes/valor-km")
+      const result = await response.json()
+      if (result.success && result.data) {
+        setValorPorKm(result.data.valor_por_km || 1.5)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar valor por km:", error)
+    }
+  }
+
+  const safeNumber = (value: any): number => {
+    const num = Number(value)
+    return isNaN(num) ? 0 : num
+  }
+
+  // Calcula o Subtotal MDO (valor da nota de servico NFS-e) para um orcamento
+  const calcularSubtotalMdoOrcamento = (orc: Orcamento): number => {
+    const parcelamentoMdo = safeNumber(orc.parcelamento_mdo) || 1
+    if (parcelamentoMdo === 0) return 0
+
+    const valorMaoObra = safeNumber(orc.valor_mao_obra)
+    const descontoMdoValor = safeNumber(orc.desconto_mdo_valor)
+    const distancia = safeNumber(orc.distancia_km)
+    const prazo = safeNumber(orc.prazo_dias)
+    const valorBoleto = safeNumber(orc.valor_boleto)
+    const impostoServico = safeNumber(orc.imposto_servico)
+
+    const custoDeslocamento = distancia * 2 * safeNumber(valorPorKm) * prazo
+    const taxaBoletoMdo = parcelamentoMdo * valorBoleto
+
+    const baseImposto = valorMaoObra - descontoMdoValor + custoDeslocamento + taxaBoletoMdo
+    const impostoServicoValor = (baseImposto * impostoServico) / 100
+
+    return valorMaoObra - descontoMdoValor + custoDeslocamento + taxaBoletoMdo + impostoServicoValor
   }
 
   const fetchOrcamentos = async () => {
@@ -694,7 +746,9 @@ export default function OrcamentosPage() {
             cliente_uf: nfseOrcamento.cliente_estado,
             cliente_cep: nfseOrcamento.cliente_cep,
             descricao: nfseOrcamento.detalhes_servico || "",
-            valor: Number(nfseOrcamento.subtotal_mdo || nfseOrcamento.valor_total),
+            valor: calcularSubtotalMdoOrcamento(nfseOrcamento),
+            valor_material: safeNumber(nfseOrcamento.valor_material),
+            valor_total_orcamento: safeNumber(nfseOrcamento.valor_total),
           }}
         />
       )}

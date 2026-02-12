@@ -42,6 +42,8 @@ interface EmitirNfseDialogProps {
     cliente_uf?: string
     cliente_cep?: string
     valor?: number
+    valor_material?: number
+    valor_total_orcamento?: number
     descricao?: string
   }
 }
@@ -425,9 +427,37 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
               Valores
             </h3>
 
+            {/* Informativo: separacao MDO vs Material quando vem de orcamento */}
+            {dadosOrigem?.origem === "orcamento" && (dadosOrigem.valor_material || dadosOrigem.valor_total_orcamento) && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-3">
+                <p className="text-xs font-medium text-blue-800 mb-2">Valores do Orcamento:</p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="text-center p-1.5 bg-blue-100 rounded">
+                    <p className="text-blue-600">Subtotal MDO (Servicos)</p>
+                    <p className="font-bold text-blue-800">{formatCurrency(dadosOrigem.valor || 0)}</p>
+                  </div>
+                  {dadosOrigem.valor_material !== undefined && (
+                    <div className="text-center p-1.5 bg-green-100 rounded">
+                      <p className="text-green-600">Subtotal Material</p>
+                      <p className="font-bold text-green-800">{formatCurrency(dadosOrigem.valor_material)}</p>
+                    </div>
+                  )}
+                  {dadosOrigem.valor_total_orcamento !== undefined && (
+                    <div className="text-center p-1.5 bg-gray-100 rounded">
+                      <p className="text-gray-600">Total Orcamento</p>
+                      <p className="font-bold text-gray-800">{formatCurrency(dadosOrigem.valor_total_orcamento)}</p>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[10px] text-blue-600 mt-2">
+                  A NFS-e da prefeitura e emitida apenas sobre o valor de servicos (MDO). A nota de material e separada.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-4 gap-3 items-end">
               <div className="space-y-2">
-                <Label>Valor dos Servicos (R$) *</Label>
+                <Label>Valor dos Servicos - MDO (R$) *</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -461,7 +491,7 @@ export function EmitirNfseDialog({ open, onOpenChange, onSuccess, dadosOrigem }:
               {form.valor_servicos > 0 && (
                 <div className="p-2 bg-emerald-50 rounded-lg text-center">
                   <p className="text-sm font-medium text-emerald-800">
-                    Total: {formatCurrency(form.valor_servicos)}
+                    Valor NFS-e: {formatCurrency(form.valor_servicos)}
                   </p>
                 </div>
               )}

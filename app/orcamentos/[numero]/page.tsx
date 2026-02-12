@@ -965,6 +965,8 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
           cliente_cep: orcamento.cliente_cep,
           descricao: orcamento.detalhes_servico || "",
           valor: calcularSubtotalMdo(),
+          valor_material: calcularSubtotalMaterial(),
+          valor_total_orcamento: safeNumber(orcamento.valor_total),
         }}
       />
     </div>
