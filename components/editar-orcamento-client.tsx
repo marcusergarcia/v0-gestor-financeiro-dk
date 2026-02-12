@@ -1023,6 +1023,7 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="aprovado">Aprovado</SelectItem>
                         <SelectItem value="enviado por email">Enviado por Email</SelectItem>
                         <SelectItem value="nota fiscal emitida">Nota Fiscal Emitida</SelectItem>
                         <SelectItem value="concluido">Concluído</SelectItem>

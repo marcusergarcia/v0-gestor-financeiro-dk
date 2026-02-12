@@ -39,6 +39,13 @@ export async function GET(request: NextRequest) {
         c.codigo as cliente_codigo,
         c.cnpj as cliente_cnpj,
         c.cpf as cliente_cpf,
+        c.email as cliente_email,
+        c.telefone as cliente_telefone,
+        c.endereco as cliente_endereco,
+        c.bairro as cliente_bairro,
+        c.cidade as cliente_cidade,
+        c.estado as cliente_estado,
+        c.cep as cliente_cep,
         c.tem_contrato
       FROM orcamentos o
       LEFT JOIN clientes c ON o.cliente_id = c.id
