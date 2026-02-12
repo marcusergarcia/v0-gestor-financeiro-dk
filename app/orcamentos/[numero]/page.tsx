@@ -27,6 +27,7 @@ import Link from "next/link"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { OrcamentoPrintEditor } from "@/components/orcamento-print-editor"
+import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
 
 interface Produto {
   id: string
@@ -68,6 +69,7 @@ interface Orcamento {
   cliente_email?: string
   cliente_telefone?: string
   cliente_endereco?: string
+  cliente_bairro?: string
   cliente_cep?: string
   cliente_cidade?: string
   cliente_estado?: string
@@ -99,6 +101,7 @@ interface Orcamento {
   parcelamento_mdo?: number
   parcelamento_material?: number
   material_a_vista?: boolean
+  subtotal_mdo?: number
 }
 
 export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ numero: string }> }) {
@@ -108,6 +111,7 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
   const [logoMenu, setLogoMenu] = useState<string>("")
   const [valorPorKm, setValorPorKm] = useState(1.5)
   const [showPrintEditor, setShowPrintEditor] = useState(false)
+  const [nfseDialogOpen, setNfseDialogOpen] = useState(false)
   const [numeroOrcamento, setNumeroOrcamento] = useState<string>("")
   const { toast } = useToast()
 
@@ -220,6 +224,11 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
         className: "bg-amber-100 text-amber-800 border-amber-200",
         icon: Clock,
       },
+      aprovado: {
+        label: "Aprovado",
+        className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+        icon: CheckCircle,
+      },
       "enviado por email": {
         label: "Enviado por Email",
         className: "bg-blue-100 text-blue-800 border-blue-200",
@@ -246,6 +255,25 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
         {config.label}
       </Badge>
     )
+  }
+
+  const handleNfseSuccess = async () => {
+    if (orcamento) {
+      try {
+        await fetch(`/api/orcamentos/${orcamento.numero}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ situacao: "nota fiscal emitida" }),
+        })
+        toast({
+          title: "Sucesso",
+          description: "NFS-e emitida e situação atualizada para 'NF Emitida'",
+        })
+        loadOrcamento()
+      } catch (error) {
+        console.error("Erro ao atualizar situação:", error)
+      }
+    }
   }
 
   const safeNumber = (value: any): number => {
@@ -426,6 +454,15 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
                 Editar
               </Button>
             </Link>
+            {orcamento.situacao === "aprovado" && (
+              <Button
+                onClick={() => setNfseDialogOpen(true)}
+                className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg"
+              >
+                <FileCheck className="h-4 w-4 mr-2" />
+                Emitir NFS-e
+              </Button>
+            )}
             <Button
               onClick={() => setShowPrintEditor(true)}
               className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg"
@@ -883,6 +920,15 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
                         Editar Orçamento
                       </Button>
                     </Link>
+                    {orcamento.situacao === "aprovado" && (
+                      <Button
+                        onClick={() => setNfseDialogOpen(true)}
+                        className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg"
+                      >
+                        <FileCheck className="h-4 w-4 mr-2" />
+                        Emitir NFS-e
+                      </Button>
+                    )}
                     <Button onClick={() => setShowPrintEditor(true)} variant="outline" className="w-full">
                       <Printer className="h-4 w-4 mr-2" />
                       Imprimir
@@ -898,6 +944,29 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
       {showPrintEditor && (
         <OrcamentoPrintEditor orcamento={orcamento} itens={itens} onClose={() => setShowPrintEditor(false)} />
       )}
+
+      <EmitirNfseDialog
+        open={nfseDialogOpen}
+        onOpenChange={setNfseDialogOpen}
+        onSuccess={handleNfseSuccess}
+        dadosOrigem={{
+          origem: "orcamento",
+          origem_numero: orcamento.numero,
+          cliente_id: Number(orcamento.cliente_id),
+          cliente_nome: orcamento.cliente_nome,
+          cliente_cnpj: orcamento.cliente_cnpj,
+          cliente_cpf: orcamento.cliente_cpf,
+          cliente_email: orcamento.cliente_email,
+          cliente_telefone: orcamento.cliente_telefone,
+          cliente_endereco: orcamento.cliente_endereco,
+          cliente_bairro: orcamento.cliente_bairro,
+          cliente_cidade: orcamento.cliente_cidade,
+          cliente_uf: orcamento.cliente_estado,
+          cliente_cep: orcamento.cliente_cep,
+          descricao: orcamento.detalhes_servico || "",
+          valor: calcularSubtotalMdo(),
+        }}
+      />
     </div>
   )
 }

@@ -221,6 +221,28 @@ export async function PUT(request: NextRequest, { params }: { params: { numero: 
   }
 }
 
+export async function PATCH(request: NextRequest, { params }: { params: { numero: string } }) {
+  try {
+    const { numero } = params
+    const data = await request.json()
+
+    if (!data.situacao) {
+      return NextResponse.json({ success: false, message: "Campo 'situacao' é obrigatório" }, { status: 400 })
+    }
+
+    await query("UPDATE orcamentos SET situacao = ?, updated_at = NOW() WHERE numero = ?", [data.situacao, numero])
+
+    return NextResponse.json({
+      success: true,
+      message: "Situação atualizada com sucesso",
+      data: { numero, situacao: data.situacao },
+    })
+  } catch (error) {
+    console.error("Erro ao atualizar situação:", error)
+    return NextResponse.json({ success: false, message: "Erro interno do servidor" }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: NextRequest, { params }: { params: { numero: string } }) {
   try {
     const { numero } = params
