@@ -26,15 +26,28 @@ import {
 import Link from "next/link"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
+import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
 
 interface Orcamento {
   id: string
   numero: string
+  cliente_id: string
   cliente_nome: string
   cliente_codigo?: string
+  cliente_cnpj?: string
+  cliente_cpf?: string
+  cliente_email?: string
+  cliente_telefone?: string
+  cliente_endereco?: string
+  cliente_bairro?: string
+  cliente_cidade?: string
+  cliente_estado?: string
+  cliente_cep?: string
   data_orcamento: string
   data_criacao: string
+  detalhes_servico?: string
   valor_total: number
+  subtotal_mdo?: number
   situacao: string
   tipo_servico: string
 }
@@ -45,6 +58,8 @@ export default function OrcamentosPage() {
   const [logoMenu, setLogoMenu] = useState<string>("")
   const [searchTerm, setSearchTerm] = useState("")
   const [situacaoFilter, setSituacaoFilter] = useState("todos")
+  const [nfseDialogOpen, setNfseDialogOpen] = useState(false)
+  const [nfseOrcamento, setNfseOrcamento] = useState<Orcamento | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -75,9 +90,10 @@ export default function OrcamentosPage() {
         const orcamentosOrdenados = (data.data || []).sort((a: Orcamento, b: Orcamento) => {
           const ordemPrioridade = {
             pendente: 1,
-            "enviado por email": 2,
-            "nota fiscal emitida": 3,
-            concluido: 4,
+            aprovado: 2,
+            "enviado por email": 3,
+            "nota fiscal emitida": 4,
+            concluido: 5,
           }
 
           const prioridadeA = ordemPrioridade[a.situacao as keyof typeof ordemPrioridade] || 5
@@ -134,12 +150,42 @@ export default function OrcamentosPage() {
     }
   }
 
+  const handleEmitirNfse = (orcamento: Orcamento) => {
+    setNfseOrcamento(orcamento)
+    setNfseDialogOpen(true)
+  }
+
+  const handleNfseSuccess = async () => {
+    if (nfseOrcamento) {
+      try {
+        await fetch(`/api/orcamentos/${nfseOrcamento.numero}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ situacao: "nota fiscal emitida" }),
+        })
+        toast({
+          title: "Sucesso",
+          description: "NFS-e emitida e situação atualizada para 'NF Emitida'",
+        })
+      } catch (error) {
+        console.error("Erro ao atualizar situação:", error)
+      }
+      setNfseOrcamento(null)
+      fetchOrcamentos()
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       pendente: {
         label: "Pendente",
         className: "bg-amber-100 text-amber-800 border-amber-200",
         icon: Calendar,
+      },
+      aprovado: {
+        label: "Aprovado",
+        className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+        icon: CheckCircle,
       },
       "enviado por email": {
         label: "Enviado",
@@ -172,12 +218,13 @@ export default function OrcamentosPage() {
   const calcularEstatisticas = () => {
     const total = orcamentos.length
     const pendentes = orcamentos.filter((o) => o.situacao === "pendente").length
+    const aprovados = orcamentos.filter((o) => o.situacao === "aprovado").length
     const enviados = orcamentos.filter((o) => o.situacao === "enviado por email").length
     const notaFiscal = orcamentos.filter((o) => o.situacao === "nota fiscal emitida").length
     const concluidos = orcamentos.filter((o) => o.situacao === "concluido").length
     const valorTotal = orcamentos.reduce((acc, o) => acc + Number(o.valor_total), 0)
 
-    return { total, pendentes, enviados, notaFiscal, concluidos, valorTotal }
+    return { total, pendentes, aprovados, enviados, notaFiscal, concluidos, valorTotal }
   }
 
   const getTipoServicoLabel = (tipo: string) => {
@@ -206,6 +253,7 @@ export default function OrcamentosPage() {
     const matchesSituacao =
       situacaoFilter === "todos" ||
       (situacaoFilter === "pendente" && orcamento.situacao === "pendente") ||
+      (situacaoFilter === "aprovado" && orcamento.situacao === "aprovado") ||
       (situacaoFilter === "enviado" && orcamento.situacao === "enviado por email") ||
       (situacaoFilter === "nf-emitida" && orcamento.situacao === "nota fiscal emitida") ||
       (situacaoFilter === "concluido" && orcamento.situacao === "concluido")
@@ -213,7 +261,7 @@ export default function OrcamentosPage() {
     return matchesSearch && matchesSituacao
   })
 
-  const { total, pendentes, enviados, notaFiscal, concluidos, valorTotal } = calcularEstatisticas()
+  const { total, pendentes, aprovados, enviados, notaFiscal, concluidos, valorTotal } = calcularEstatisticas()
 
   if (loading) {
     return (
@@ -258,7 +306,7 @@ export default function OrcamentosPage() {
         </div>
 
         {/* Stats Cards - Agora clicáveis */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2 lg:gap-4">
           <Card
             className={`border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-105 ${
               situacaoFilter === "todos" ? "ring-2 ring-blue-400 ring-offset-2" : ""
@@ -288,6 +336,22 @@ export default function OrcamentosPage() {
             <CardContent className="p-3 pt-0 lg:p-6 lg:pt-0">
               <div className="text-xl lg:text-3xl font-bold text-amber-800">{pendentes}</div>
               <p className="text-[10px] lg:text-xs text-amber-600 mt-1">Aguardando</p>
+            </CardContent>
+          </Card>
+
+          <Card
+            className={`border-0 shadow-lg bg-gradient-to-br from-emerald-50 to-emerald-100 hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-105 ${
+              situacaoFilter === "aprovado" ? "ring-2 ring-emerald-400 ring-offset-2" : ""
+            }`}
+            onClick={() => setSituacaoFilter("aprovado")}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 lg:pb-2 p-3 lg:p-6">
+              <CardTitle className="text-xs lg:text-sm font-medium text-emerald-700">Aprovados</CardTitle>
+              <CheckCircle className="h-4 w-4 lg:h-5 lg:w-5 text-emerald-600" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0 lg:p-6 lg:pt-0">
+              <div className="text-xl lg:text-3xl font-bold text-emerald-800">{aprovados}</div>
+              <p className="text-[10px] lg:text-xs text-emerald-600 mt-1">Aprovados</p>
             </CardContent>
           </Card>
 
@@ -373,6 +437,7 @@ export default function OrcamentosPage() {
                   <SelectContent>
                     <SelectItem value="todos">Todas as situações</SelectItem>
                     <SelectItem value="pendente">Pendentes</SelectItem>
+                    <SelectItem value="aprovado">Aprovados</SelectItem>
                     <SelectItem value="enviado">Enviados</SelectItem>
                     <SelectItem value="nf-emitida">NF Emitida</SelectItem>
                     <SelectItem value="concluido">Concluídos</SelectItem>
@@ -488,6 +553,17 @@ export default function OrcamentosPage() {
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </Link>
+                            {orcamento.situacao === "aprovado" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEmitirNfse(orcamento)}
+                                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-transparent h-8 w-8 p-0"
+                                title="Emitir NFS-e"
+                              >
+                                <FileCheck className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="outline"
@@ -548,7 +624,7 @@ export default function OrcamentosPage() {
                       </div>
 
                       {/* Botões de Ação */}
-                      <div className="grid grid-cols-3 gap-2 pt-3 border-t-2 border-slate-200">
+                      <div className={`grid gap-2 pt-3 border-t-2 border-slate-200 ${orcamento.situacao === "aprovado" ? "grid-cols-4" : "grid-cols-3"}`}>
                         <Link href={`/orcamentos/${orcamento.numero}`} className="w-full">
                           <Button
                             variant="outline"
@@ -567,6 +643,16 @@ export default function OrcamentosPage() {
                             <Edit className="h-4 w-4" />
                           </Button>
                         </Link>
+                        {orcamento.situacao === "aprovado" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-9 text-xs bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-300 text-emerald-700 font-medium"
+                            onClick={() => handleEmitirNfse(orcamento)}
+                          >
+                            <FileCheck className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -584,6 +670,34 @@ export default function OrcamentosPage() {
           )}
         </div>
       </div>
+
+      {nfseOrcamento && (
+        <EmitirNfseDialog
+          open={nfseDialogOpen}
+          onOpenChange={(open) => {
+            setNfseDialogOpen(open)
+            if (!open) setNfseOrcamento(null)
+          }}
+          onSuccess={handleNfseSuccess}
+          dadosOrigem={{
+            origem: "orcamento",
+            origem_numero: nfseOrcamento.numero,
+            cliente_id: Number(nfseOrcamento.cliente_id),
+            cliente_nome: nfseOrcamento.cliente_nome,
+            cliente_cnpj: nfseOrcamento.cliente_cnpj,
+            cliente_cpf: nfseOrcamento.cliente_cpf,
+            cliente_email: nfseOrcamento.cliente_email,
+            cliente_telefone: nfseOrcamento.cliente_telefone,
+            cliente_endereco: nfseOrcamento.cliente_endereco,
+            cliente_bairro: nfseOrcamento.cliente_bairro,
+            cliente_cidade: nfseOrcamento.cliente_cidade,
+            cliente_uf: nfseOrcamento.cliente_estado,
+            cliente_cep: nfseOrcamento.cliente_cep,
+            descricao: nfseOrcamento.detalhes_servico || "",
+            valor: Number(nfseOrcamento.subtotal_mdo || nfseOrcamento.valor_total),
+          }}
+        />
+      )}
     </div>
   )
 }
