@@ -22,12 +22,14 @@ import {
   CheckCircle,
   FileCheck,
   CreditCard,
+  Package as PackageIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { OrcamentoPrintEditor } from "@/components/orcamento-print-editor"
 import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
+import { EmitirNfeDialog } from "@/components/nfe/emitir-nfe-dialog"
 
 interface Produto {
   id: string
@@ -112,6 +114,7 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
   const [valorPorKm, setValorPorKm] = useState(1.5)
   const [showPrintEditor, setShowPrintEditor] = useState(false)
   const [nfseDialogOpen, setNfseDialogOpen] = useState(false)
+  const [nfeDialogOpen, setNfeDialogOpen] = useState(false)
   const [numeroOrcamento, setNumeroOrcamento] = useState<string>("")
   const { toast } = useToast()
 
@@ -272,6 +275,20 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
         loadOrcamento()
       } catch (error) {
         console.error("Erro ao atualizar situação:", error)
+      }
+    }
+  }
+
+  const handleNfeSuccess = async () => {
+    if (orcamento) {
+      try {
+        toast({
+          title: "Sucesso",
+          description: "NF-e de material emitida com sucesso!",
+        })
+        loadOrcamento()
+      } catch (error) {
+        console.error("Erro ao atualizar após NF-e:", error)
       }
     }
   }
@@ -920,13 +937,22 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
                         Editar Orçamento
                       </Button>
                     </Link>
-                    {orcamento.situacao === "aprovado" && (
+                    {orcamento.situacao === "aprovado" && calcularSubtotalMdo() > 0 && (
                       <Button
                         onClick={() => setNfseDialogOpen(true)}
                         className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg"
                       >
                         <FileCheck className="h-4 w-4 mr-2" />
-                        Emitir NFS-e
+                        Emitir NFS-e (Servico)
+                      </Button>
+                    )}
+                    {orcamento.situacao === "aprovado" && calcularSubtotalMaterial() > 0 && (
+                      <Button
+                        onClick={() => setNfeDialogOpen(true)}
+                        className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg"
+                      >
+                        <PackageIcon className="h-4 w-4 mr-2" />
+                        Emitir NF-e (Material)
                       </Button>
                     )}
                     <Button onClick={() => setShowPrintEditor(true)} variant="outline" className="w-full">
@@ -967,6 +993,42 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
           valor: calcularSubtotalMdo(),
           valor_material: calcularSubtotalMaterial(),
           valor_total_orcamento: safeNumber(orcamento.valor_total),
+        }}
+      />
+
+      <EmitirNfeDialog
+        open={nfeDialogOpen}
+        onOpenChange={setNfeDialogOpen}
+        onSuccess={handleNfeSuccess}
+        dadosOrigem={{
+          origem: "orcamento",
+          origem_numero: orcamento.numero,
+          cliente_id: Number(orcamento.cliente_id),
+          cliente_nome: orcamento.cliente_nome,
+          cliente_cnpj: orcamento.cliente_cnpj,
+          cliente_cpf: orcamento.cliente_cpf,
+          cliente_email: orcamento.cliente_email,
+          cliente_telefone: orcamento.cliente_telefone,
+          cliente_endereco: orcamento.cliente_endereco,
+          cliente_numero: "",
+          cliente_complemento: "",
+          cliente_bairro: orcamento.cliente_bairro,
+          cliente_cidade: orcamento.cliente_cidade,
+          cliente_uf: orcamento.cliente_estado,
+          cliente_cep: orcamento.cliente_cep,
+          itens: itens
+            .filter((item) => safeNumber(item.valor_unitario) > 0)
+            .map((item) => ({
+              produto_id: Number(item.produto_id),
+              codigo_produto: item.produto?.codigo || "",
+              descricao: item.produto?.descricao || "",
+              ncm: item.produto?.ncm || "00000000",
+              unidade: item.produto?.unidade || "UN",
+              quantidade: safeNumber(item.quantidade),
+              valor_unitario: safeNumber(item.valor_unitario),
+              valor_total: safeNumber(item.quantidade) * safeNumber(item.valor_unitario),
+            })),
+          valor_material: calcularSubtotalMaterial(),
         }}
       />
     </div>

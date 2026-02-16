@@ -16,6 +16,7 @@ import {
   Database,
   CreditCard,
   FileCheck,
+  Package,
 } from "lucide-react"
 import { LogosTab } from "@/components/configuracoes/logos-tab"
 import { LayoutTab } from "@/components/configuracoes/layout-tab"
@@ -27,6 +28,7 @@ import { TermosTab } from "@/components/configuracoes/termos-tab"
 import { BackupTab } from "@/components/configuracoes/backup-tab"
 import { AsaasTab } from "@/components/configuracoes/asaas-tab"
 import { NfseTab } from "@/components/configuracoes/nfse-tab"
+import { NfeTab } from "@/components/configuracoes/nfe-tab"
 import { useEffect } from "react"
 
 export default function ConfiguracoesPage() {
@@ -91,7 +93,7 @@ export default function ConfiguracoesPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               {/* Desktop: Grid 9 colunas agora */}
               <div className="hidden md:block border-b bg-gradient-to-r from-indigo-50 to-purple-50">
-                <TabsList className="grid w-full grid-cols-10 h-auto p-2 bg-transparent">
+                <TabsList className="grid w-full grid-cols-11 h-auto p-2 bg-transparent">
                   <TabsTrigger
                     value="logos"
                     className="flex flex-col items-center gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
@@ -162,12 +164,19 @@ export default function ConfiguracoesPage() {
                     <FileCheck className="h-4 w-4" />
                     NFS-e
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="nfe"
+                    className="flex flex-col items-center gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white"
+                  >
+                    <Package className="h-4 w-4" />
+                    NF-e
+                  </TabsTrigger>
                 </TabsList>
               </div>
 
               {/* Mobile: Grid 4x2 fixo no rodapé */}
               <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-2xl">
-                <TabsList className="grid grid-cols-5 grid-rows-2 w-full h-auto p-2 gap-1 bg-gradient-to-r from-indigo-50 to-purple-50">
+                <TabsList className="grid grid-cols-5 grid-rows-3 w-full h-auto p-2 gap-1 bg-gradient-to-r from-indigo-50 to-purple-50">
                   <TabsTrigger
                     value="logos"
                     className="flex flex-col items-center gap-1 py-2 text-[9px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-indigo-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white rounded"
@@ -238,6 +247,13 @@ export default function ConfiguracoesPage() {
                     <FileCheck className="h-4 w-4" />
                     <span>NFS-e</span>
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="nfe"
+                    className="flex flex-col items-center gap-1 py-2 text-[9px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-blue-600 data-[state=active]:text-white rounded"
+                  >
+                    <Package className="h-4 w-4" />
+                    <span>NF-e</span>
+                  </TabsTrigger>
                 </TabsList>
               </div>
 
@@ -280,6 +296,10 @@ export default function ConfiguracoesPage() {
 
                 <TabsContent value="nfse" className="mt-0">
                   <NfseTab />
+                </TabsContent>
+
+                <TabsContent value="nfe" className="mt-0">
+                  <NfeTab />
                 </TabsContent>
               </div>
             </Tabs>
