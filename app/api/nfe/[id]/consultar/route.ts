@@ -27,19 +27,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     const config = configs[0]
 
+    // Buscar certificado - prioridade: NF-e proprio > NFS-e (fallback)
     let certificadoBase64 = ""
     let certificadoSenha = ""
-    if (config.usar_certificado_nfse) {
+
+    if (config.certificado_base64) {
+      certificadoBase64 = config.certificado_base64
+      certificadoSenha = config.certificado_senha || ""
+    } else if (config.usar_certificado_nfse) {
       const [nfseRows] = await pool.execute("SELECT certificado_base64, certificado_senha FROM nfse_config WHERE ativo = 1 LIMIT 1")
       const nfseConfigs = nfseRows as any[]
-      if (nfseConfigs.length > 0) {
+      if (nfseConfigs.length > 0 && nfseConfigs[0].certificado_base64) {
         certificadoBase64 = nfseConfigs[0].certificado_base64
         certificadoSenha = nfseConfigs[0].certificado_senha
       }
     }
 
     if (!certificadoBase64) {
-      return NextResponse.json({ success: false, message: "Certificado digital nao encontrado" }, { status: 400 })
+      return NextResponse.json({ success: false, message: "Certificado digital nao encontrado. Configure em Configuracoes > NF-e Material." }, { status: 400 })
     }
 
     // Consultar na SEFAZ

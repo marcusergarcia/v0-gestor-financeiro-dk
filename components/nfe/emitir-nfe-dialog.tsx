@@ -89,6 +89,13 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
     dest_codigo_municipio: "3550308",
     info_complementar: "",
     natureza_operacao: "Venda",
+    // Novos campos obrigatorios para NF-e
+    tipo_nota: 1 as number, // 0 = Entrada, 1 = Saida (padrao)
+    natureza_tipo: "Venda" as string, // Venda, Remessa, Transferencia, Devolucao
+    origem_produto: "estoque" as string, // estoque, producao, terceiros
+    consumidor_final: 1 as number, // 0 = Nao, 1 = Sim (padrao)
+    meio_pagamento: "15" as string, // 15 = Boleto, 01 = Dinheiro, 03 = Cartao Credito, etc.
+    tipo_venda: 1 as number, // 1 = Presencial, 2 = Internet, 9 = Outros
   })
 
   const [itens, setItens] = useState<ItemNFe[]>(dadosOrigem?.itens || [])
@@ -379,6 +386,160 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Dados da Nota */}
+          <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium text-foreground whitespace-nowrap">{"Emissao de nota fiscal de"}</span>
+              <Select
+                value={String(form.tipo_nota)}
+                onValueChange={(v) => updateForm("tipo_nota", Number(v))}
+              >
+                <SelectTrigger className="w-[120px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Saida</SelectItem>
+                  <SelectItem value="0">Entrada</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="font-medium text-foreground whitespace-nowrap">para</span>
+              <Select
+                value={form.dest_tipo}
+                onValueChange={(v) => updateForm("dest_tipo", v)}
+              >
+                <SelectTrigger className="w-[170px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PJ">Pessoa Juridica</SelectItem>
+                  <SelectItem value="PF">Pessoa Fisica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium text-foreground whitespace-nowrap">{"com natureza da operacao de"}</span>
+              <Select
+                value={form.natureza_tipo}
+                onValueChange={(v) => {
+                  updateForm("natureza_tipo", v)
+                  updateForm("natureza_operacao", v)
+                }}
+              >
+                <SelectTrigger className="w-[160px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Venda">Venda</SelectItem>
+                  <SelectItem value="Remessa">Remessa</SelectItem>
+                  <SelectItem value="Transferencia">Transferencia</SelectItem>
+                  <SelectItem value="Devolucao">Devolucao</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="font-medium text-foreground whitespace-nowrap">{"de produtos do"}</span>
+              <Select
+                value={form.origem_produto}
+                onValueChange={(v) => updateForm("origem_produto", v)}
+              >
+                <SelectTrigger className="w-[150px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="estoque">Estoque</SelectItem>
+                  <SelectItem value="producao">Producao</SelectItem>
+                  <SelectItem value="terceiros">Terceiros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium text-foreground whitespace-nowrap">{"e meu cliente"}</span>
+              <Select
+                value={String(form.dest_ind_ie_dest)}
+                onValueChange={(v) => updateForm("dest_ind_ie_dest", Number(v))}
+              >
+                <SelectTrigger className="w-[200px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Contribuinte ICMS</SelectItem>
+                  <SelectItem value="2">Contribuinte Isento</SelectItem>
+                  <SelectItem value="9">Nao Contribuinte</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="font-medium text-foreground whitespace-nowrap">de ICMS.</span>
+            </div>
+
+            <Separator />
+
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium text-foreground whitespace-nowrap">{"Esta e uma venda para consumidor final?"}</span>
+              <Select
+                value={String(form.consumidor_final)}
+                onValueChange={(v) => updateForm("consumidor_final", Number(v))}
+              >
+                <SelectTrigger className="w-[100px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Sim</SelectItem>
+                  <SelectItem value="0">Nao</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium text-foreground whitespace-nowrap">Meio de pagamento</span>
+              <Select
+                value={form.meio_pagamento}
+                onValueChange={(v) => updateForm("meio_pagamento", v)}
+              >
+                <SelectTrigger className="w-[200px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="15">Boleto bancario</SelectItem>
+                  <SelectItem value="01">Dinheiro</SelectItem>
+                  <SelectItem value="02">Cheque</SelectItem>
+                  <SelectItem value="03">Cartao de Credito</SelectItem>
+                  <SelectItem value="04">Cartao de Debito</SelectItem>
+                  <SelectItem value="05">Credito Loja</SelectItem>
+                  <SelectItem value="10">Vale Alimentacao</SelectItem>
+                  <SelectItem value="11">Vale Refeicao</SelectItem>
+                  <SelectItem value="12">Vale Presente</SelectItem>
+                  <SelectItem value="13">Vale Combustivel</SelectItem>
+                  <SelectItem value="14">Duplicata Mercantil</SelectItem>
+                  <SelectItem value="16">Deposito Bancario</SelectItem>
+                  <SelectItem value="17">PIX</SelectItem>
+                  <SelectItem value="18">Transferencia bancaria</SelectItem>
+                  <SelectItem value="99">Outros</SelectItem>
+                  <SelectItem value="90">Sem pagamento</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium text-foreground whitespace-nowrap">Tipo de venda</span>
+              <Select
+                value={String(form.tipo_venda)}
+                onValueChange={(v) => updateForm("tipo_venda", Number(v))}
+              >
+                <SelectTrigger className="w-[160px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Presencial</SelectItem>
+                  <SelectItem value="2">Internet</SelectItem>
+                  <SelectItem value="3">Telemarketing</SelectItem>
+                  <SelectItem value="4">Delivery</SelectItem>
+                  <SelectItem value="9">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Destinatario */}
           <div>
             <h3 className="font-semibold text-foreground flex items-center gap-2 mb-3">
@@ -421,21 +582,6 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
               <Separator />
 
               <div className="grid grid-cols-4 gap-3">
-                <div className="space-y-2">
-                  <Label>Tipo</Label>
-                  <Select
-                    value={form.dest_tipo}
-                    onValueChange={(v) => updateForm("dest_tipo", v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PJ">Pessoa Juridica (CNPJ)</SelectItem>
-                      <SelectItem value="PF">Pessoa Fisica (CPF)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="space-y-2">
                   <Label>{form.dest_tipo === "PJ" ? "CNPJ" : "CPF"} *</Label>
                   <Input
@@ -511,22 +657,6 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
                     onChange={(e) => updateForm("dest_cep", e.target.value)}
                     placeholder="00000-000"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label>Indicador IE Dest.</Label>
-                  <Select
-                    value={String(form.dest_ind_ie_dest)}
-                    onValueChange={(v) => updateForm("dest_ind_ie_dest", Number(v))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 - Contribuinte ICMS</SelectItem>
-                      <SelectItem value="2">2 - Contribuinte isento</SelectItem>
-                      <SelectItem value="9">9 - Nao contribuinte</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
                 {form.dest_ind_ie_dest === 1 && (
                   <div className="space-y-2">

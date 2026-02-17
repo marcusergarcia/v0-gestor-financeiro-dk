@@ -79,6 +79,11 @@ export interface DadosNFe {
   // Formato: YYYY-MM-DD (usado para chave de acesso e datas)
   dataEmissaoSP?: string // YYYY-MM-DD no fuso SP
   dhEmiSP?: string // YYYY-MM-DDTHH:mm:ss-03:00 completo no fuso SP
+  // Novos campos do formulario
+  tipoNota?: number // 0=Entrada, 1=Saida (padrao)
+  consumidorFinal?: number // 0=Nao, 1=Sim (padrao)
+  meioPagamento?: string // Codigo do meio de pagamento (15=Boleto, 01=Dinheiro, etc.)
+  tipoVenda?: number // 1=Presencial, 2=Internet, 9=Outros
 }
 
 // ==================== CONSTANTES ====================
@@ -237,7 +242,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<nNF>${dados.numeroNF}</nNF>`
   xml += `<dhEmi>${dhEmi}</dhEmi>`
   xml += `<dhSaiEnt>${dhSaiEnt}</dhSaiEnt>`
-  xml += `<tpNF>1</tpNF>` // 1=Saida
+  xml += `<tpNF>${dados.tipoNota ?? 1}</tpNF>` // 0=Entrada, 1=Saida
   xml += `<idDest>1</idDest>` // 1=Operacao interna
   xml += `<cMunFG>${dados.emitente.endereco.codigoMunicipio}</cMunFG>`
   xml += `<tpImp>1</tpImp>` // 1=DANFE normal retrato
@@ -245,8 +250,8 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<cDV>${cDV}</cDV>`
   xml += `<tpAmb>${dados.tipoAmbiente}</tpAmb>`
   xml += `<finNFe>1</finNFe>` // 1=NF-e normal
-  xml += `<indFinal>1</indFinal>` // 1=Consumidor final
-  xml += `<indPres>2</indPres>` // 2=Nao presencial (internet)
+  xml += `<indFinal>${dados.consumidorFinal ?? 1}</indFinal>` // 0=Normal, 1=Consumidor final
+  xml += `<indPres>${dados.tipoVenda ?? 1}</indPres>` // 1=Presencial, 2=Internet, 9=Outros
   xml += `<indIntermed>0</indIntermed>` // 0=Operacao sem intermediador (NT 2020.006 - obrigatorio no PL_009_V4)
   xml += `<procEmi>0</procEmi>` // 0=Aplicativo do contribuinte
   xml += `<verProc>GestorFinanceiro 1.0</verProc>`
@@ -402,13 +407,26 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `</transp>`
 
   // === pag - Pagamento ===
+  const tPag = dados.meioPagamento || "15" // 15=Boleto bancario (padrao)
+  const descPagMap: Record<string, string> = {
+    "01": "Dinheiro", "02": "Cheque", "03": "Cartao de Credito",
+    "04": "Cartao de Debito", "05": "Credito Loja", "10": "Vale Alimentacao",
+    "11": "Vale Refeicao", "12": "Vale Presente", "13": "Vale Combustivel",
+    "14": "Duplicata Mercantil", "15": "Boleto Bancario", "16": "Deposito Bancario",
+    "17": "Pagamento Instantaneo (PIX)", "18": "Transferencia bancaria, Carteira Digital",
+    "90": "Sem pagamento", "99": "Outros",
+  }
   xml += `<pag>`
   xml += `<detPag>`
-  // indPag REMOVIDO: campo nao existe no schema PL_008i2 usado pela SEFAZ SP
-  // (removido pela NT 2016.002, re-adicionado apenas no PL_009)
-  xml += `<tPag>99</tPag>` // 99=Outros
-  xml += `<xPag>Outros</xPag>` // Descricao obrigatoria quando tPag=99 (rejeicao 441)
-  xml += `<vPag>${vNF.toFixed(2)}</vPag>`
+  xml += `<tPag>${tPag}</tPag>`
+  if (tPag === "99") {
+    xml += `<xPag>Outros</xPag>`
+  }
+  if (tPag === "90") {
+    xml += `<vPag>0.00</vPag>`
+  } else {
+    xml += `<vPag>${vNF.toFixed(2)}</vPag>`
+  }
   xml += `</detPag>`
   xml += `</pag>`
 
