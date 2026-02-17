@@ -260,8 +260,15 @@ export function gerarXmlNFe(dados: DadosNFe): {
   // === emit - Emitente ===
   xml += `<emit>`
   xml += `<CNPJ>${dados.emitente.cnpj.replace(/\D/g, "").padStart(14, "0")}</CNPJ>`
-  xml += `<xNome>${escapeXml(dados.emitente.razaoSocial, 60)}</xNome>` // XSD: TString 2-60
-  if (dados.emitente.nomeFantasia) {
+  // Usar o nome fantasia se existir e for mais curto que a razao social,
+  // para evitar ultrapassar o limite de 60 chars do XSD.
+  // O XML autorizado da Contabilizei (NF-e 155) usa o nome curto e NAO emite xFant.
+  const nomeEmitente = dados.emitente.nomeFantasia && dados.emitente.nomeFantasia.length < dados.emitente.razaoSocial.length
+    ? dados.emitente.nomeFantasia
+    : dados.emitente.razaoSocial
+  xml += `<xNome>${escapeXml(nomeEmitente, 60)}</xNome>` // XSD: TString 2-60
+  // xFant so e emitido se nomeFantasia existir E for diferente do que ja foi usado no xNome
+  if (dados.emitente.nomeFantasia && dados.emitente.nomeFantasia !== nomeEmitente) {
     xml += `<xFant>${escapeXml(dados.emitente.nomeFantasia, 60)}</xFant>` // XSD: TString 1-60
   }
   xml += `<enderEmit>`
