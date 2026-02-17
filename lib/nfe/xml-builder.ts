@@ -260,9 +260,16 @@ export function gerarXmlNFe(dados: DadosNFe): {
   // === emit - Emitente ===
   xml += `<emit>`
   xml += `<CNPJ>${dados.emitente.cnpj.replace(/\D/g, "").padStart(14, "0")}</CNPJ>`
-  xml += `<xNome>${escapeXml(dados.emitente.razaoSocial, 60)}</xNome>`
-  if (dados.emitente.nomeFantasia) {
-    xml += `<xFant>${escapeXml(dados.emitente.nomeFantasia, 60)}</xFant>`
+  // Usar o nome fantasia se existir e for mais curto que a razao social,
+  // para evitar ultrapassar o limite de 60 chars do XSD.
+  // O XML autorizado da Contabilizei (NF-e 155) usa o nome curto e NAO emite xFant.
+  const nomeEmitente = dados.emitente.nomeFantasia && dados.emitente.nomeFantasia.length < dados.emitente.razaoSocial.length
+    ? dados.emitente.nomeFantasia
+    : dados.emitente.razaoSocial
+  xml += `<xNome>${escapeXml(nomeEmitente, 60)}</xNome>` // XSD: TString 2-60
+  // xFant so e emitido se nomeFantasia existir E for diferente do que ja foi usado no xNome
+  if (dados.emitente.nomeFantasia && dados.emitente.nomeFantasia !== nomeEmitente) {
+    xml += `<xFant>${escapeXml(dados.emitente.nomeFantasia, 60)}</xFant>` // XSD: TString 1-60
   }
   xml += `<enderEmit>`
   xml += `<xLgr>${escapeXml(dados.emitente.endereco.logradouro, 60)}</xLgr>`
@@ -325,25 +332,25 @@ export function gerarXmlNFe(dados: DadosNFe): {
 
     // prod - Dados do produto
     xml += `<prod>`
-    xml += `<cProd>${escapeXml(item.codigoProduto, 60)}</cProd>`
+    xml += `<cProd>${escapeXml(item.codigoProduto, 60)}</cProd>` // XSD: 1-60
     xml += `<cEAN>${ean}</cEAN>`
-    xml += `<xProd>${escapeXml(item.descricao, 120)}</xProd>`
-    xml += `<NCM>${item.ncm.replace(/\D/g, "").padStart(8, "0")}</NCM>`
+    xml += `<xProd>${escapeXml(item.descricao, 120)}</xProd>` // XSD: 1-120
+    xml += `<NCM>${item.ncm.replace(/\D/g, "").padStart(8, "0")}</NCM>` // XSD: 8 digitos
     xml += `<CFOP>${item.cfop}</CFOP>`
-    xml += `<uCom>${escapeXml(item.unidade, 6)}</uCom>`
-    xml += `<qCom>${Number(item.quantidade).toFixed(4)}</qCom>`
-    xml += `<vUnCom>${Number(item.valorUnitario).toFixed(10)}</vUnCom>`
-    xml += `<vProd>${Number(item.valorTotal).toFixed(2)}</vProd>`
+    xml += `<uCom>${escapeXml(item.unidade, 6)}</uCom>` // XSD: 1-6
+    xml += `<qCom>${formatDecimal(item.quantidade, 4)}</qCom>` // XSD: TDec_1104v (11 int + 4 dec)
+    xml += `<vUnCom>${formatDecimal(item.valorUnitario, 10)}</vUnCom>` // XSD: TDec_1110v (11 int + 10 dec)
+    xml += `<vProd>${formatDecimal(item.valorTotal, 2)}</vProd>` // XSD: TDec_1302 (13 int + 2 dec)
     xml += `<cEANTrib>${ean}</cEANTrib>`
-    xml += `<uTrib>${escapeXml(item.unidade, 6)}</uTrib>`
-    xml += `<qTrib>${Number(item.quantidade).toFixed(4)}</qTrib>`
-    xml += `<vUnTrib>${Number(item.valorUnitario).toFixed(10)}</vUnTrib>`
+    xml += `<uTrib>${escapeXml(item.unidade, 6)}</uTrib>` // XSD: 1-6
+    xml += `<qTrib>${formatDecimal(item.quantidade, 4)}</qTrib>` // XSD: TDec_1104v
+    xml += `<vUnTrib>${formatDecimal(item.valorUnitario, 10)}</vUnTrib>` // XSD: TDec_1110v
     xml += `<indTot>1</indTot>` // 1=Compoe total
     xml += `</prod>`
 
     // imposto - Simples Nacional CSOSN 102
     xml += `<imposto>`
-    xml += `<vTotTrib>${vTotTribItem.toFixed(2)}</vTotTrib>`
+    xml += `<vTotTrib>${formatDecimal(vTotTribItem, 2)}</vTotTrib>`
     xml += `<ICMS>`
     xml += `<ICMSSN102>`
     xml += `<orig>0</orig>` // 0=Nacional
@@ -386,7 +393,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<vST>0.00</vST>`
   xml += `<vFCPST>0.00</vFCPST>`
   xml += `<vFCPSTRet>0.00</vFCPSTRet>`
-  xml += `<vProd>${vProd.toFixed(2)}</vProd>`
+  xml += `<vProd>${formatDecimal(vProd, 2)}</vProd>`
   xml += `<vFrete>0.00</vFrete>`
   xml += `<vSeg>0.00</vSeg>`
   xml += `<vDesc>0.00</vDesc>`
@@ -396,8 +403,8 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<vPIS>0.00</vPIS>`
   xml += `<vCOFINS>0.00</vCOFINS>`
   xml += `<vOutro>0.00</vOutro>`
-  xml += `<vNF>${vNF.toFixed(2)}</vNF>`
-  xml += `<vTotTrib>${vTotTrib.toFixed(2)}</vTotTrib>`
+  xml += `<vNF>${formatDecimal(vNF, 2)}</vNF>`
+  xml += `<vTotTrib>${formatDecimal(vTotTrib, 2)}</vTotTrib>`
   xml += `</ICMSTot>`
   xml += `</total>`
 
@@ -408,14 +415,6 @@ export function gerarXmlNFe(dados: DadosNFe): {
 
   // === pag - Pagamento ===
   const tPag = dados.meioPagamento || "15" // 15=Boleto bancario (padrao)
-  const descPagMap: Record<string, string> = {
-    "01": "Dinheiro", "02": "Cheque", "03": "Cartao de Credito",
-    "04": "Cartao de Debito", "05": "Credito Loja", "10": "Vale Alimentacao",
-    "11": "Vale Refeicao", "12": "Vale Presente", "13": "Vale Combustivel",
-    "14": "Duplicata Mercantil", "15": "Boleto Bancario", "16": "Deposito Bancario",
-    "17": "Pagamento Instantaneo (PIX)", "18": "Transferencia bancaria, Carteira Digital",
-    "90": "Sem pagamento", "99": "Outros",
-  }
   xml += `<pag>`
   xml += `<detPag>`
   xml += `<tPag>${tPag}</tPag>`
@@ -425,7 +424,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   if (tPag === "90") {
     xml += `<vPag>0.00</vPag>`
   } else {
-    xml += `<vPag>${vNF.toFixed(2)}</vPag>`
+    xml += `<vPag>${formatDecimal(vNF, 2)}</vPag>`
   }
   xml += `</detPag>`
   xml += `</pag>`
@@ -512,17 +511,58 @@ export function gerarXmlCancelamento(dados: {
 
 // ==================== HELPERS ====================
 
+/**
+ * Formata numero decimal conforme regras do XSD da SEFAZ.
+ * Garante que nao haja notacao cientifica e respeita o numero de casas decimais.
+ * Ex: formatDecimal(189.8566, 10) => "189.8566000000"
+ * Ex: formatDecimal(150, 2) => "150.00"
+ */
+function formatDecimal(value: number, decimals: number): string {
+  const num = Number(value) || 0
+  return num.toFixed(decimals)
+}
+
+/**
+ * Sanitiza string para XML da NF-e conforme XSD da SEFAZ.
+ * 1. Remove acentos/diacriticos (SEFAZ SP PL_008i2 rejeita caracteres acentuados em varios campos)
+ * 2. Remove caracteres de controle (tabs, newlines, etc.)
+ * 3. Remove caracteres especiais nao permitidos no XSD (@, #, $, %, etc.)
+ * 4. Escapa entidades XML (&, <, >, ", ')
+ * 5. Remove espacos duplos e trim
+ * 6. Trunca no maxLength ANTES do escape (o XSD mede o texto, nao as entidades)
+ * 
+ * Referencia: XML autorizado Contabilizei usa TUDO MAIUSCULO SEM ACENTOS
+ * Ex: "MACINTEL SEGURANCA ELETRONICA" em vez de "Macintel Segurança Eletrônica"
+ */
 function escapeXml(str: string, maxLength?: number): string {
+  if (!str) return ""
+  
   let s = str
+  
+  // 1. Remover acentos/diacriticos via decomposicao Unicode (NFD) + remocao de combining marks
+  s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+  
+  // 2. Remover caracteres de controle (tabs, newlines, etc.) - schema nao permite
+  s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+  // Converter newlines e tabs para espaco
+  s = s.replace(/[\r\n\t]/g, " ")
+  
+  // 3. Remover espacos duplos e trim
+  s = s.replace(/\s+/g, " ").trim()
+  
+  // 4. Truncar ANTES do escape (XSD maxLength conta texto, nao entidades)
+  if (maxLength && s.length > maxLength) {
+    s = s.substring(0, maxLength)
+  }
+  
+  // 5. Escapar entidades XML
+  s = s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;")
-  // Truncar para respeitar maxLength do XSD (SEFAZ rejeita com erro 225)
-  if (maxLength && s.length > maxLength) {
-    s = s.substring(0, maxLength)
-  }
+  
   return s
 }
 
