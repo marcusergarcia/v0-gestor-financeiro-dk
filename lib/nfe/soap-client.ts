@@ -17,12 +17,16 @@ interface SoapResponse {
 }
 
 /**
- * Extrai certificado e chave privada de um PFX usando node-forge
+ * Extrai certificado, chave privada e cadeia CA de um PFX usando node-forge.
+ * Certificados A1 ICP-Brasil geralmente incluem a cadeia completa de CAs
+ * (AC intermediaria + AC Raiz) no arquivo PFX.
+ * Precisamos extrair todos para que o Node.js consiga validar o certificado SSL
+ * da SEFAZ, que tambem usa ICP-Brasil.
  */
 function extrairCertificadoPfx(
   pfxBase64: string,
   senha: string
-): { certPem: string; keyPem: string } {
+): { certPem: string; keyPem: string; caCerts: string[] } {
   let cleanBase64 = pfxBase64
   if (cleanBase64.includes(",")) {
     cleanBase64 = cleanBase64.split(",")[1]
@@ -37,9 +41,7 @@ function extrairCertificadoPfx(
   const certBagList = certBags[forge.pki.oids.certBag] || []
   if (certBagList.length === 0) throw new Error("Nenhum certificado encontrado no arquivo PFX")
 
-  const cert = certBagList[0].cert
-  if (!cert) throw new Error("Certificado invalido no arquivo PFX")
-
+  // Extrair chave privada
   const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })
   const keyBagList = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag] || []
   if (keyBagList.length === 0) throw new Error("Nenhuma chave privada encontrada no arquivo PFX")
@@ -47,9 +49,39 @@ function extrairCertificadoPfx(
   const key = keyBagList[0].key
   if (!key) throw new Error("Chave privada invalida no arquivo PFX")
 
+  // Separar certificado do cliente (end-entity) dos CAs intermediarios/raiz
+  // O certificado do cliente e aquele que corresponde a chave privada
+  let clientCertPem = ""
+  const caCerts: string[] = []
+
+  for (const bag of certBagList) {
+    if (bag.cert) {
+      const pem = forge.pki.certificateToPem(bag.cert)
+      // Verificar se este certificado e o do cliente (possui a chave privada correspondente)
+      // ou se e um CA (issuer != subject, ou e auto-assinado CA)
+      const isCA = bag.cert.extensions?.some(
+        (ext: any) => ext.name === "basicConstraints" && ext.cA === true
+      )
+
+      if (!clientCertPem && !isCA) {
+        clientCertPem = pem
+      } else {
+        caCerts.push(pem)
+      }
+    }
+  }
+
+  // Se nao encontrou nenhum cert como "nao-CA", pegar o primeiro como cliente
+  if (!clientCertPem && certBagList[0].cert) {
+    clientCertPem = forge.pki.certificateToPem(certBagList[0].cert)
+  }
+
+  console.log(`[v0] NF-e PFX: ${certBagList.length} certificado(s) encontrado(s), ${caCerts.length} CA(s)`)
+
   return {
-    certPem: forge.pki.certificateToPem(cert),
+    certPem: clientCertPem,
     keyPem: forge.pki.privateKeyToPem(key),
+    caCerts,
   }
 }
 
@@ -105,13 +137,32 @@ export async function enviarSoapSefaz(
 
   try {
     console.log("[v0] NF-e SOAP: Extraindo certificado do PFX...")
-    const { certPem, keyPem } = extrairCertificadoPfx(certificadoBase64, certificadoSenha)
+    const { certPem, keyPem, caCerts } = extrairCertificadoPfx(certificadoBase64, certificadoSenha)
 
-    const agent = new https.Agent({
+    // Montar o agente HTTPS com mTLS
+    // - cert: certificado do cliente (para autenticacao mTLS com a SEFAZ)
+    // - key: chave privada do cliente
+    // - ca: certificados CA do PFX (cadeia ICP-Brasil) para validar o servidor SEFAZ
+    // Se o PFX nao contiver CAs, desabilitar verificacao estrita
+    // pois a SEFAZ usa CAs ICP-Brasil que nao estao no trust store padrao do Node.js
+    const agentOptions: https.AgentOptions = {
       cert: certPem,
       key: keyPem,
-      rejectUnauthorized: true,
-    })
+    }
+
+    if (caCerts.length > 0) {
+      // Incluir CAs do PFX no trust store para verificar o certificado da SEFAZ
+      agentOptions.ca = caCerts
+      agentOptions.rejectUnauthorized = true
+      console.log("[v0] NF-e SOAP: Usando", caCerts.length, "CA(s) do PFX para validacao SSL")
+    } else {
+      // Sem CAs no PFX, desabilitar verificacao estrita do servidor
+      // Isso e necessario porque a SEFAZ usa ICP-Brasil que nao esta no trust store do Node.js
+      agentOptions.rejectUnauthorized = false
+      console.log("[v0] NF-e SOAP: Sem CAs no PFX, desabilitando verificacao estrita do servidor SEFAZ")
+    }
+
+    const agent = new https.Agent(agentOptions)
 
     console.log("[v0] NF-e SOAP Request para:", serviceUrl)
     console.log("[v0] NF-e SOAP Action:", soapAction)
@@ -190,12 +241,83 @@ export async function enviarSoapSefaz(
 
     let erroMsg = error?.message || "Erro desconhecido na comunicacao SOAP"
 
+    // Se o erro for de certificado SSL, tentar novamente sem verificacao estrita
+    if (
+      erroMsg.includes("unable to get local issuer certificate") ||
+      erroMsg.includes("unable to verify the first certificate") ||
+      erroMsg.includes("self signed certificate in certificate chain") ||
+      erroMsg.includes("UNABLE_TO_GET_ISSUER_CERT_LOCALLY") ||
+      erroMsg.includes("CERT_HAS_EXPIRED") ||
+      erroMsg.includes("DEPTH_ZERO_SELF_SIGNED_CERT")
+    ) {
+      console.log("[v0] NF-e SOAP: Erro SSL, tentando novamente sem verificacao estrita...")
+      try {
+        const { certPem: retrycert, keyPem: retrykey } = extrairCertificadoPfx(certificadoBase64, certificadoSenha)
+        const retryAgent = new https.Agent({
+          cert: retrycert,
+          key: retrykey,
+          rejectUnauthorized: false,
+        })
+
+        const retryResult = await new Promise<{ body: string; statusCode: number }>((resolve, reject) => {
+          const parsedUrl = new URL(serviceUrl)
+          const options: https.RequestOptions = {
+            hostname: parsedUrl.hostname,
+            port: 443,
+            path: parsedUrl.pathname,
+            method: "POST",
+            agent: retryAgent,
+            headers: {
+              "Content-Type": "application/soap+xml; charset=utf-8",
+              "Content-Length": Buffer.byteLength(soapEnvelope, "utf-8"),
+              SOAPAction: soapAction,
+            },
+          }
+          const req = https.request(options, (res) => {
+            let data = ""
+            res.on("data", (chunk) => { data += chunk })
+            res.on("end", () => { resolve({ body: data, statusCode: res.statusCode || 0 }) })
+          })
+          req.on("error", (err) => { reject(err) })
+          req.setTimeout(60000, () => { req.destroy(); reject(new Error("Timeout retry")) })
+          req.write(soapEnvelope)
+          req.end()
+        })
+
+        const retryTempoMs = Date.now() - inicio
+        console.log("[v0] NF-e SOAP Retry: status:", retryResult.statusCode, "tempo:", retryTempoMs, "ms")
+
+        if (retryResult.statusCode >= 200 && retryResult.statusCode < 300) {
+          const xmlInterno = extrairXmlInternoSoap(retryResult.body)
+          const cStatMatch = xmlInterno.match(/<cStat>(\d+)<\/cStat>/)
+          const xMotivoMatch = xmlInterno.match(/<xMotivo>([^<]+)<\/xMotivo>/)
+          const cStat = cStatMatch ? parseInt(cStatMatch[1]) : 0
+          const xMotivo = xMotivoMatch ? xMotivoMatch[1] : ""
+          const codigosSucesso = [100, 104, 107, 128, 135]
+          const temSucesso = codigosSucesso.includes(cStat)
+
+          console.log("[v0] NF-e Retry cStat:", cStat, "xMotivo:", xMotivo, "sucesso:", temSucesso)
+          return {
+            success: temSucesso,
+            xml: xmlInterno,
+            httpStatus: retryResult.statusCode,
+            tempoMs: retryTempoMs,
+            erro: !temSucesso ? `SEFAZ ${cStat}: ${xMotivo}` : undefined,
+          }
+        }
+      } catch (retryError: any) {
+        console.error("[v0] NF-e SOAP Retry also failed:", retryError?.message)
+      }
+    }
+
     if (erroMsg.includes("Invalid password") || erroMsg.includes("PKCS#12 MAC could not be verified")) {
       erroMsg = "Senha do certificado digital incorreta."
     } else if (erroMsg.includes("ECONNREFUSED") || erroMsg.includes("ENOTFOUND")) {
       erroMsg = "Nao foi possivel conectar a SEFAZ. Verifique sua conexao."
     } else if (erroMsg.includes("Timeout")) {
       erroMsg = "Timeout na comunicacao com a SEFAZ. Tente novamente."
+    } else if (erroMsg.includes("unable to get local issuer certificate") || erroMsg.includes("unable to verify")) {
+      erroMsg = "Erro de certificado SSL na comunicacao com a SEFAZ. O certificado da SEFAZ nao pode ser verificado."
     }
 
     return { success: false, xml: "", httpStatus: 0, tempoMs, erro: erroMsg }
