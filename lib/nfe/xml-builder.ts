@@ -423,13 +423,10 @@ export function gerarXmlNFe(dados: DadosNFe): {
  * Envelope para enviar ao web service NFeAutorizacao4
  */
 export function gerarXmlEnviNFe(xmlNFeAssinado: string, idLote: string): string {
-  // Remover xmlns duplicado do <NFe> quando ja esta declarado no <enviNFe>
-  // O SEFAZ pode rejeitar (erro 225) se houver declaracao de namespace redundante
-  const xmlNFeLimpo = xmlNFeAssinado.replace(
-    '<NFe xmlns="http://www.portalfiscal.inf.br/nfe">',
-    "<NFe>"
-  )
-  return `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>${idLote}</idLote><indSinc>1</indSinc>${xmlNFeLimpo}</enviNFe>`
+  // MANTER o xmlns no <NFe> - a assinatura digital foi calculada com ele.
+  // Remover o xmlns invalida o digest da assinatura (SEFAZ retorna erro 225).
+  // O XML autorizado do Contabilizei tambem mantem xmlns no <NFe>.
+  return `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>${idLote}</idLote><indSinc>1</indSinc>${xmlNFeAssinado}</enviNFe>`
 }
 
 /**
