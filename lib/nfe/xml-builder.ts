@@ -429,7 +429,13 @@ export function gerarXmlNFe(dados: DadosNFe): {
  * Envelope para enviar ao web service NFeAutorizacao4
  */
 export function gerarXmlEnviNFe(xmlNFeAssinado: string, idLote: string): string {
-  return `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>${idLote}</idLote><indSinc>1</indSinc>${xmlNFeAssinado}</enviNFe>`
+  // Remover xmlns duplicado do <NFe> quando ja esta declarado no <enviNFe>
+  // O SEFAZ pode rejeitar (erro 225) se houver declaracao de namespace redundante
+  const xmlNFeLimpo = xmlNFeAssinado.replace(
+    '<NFe xmlns="http://www.portalfiscal.inf.br/nfe">',
+    "<NFe>"
+  )
+  return `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>${idLote}</idLote><indSinc>1</indSinc>${xmlNFeLimpo}</enviNFe>`
 }
 
 /**
