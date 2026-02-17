@@ -177,10 +177,16 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
         dest_email: cliente.email || "",
         dest_telefone: cliente.telefone || "",
         dest_endereco: cliente.endereco || "",
+        dest_numero: cliente.numero || "",
+        dest_complemento: cliente.complemento || "",
         dest_bairro: cliente.bairro || "",
         dest_cidade: cliente.cidade || "",
         dest_uf: cliente.estado || "",
         dest_cep: cliente.cep || "",
+        dest_codigo_municipio: cliente.codigo_municipio || prev.dest_codigo_municipio,
+        // IE do destinatario: preencher se o cliente tiver
+        dest_inscricao_estadual: cliente.inscricao_estadual || "",
+        dest_ind_ie_dest: cliente.inscricao_estadual ? 1 : 9,
       }))
     }
   }
@@ -260,6 +266,13 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
     }
     if (!form.dest_razao_social) {
       const msg = "Informe a razao social/nome do destinatario"
+      setSubmitError(msg)
+      toast({ title: "Campo obrigatorio", description: msg, variant: "destructive" })
+      return
+    }
+    // Validar IE do destinatario quando contribuinte ICMS
+    if (form.dest_ind_ie_dest === 1 && !form.dest_inscricao_estadual.trim()) {
+      const msg = "Inscricao Estadual do destinatario e obrigatoria quando Indicador IE = Contribuinte ICMS"
       setSubmitError(msg)
       toast({ title: "Campo obrigatorio", description: msg, variant: "destructive" })
       return

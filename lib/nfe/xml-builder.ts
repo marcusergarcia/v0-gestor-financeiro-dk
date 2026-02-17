@@ -314,6 +314,11 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `</enderDest>`
   }
   xml += `<indIEDest>${dados.destinatario.indicadorIE}</indIEDest>`
+  // IE do destinatario: obrigatoria quando indIEDest=1 (contribuinte ICMS)
+  // Quando indIEDest=2 (isento) ou 9 (nao contribuinte), NAO incluir <IE>
+  if (dados.destinatario.indicadorIE === 1 && dados.destinatario.inscricaoEstadual) {
+    xml += `<IE>${dados.destinatario.inscricaoEstadual.replace(/\D/g, "")}</IE>`
+  }
   if (dados.destinatario.email) {
     xml += `<email>${escapeXml(dados.destinatario.email, 60)}</email>`
   }
