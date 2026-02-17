@@ -407,6 +407,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<detPag>`
   xml += `<indPag>0</indPag>` // 0=A vista
   xml += `<tPag>99</tPag>` // 99=Outros
+  xml += `<xPag>Outros</xPag>` // Descricao obrigatoria quando tPag=99 (rejeicao 441)
   xml += `<vPag>${vNF.toFixed(2)}</vPag>`
   xml += `</detPag>`
   xml += `</pag>`
