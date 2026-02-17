@@ -280,6 +280,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Debug: Log do XML assinado e envelope para troubleshooting
+    console.log("[v0] NF-e: XML NFe assinado (primeiros 1000):", xmlAssinado.substring(0, 1000))
+    console.log("[v0] NF-e: XML enviNFe tamanho:", xmlEnviNFe.length, "bytes")
+
     // Enviar para a SEFAZ
     console.log("[v0] NF-e: Enviando para SEFAZ SP...")
     const resultado = await autorizarNFe(
@@ -288,6 +292,25 @@ export async function POST(request: NextRequest) {
       certificadoBase64,
       certificadoSenha,
     )
+
+    // Debug: Log completo do retorno da SEFAZ
+    console.log("[v0] NF-e: SEFAZ retorno success:", resultado.success, "httpStatus:", resultado.httpStatus, "tempoMs:", resultado.tempoMs)
+    console.log("[v0] NF-e: SEFAZ retorno XML (primeiros 2000):", resultado.xml.substring(0, 2000))
+    console.log("[v0] NF-e: SEFAZ retorno erro:", resultado.erro || "(nenhum)")
+
+    // Extrair dados do protNFe (dentro de infProt) - este e o status REAL da NF-e
+    // O retorno da SEFAZ para autorizacao sincrona tem dois niveis:
+    // - cStat do lote (retEnviNFe): 104 = "Lote processado"
+    // - cStat da NF-e (protNFe > infProt): 100 = "Autorizado" ou codigo de rejeicao
+    const protNFeData = extrairDadosProtNFe(resultado.xml)
+    const cStatReal = protNFeData.cStat || extrairCampoXml(resultado.xml, "cStat") || ""
+    const xMotivoReal = protNFeData.xMotivo || extrairCampoXml(resultado.xml, "xMotivo") || resultado.erro || ""
+    const protocoloReal = protNFeData.nProt || ""
+
+    // A NF-e so foi REALMENTE autorizada se o cStat dentro de protNFe e 100
+    const nfeAutorizada = cStatReal === "100" || (resultado.success && protNFeData.cStat === "")
+
+    console.log("[v0] NF-e: cStat real (protNFe):", cStatReal, "xMotivo:", xMotivoReal, "protocolo:", protocoloReal, "autorizada:", nfeAutorizada)
 
     // Registrar transmissao
     await connection.execute(
@@ -298,18 +321,18 @@ export async function POST(request: NextRequest) {
         nfeId,
         xmlEnviNFe.substring(0, 65535),
         resultado.xml.substring(0, 65535),
-        resultado.success ? 1 : 0,
-        extrairCampoXml(resultado.xml, "cStat") || "",
-        extrairCampoXml(resultado.xml, "xMotivo") || resultado.erro || "",
+        nfeAutorizada ? 1 : 0,
+        cStatReal,
+        xMotivoReal,
         resultado.tempoMs,
       ]
     )
 
-    if (resultado.success) {
+    if (nfeAutorizada) {
       // Extrair dados do protocolo
-      const protocolo = extrairCampoXml(resultado.xml, "nProt") || ""
-      const cStat = extrairCampoXml(resultado.xml, "cStat") || ""
-      const xMotivo = extrairCampoXml(resultado.xml, "xMotivo") || ""
+      const protocolo = protocoloReal
+      const cStat = cStatReal
+      const xMotivo = xMotivoReal
 
       // Montar XML do nfeProc (NF-e processada = NF-e + protocolo)
       const xmlProtocolo = montarNfeProc(xmlAssinado, resultado.xml)
@@ -350,9 +373,9 @@ export async function POST(request: NextRequest) {
         },
       })
     } else {
-      // Erro na SEFAZ
-      const cStat = extrairCampoXml(resultado.xml, "cStat") || ""
-      const xMotivo = extrairCampoXml(resultado.xml, "xMotivo") || resultado.erro || ""
+      // Erro na SEFAZ - NF-e rejeitada ou erro de comunicacao
+      const cStat = cStatReal
+      const xMotivo = xMotivoReal
 
       await connection.execute(
         `UPDATE nfe_emitidas SET
@@ -395,6 +418,24 @@ export async function POST(request: NextRequest) {
 function extrairCampoXml(xml: string, campo: string): string | null {
   const match = xml.match(new RegExp(`<${campo}>([^<]+)</${campo}>`))
   return match ? match[1] : null
+}
+
+/**
+ * Extrai dados de dentro de <protNFe><infProt>...</infProt></protNFe>
+ * Este e o status REAL da NF-e (diferente do status do lote)
+ */
+function extrairDadosProtNFe(xml: string): { cStat: string; xMotivo: string; nProt: string; dhRecbto: string } {
+  const protNFeMatch = xml.match(/<protNFe[^>]*>[\s\S]*?<infProt[^>]*>([\s\S]*?)<\/infProt>[\s\S]*?<\/protNFe>/)
+  if (!protNFeMatch) {
+    return { cStat: "", xMotivo: "", nProt: "", dhRecbto: "" }
+  }
+  const infProt = protNFeMatch[1]
+  return {
+    cStat: (infProt.match(/<cStat>([^<]+)<\/cStat>/)?.[1] || "").trim(),
+    xMotivo: (infProt.match(/<xMotivo>([^<]+)<\/xMotivo>/)?.[1] || "").trim(),
+    nProt: (infProt.match(/<nProt>([^<]+)<\/nProt>/)?.[1] || "").trim(),
+    dhRecbto: (infProt.match(/<dhRecbto>([^<]+)<\/dhRecbto>/)?.[1] || "").trim(),
+  }
 }
 
 function montarNfeProc(xmlNFeAssinado: string, xmlRetorno: string): string {
