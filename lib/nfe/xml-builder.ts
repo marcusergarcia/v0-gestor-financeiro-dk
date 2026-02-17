@@ -231,7 +231,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<ide>`
   xml += `<cUF>35</cUF>` // SP
   xml += `<cNF>${cNF}</cNF>`
-  xml += `<natOp>${escapeXml(dados.naturezaOperacao || "Venda")}</natOp>`
+  xml += `<natOp>${escapeXml(dados.naturezaOperacao || "Venda", 60)}</natOp>`
   xml += `<mod>55</mod>`
   xml += `<serie>${dados.serie}</serie>`
   xml += `<nNF>${dados.numeroNF}</nNF>`
@@ -255,19 +255,19 @@ export function gerarXmlNFe(dados: DadosNFe): {
   // === emit - Emitente ===
   xml += `<emit>`
   xml += `<CNPJ>${dados.emitente.cnpj.replace(/\D/g, "").padStart(14, "0")}</CNPJ>`
-  xml += `<xNome>${escapeXml(dados.emitente.razaoSocial)}</xNome>`
+  xml += `<xNome>${escapeXml(dados.emitente.razaoSocial, 60)}</xNome>`
   if (dados.emitente.nomeFantasia) {
-    xml += `<xFant>${escapeXml(dados.emitente.nomeFantasia)}</xFant>`
+    xml += `<xFant>${escapeXml(dados.emitente.nomeFantasia, 60)}</xFant>`
   }
   xml += `<enderEmit>`
-  xml += `<xLgr>${escapeXml(dados.emitente.endereco.logradouro)}</xLgr>`
-  xml += `<nro>${escapeXml(dados.emitente.endereco.numero)}</nro>`
+  xml += `<xLgr>${escapeXml(dados.emitente.endereco.logradouro, 60)}</xLgr>`
+  xml += `<nro>${escapeXml(dados.emitente.endereco.numero, 60)}</nro>`
   if (dados.emitente.endereco.complemento) {
-    xml += `<xCpl>${escapeXml(dados.emitente.endereco.complemento)}</xCpl>`
+    xml += `<xCpl>${escapeXml(dados.emitente.endereco.complemento, 60)}</xCpl>`
   }
-  xml += `<xBairro>${escapeXml(dados.emitente.endereco.bairro)}</xBairro>`
+  xml += `<xBairro>${escapeXml(dados.emitente.endereco.bairro, 60)}</xBairro>`
   xml += `<cMun>${dados.emitente.endereco.codigoMunicipio}</cMun>`
-  xml += `<xMun>${escapeXml(dados.emitente.endereco.municipio)}</xMun>`
+  xml += `<xMun>${escapeXml(dados.emitente.endereco.municipio, 60)}</xMun>`
   xml += `<UF>${dados.emitente.endereco.uf}</UF>`
   xml += `<CEP>${dados.emitente.endereco.cep.replace(/\D/g, "").padStart(8, "0")}</CEP>`
   xml += `<cPais>1058</cPais>`
@@ -290,17 +290,17 @@ export function gerarXmlNFe(dados: DadosNFe): {
   } else {
     xml += `<CPF>${dados.destinatario.cpfCnpj.replace(/\D/g, "").padStart(11, "0")}</CPF>`
   }
-  xml += `<xNome>${escapeXml(dados.destinatario.razaoSocial)}</xNome>`
+  xml += `<xNome>${escapeXml(dados.destinatario.razaoSocial, 60)}</xNome>`
   if (dados.destinatario.endereco) {
     xml += `<enderDest>`
-    xml += `<xLgr>${escapeXml(dados.destinatario.endereco.logradouro)}</xLgr>`
-    xml += `<nro>${escapeXml(dados.destinatario.endereco.numero)}</nro>`
+    xml += `<xLgr>${escapeXml(dados.destinatario.endereco.logradouro, 60)}</xLgr>`
+    xml += `<nro>${escapeXml(dados.destinatario.endereco.numero, 60)}</nro>`
     if (dados.destinatario.endereco.complemento) {
-      xml += `<xCpl>${escapeXml(dados.destinatario.endereco.complemento)}</xCpl>`
+      xml += `<xCpl>${escapeXml(dados.destinatario.endereco.complemento, 60)}</xCpl>`
     }
-    xml += `<xBairro>${escapeXml(dados.destinatario.endereco.bairro)}</xBairro>`
+    xml += `<xBairro>${escapeXml(dados.destinatario.endereco.bairro, 60)}</xBairro>`
     xml += `<cMun>${dados.destinatario.endereco.codigoMunicipio}</cMun>`
-    xml += `<xMun>${escapeXml(dados.destinatario.endereco.municipio)}</xMun>`
+    xml += `<xMun>${escapeXml(dados.destinatario.endereco.municipio, 60)}</xMun>`
     xml += `<UF>${dados.destinatario.endereco.uf}</UF>`
     xml += `<CEP>${dados.destinatario.endereco.cep.replace(/\D/g, "").padStart(8, "0")}</CEP>`
     xml += `<cPais>1058</cPais>`
@@ -315,7 +315,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   }
   xml += `<indIEDest>${dados.destinatario.indicadorIE}</indIEDest>`
   if (dados.destinatario.email) {
-    xml += `<email>${escapeXml(dados.destinatario.email)}</email>`
+    xml += `<email>${escapeXml(dados.destinatario.email, 60)}</email>`
   }
   xml += `</dest>`
 
@@ -328,17 +328,17 @@ export function gerarXmlNFe(dados: DadosNFe): {
 
     // prod - Dados do produto
     xml += `<prod>`
-    xml += `<cProd>${escapeXml(item.codigoProduto)}</cProd>`
+    xml += `<cProd>${escapeXml(item.codigoProduto, 60)}</cProd>`
     xml += `<cEAN>${ean}</cEAN>`
-    xml += `<xProd>${escapeXml(item.descricao)}</xProd>`
+    xml += `<xProd>${escapeXml(item.descricao, 120)}</xProd>`
     xml += `<NCM>${item.ncm.replace(/\D/g, "").padStart(8, "0")}</NCM>`
     xml += `<CFOP>${item.cfop}</CFOP>`
-    xml += `<uCom>${escapeXml(item.unidade)}</uCom>`
+    xml += `<uCom>${escapeXml(item.unidade, 6)}</uCom>`
     xml += `<qCom>${Number(item.quantidade).toFixed(4)}</qCom>`
     xml += `<vUnCom>${Number(item.valorUnitario).toFixed(10)}</vUnCom>`
     xml += `<vProd>${Number(item.valorTotal).toFixed(2)}</vProd>`
     xml += `<cEANTrib>${ean}</cEANTrib>`
-    xml += `<uTrib>${escapeXml(item.unidade)}</uTrib>`
+    xml += `<uTrib>${escapeXml(item.unidade, 6)}</uTrib>`
     xml += `<qTrib>${Number(item.quantidade).toFixed(4)}</qTrib>`
     xml += `<vUnTrib>${Number(item.valorUnitario).toFixed(10)}</vUnTrib>`
     xml += `<indTot>1</indTot>` // 1=Compoe total
@@ -414,7 +414,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   // === infAdic - Informacoes adicionais ===
   if (dados.informacoesAdicionais) {
     xml += `<infAdic>`
-    xml += `<infCpl>${escapeXml(dados.informacoesAdicionais)}</infCpl>`
+    xml += `<infCpl>${escapeXml(dados.informacoesAdicionais, 5000)}</infCpl>`
     xml += `</infAdic>`
   }
 
@@ -482,7 +482,7 @@ export function gerarXmlCancelamento(dados: {
   xml += `<detEvento versao="1.00">`
   xml += `<descEvento>Cancelamento</descEvento>`
   xml += `<nProt>${dados.protocolo}</nProt>`
-  xml += `<xJust>${escapeXml(dados.justificativa)}</xJust>`
+  xml += `<xJust>${escapeXml(dados.justificativa, 255)}</xJust>`
   xml += `</detEvento>`
   xml += `</infEvento>`
   xml += `</evento>`
@@ -493,13 +493,18 @@ export function gerarXmlCancelamento(dados: {
 
 // ==================== HELPERS ====================
 
-function escapeXml(str: string): string {
-  return str
+function escapeXml(str: string, maxLength?: number): string {
+  let s = str
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;")
+  // Truncar para respeitar maxLength do XSD (SEFAZ rejeita com erro 225)
+  if (maxLength && s.length > maxLength) {
+    s = s.substring(0, maxLength)
+  }
+  return s
 }
 
 /**

@@ -60,7 +60,7 @@ XML_NFE = """<?xml version="1.0" encoding="UTF-8"?>
 </ide>
 <emit>
 <CNPJ>49895742000111</CNPJ>
-<xNome>Macintel Seguranca Eletronica e Controle de Acesso Unipessoal LTDA</xNome>
+<xNome>Macintel Seguranca Eletronica e Controle de Acesso Unipe</xNome>
 <xFant>Macintel Seguranca Eletronica e Controle de Acesso</xFant>
 <enderEmit>
 <xLgr>Rua Luis Noberto Freire,</xLgr>
