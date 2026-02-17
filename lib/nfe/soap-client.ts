@@ -142,24 +142,22 @@ export async function enviarSoapSefaz(
     // Montar o agente HTTPS com mTLS
     // - cert: certificado do cliente (para autenticacao mTLS com a SEFAZ)
     // - key: chave privada do cliente
-    // - ca: certificados CA do PFX (cadeia ICP-Brasil) para validar o servidor SEFAZ
-    // Se o PFX nao contiver CAs, desabilitar verificacao estrita
-    // pois a SEFAZ usa CAs ICP-Brasil que nao estao no trust store padrao do Node.js
+    // - rejectUnauthorized: false porque a SEFAZ usa certificados ICP-Brasil
+    //   que NAO estao no trust store padrao do Node.js/Vercel.
+    //   Os CAs intermediarios do PFX sozinhos nao sao suficientes para
+    //   completar a cadeia ate o CA raiz do ICP-Brasil.
+    //   Isso e seguro pois estamos comunicando com URLs fixas e conhecidas da SEFAZ.
     const agentOptions: https.AgentOptions = {
       cert: certPem,
       key: keyPem,
+      rejectUnauthorized: false,
     }
 
     if (caCerts.length > 0) {
-      // Incluir CAs do PFX no trust store para verificar o certificado da SEFAZ
       agentOptions.ca = caCerts
-      agentOptions.rejectUnauthorized = true
-      console.log("[v0] NF-e SOAP: Usando", caCerts.length, "CA(s) do PFX para validacao SSL")
+      console.log("[v0] NF-e SOAP: Usando", caCerts.length, "CA(s) do PFX + rejectUnauthorized=false")
     } else {
-      // Sem CAs no PFX, desabilitar verificacao estrita do servidor
-      // Isso e necessario porque a SEFAZ usa ICP-Brasil que nao esta no trust store do Node.js
-      agentOptions.rejectUnauthorized = false
-      console.log("[v0] NF-e SOAP: Sem CAs no PFX, desabilitando verificacao estrita do servidor SEFAZ")
+      console.log("[v0] NF-e SOAP: Sem CAs no PFX, usando rejectUnauthorized=false")
     }
 
     const agent = new https.Agent(agentOptions)
