@@ -186,12 +186,24 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
   }
 
   const adicionarProduto = (produto: any) => {
+    // Validar se o produto possui NCM
+    const ncmLimpo = (produto.ncm || "").replace(/\D/g, "")
+    if (!ncmLimpo || ncmLimpo === "00000000" || ncmLimpo.length < 2) {
+      toast({
+        title: "Produto sem NCM",
+        description: `O produto "${produto.descricao || produto.codigo}" nao possui NCM cadastrado. Atualize o cadastro do produto antes de emitir a NF-e.`,
+        variant: "destructive",
+      })
+      setProdutoSearchOpen(false)
+      setProdutoSearchValue("")
+      return
+    }
     const valorUnit = Number(produto.valor_unitario) || 0
     setItens((prev) => [...prev, {
       produto_id: Number(produto.id),
       codigo_produto: produto.codigo || "",
       descricao: produto.descricao || "",
-      ncm: produto.ncm || "00000000",
+      ncm: ncmLimpo.padStart(8, "0"),
       unidade: produto.unidade || "UN",
       quantidade: 1,
       valor_unitario: valorUnit,
@@ -205,7 +217,7 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
     setItens((prev) => [...prev, {
       codigo_produto: "",
       descricao: "",
-      ncm: "00000000",
+      ncm: "",
       unidade: "UN",
       quantidade: 1,
       valor_unitario: 0,
@@ -265,6 +277,18 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
       toast({ title: "Item invalido", description: msg, variant: "destructive" })
       return
     }
+    // Validar NCM de todos os itens
+    const itensSemNcm = itens.filter((i) => {
+      const ncm = (i.ncm || "").replace(/\D/g, "")
+      return !ncm || ncm === "00000000" || ncm.length < 2
+    })
+    if (itensSemNcm.length > 0) {
+      const nomes = itensSemNcm.map((i) => i.descricao || i.codigo_produto).join(", ")
+      const msg = `Os seguintes itens nao possuem NCM valido: ${nomes}. Atualize o cadastro dos produtos.`
+      setSubmitError(msg)
+      toast({ title: "Produto sem NCM", description: msg, variant: "destructive" })
+      return
+    }
 
     setLoading(true)
 
@@ -278,7 +302,7 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
             produto_id: item.produto_id || null,
             codigo_produto: item.codigo_produto,
             descricao: item.descricao,
-            ncm: item.ncm || "00000000",
+            ncm: (item.ncm || "").replace(/\D/g, "").padStart(8, "0"),
             unidade: item.unidade || "UN",
             quantidade: item.quantidade,
             valor_unitario: item.valor_unitario,
