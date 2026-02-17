@@ -4,14 +4,12 @@ import { useState, useEffect, useRef } from "react"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Loader2, Printer, Package, Download } from "lucide-react"
+import { Loader2, Printer, Package } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
-import { useToast } from "@/hooks/use-toast"
 
 interface DanfeDialogProps {
   open: boolean
@@ -22,7 +20,40 @@ interface DanfeDialogProps {
 function formatDateBR(dateStr: string | null): string {
   if (!dateStr) return "-"
   try {
-    return new Date(dateStr).toLocaleDateString("pt-BR")
+    return new Date(dateStr).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })
+  } catch {
+    return dateStr
+  }
+}
+
+function formatDateTimeBR(dateStr: string | null): string {
+  if (!dateStr) return "-"
+  try {
+    return new Date(dateStr).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+  } catch {
+    return dateStr
+  }
+}
+
+function formatTimeBR(dateStr: string | null): string {
+  if (!dateStr) return "-"
+  try {
+    return new Date(dateStr).toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
   } catch {
     return dateStr
   }
@@ -40,6 +71,15 @@ function formatCnpjCpf(doc: string): string {
   return doc
 }
 
+function formatCep(value: string): string {
+  if (!value) return ""
+  const clean = value.replace(/\D/g, "")
+  if (clean.length === 8) {
+    return clean.replace(/(\d{5})(\d{3})/, "$1-$2")
+  }
+  return value
+}
+
 function formatChaveAcesso(chave: string): string {
   if (!chave) return "-"
   return chave.replace(/(\d{4})/g, "$1 ").trim()
@@ -49,7 +89,6 @@ export function DanfeDialog({ open, onOpenChange, nfeId }: DanfeDialogProps) {
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<any>(null)
   const printRef = useRef<HTMLDivElement>(null)
-  const { toast } = useToast()
 
   useEffect(() => {
     if (open && nfeId) {
@@ -65,69 +104,70 @@ export function DanfeDialog({ open, onOpenChange, nfeId }: DanfeDialogProps) {
       const result = await response.json()
       if (result.success) {
         setData(result.data)
-      } else {
-        toast({ title: "Erro", description: result.message, variant: "destructive" })
       }
-    } catch {
-      toast({ title: "Erro", description: "Erro ao carregar dados do DANFE", variant: "destructive" })
+    } catch (error) {
+      console.error("Erro ao carregar DANFE:", error)
     } finally {
       setLoading(false)
     }
   }
 
   const handlePrint = () => {
-    if (!printRef.current) return
-    const printContent = printRef.current.innerHTML
-    const printWindow = window.open("", "", "width=800,height=1100")
-    if (printWindow) {
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>DANFE - NF-e ${data?.nfe?.numero_nfe || ""}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, Helvetica, sans-serif; font-size: 9px; color: #000; padding: 10px; }
-            .danfe-container { max-width: 210mm; margin: 0 auto; border: 2px solid #000; }
-            .danfe-header { display: flex; border-bottom: 2px solid #000; }
-            .danfe-header-left { width: 30%; border-right: 1px solid #000; padding: 6px; text-align: center; }
-            .danfe-header-center { width: 40%; border-right: 1px solid #000; padding: 6px; text-align: center; }
-            .danfe-header-right { width: 30%; padding: 6px; }
-            .danfe-logo { max-height: 50px; max-width: 100%; }
-            .danfe-title { font-size: 14px; font-weight: bold; }
-            .danfe-subtitle { font-size: 8px; margin-top: 2px; }
-            .danfe-section { border-bottom: 1px solid #000; padding: 4px 6px; }
-            .danfe-section-title { font-weight: bold; font-size: 8px; text-transform: uppercase; background: #f0f0f0; padding: 2px 4px; margin: -4px -6px 4px; }
-            .danfe-row { display: flex; border-bottom: 1px solid #ccc; }
-            .danfe-row:last-child { border-bottom: none; }
-            .danfe-cell { flex: 1; padding: 2px 4px; border-right: 1px solid #ccc; }
-            .danfe-cell:last-child { border-right: none; }
-            .danfe-cell label { font-size: 7px; color: #666; display: block; }
-            .danfe-cell span { font-size: 9px; font-weight: 500; }
-            .danfe-chave { font-family: monospace; font-size: 8px; letter-spacing: 1px; text-align: center; padding: 4px; }
-            table { width: 100%; border-collapse: collapse; font-size: 8px; }
-            th { background: #f0f0f0; border: 1px solid #000; padding: 3px; text-align: center; font-size: 7px; }
-            td { border: 1px solid #ccc; padding: 2px 4px; }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            .total-row { font-weight: bold; background: #f8f8f8; }
-            .info-compl { font-size: 8px; padding: 6px; min-height: 40px; }
-            @media print {
-              body { padding: 0; }
-              .danfe-container { border-width: 2px; }
-            }
-          </style>
-        </head>
-        <body>
-          ${printContent}
-        </body>
-        </html>
-      `)
-      printWindow.document.close()
-      setTimeout(() => {
-        printWindow.print()
-        printWindow.close()
-      }, 500)
+    const content = printRef.current
+    if (!content) return
+
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) return
+
+    const baseUrl = window.location.origin
+    let htmlContent = content.innerHTML
+    htmlContent = htmlContent.replace(
+      /src="\/images\//g,
+      `src="${baseUrl}/images/`
+    )
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>DANFE - NF-e ${data?.nfe?.numero_nfe || ""}</title>
+        <style>
+          ${getPrintStyles()}
+          img { max-width: 100%; }
+          @media print {
+            body { padding: 0; margin: 0; }
+            @page { margin: 8mm; size: A4; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+          }
+        </style>
+      </head>
+      <body>${htmlContent}</body>
+      </html>
+    `)
+    printWindow.document.close()
+    const images = printWindow.document.querySelectorAll("img")
+    let loadedCount = 0
+    const totalImages = images.length
+
+    const tryPrint = () => {
+      loadedCount++
+      if (loadedCount >= totalImages) {
+        setTimeout(() => printWindow.print(), 300)
+      }
+    }
+
+    if (totalImages === 0) {
+      setTimeout(() => printWindow.print(), 300)
+    } else {
+      images.forEach((img) => {
+        if (img.complete) {
+          tryPrint()
+        } else {
+          img.onload = tryPrint
+          img.onerror = tryPrint
+        }
+      })
+      setTimeout(() => printWindow.print(), 3000)
     }
   }
 
@@ -138,194 +178,595 @@ export function DanfeDialog({ open, onOpenChange, nfeId }: DanfeDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-blue-600" />
-            DANFE - NF-e {nfe?.numero_nfe ? String(nfe.numero_nfe).padStart(9, "0") : ""}
+      <DialogContent className="max-w-5xl w-[80vw] max-h-[80vh] overflow-y-auto p-0">
+        <DialogHeader className="p-4 pb-0 pr-14">
+          <DialogTitle className="flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Printer className="h-5 w-5 text-blue-600" />
+              Imprimir DANFE
+            </span>
+            <Button
+              size="sm"
+              onClick={handlePrint}
+              disabled={loading || !data}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
+            </Button>
           </DialogTitle>
-          <DialogDescription>
-            Documento Auxiliar da Nota Fiscal Eletronica
-          </DialogDescription>
         </DialogHeader>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           </div>
         ) : nfe ? (
-          <>
-            {/* Action buttons */}
-            <div className="flex items-center gap-2 justify-end">
-              <Button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Printer className="h-4 w-4 mr-2" />
-                Imprimir
-              </Button>
+          <div className="p-4 pt-2">
+            <div ref={printRef}>
+              <DanfeLayout nfe={nfe} itens={itens} emitente={emitente} logo={logo} />
             </div>
-
-            {/* DANFE Content */}
-            <div ref={printRef} className="bg-white">
-              <div className="danfe-container" style={{ maxWidth: "210mm", margin: "0 auto", border: "2px solid #000", fontFamily: "Arial, sans-serif", fontSize: "9px" }}>
-                {/* Header */}
-                <div style={{ display: "flex", borderBottom: "2px solid #000" }}>
-                  <div style={{ width: "30%", borderRight: "1px solid #000", padding: "6px", textAlign: "center" }}>
-                    {logo && (
-                      <img src={logo} alt="Logo" style={{ maxHeight: "50px", maxWidth: "100%", marginBottom: "4px" }} />
-                    )}
-                    <div style={{ fontSize: "10px", fontWeight: "bold" }}>
-                      {emitente?.razao_social || emitente?.nome_fantasia || ""}
-                    </div>
-                    <div style={{ fontSize: "7px", marginTop: "2px" }}>
-                      {[emitente?.endereco, emitente?.numero_endereco, emitente?.bairro].filter(Boolean).join(", ")}
-                    </div>
-                    <div style={{ fontSize: "7px" }}>
-                      {emitente?.cidade} - {emitente?.uf} | CEP: {emitente?.cep}
-                    </div>
-                    <div style={{ fontSize: "7px" }}>
-                      CNPJ: {formatCnpjCpf(emitente?.cnpj || "")} | IE: {emitente?.inscricao_estadual || ""}
-                    </div>
-                  </div>
-                  <div style={{ width: "40%", borderRight: "1px solid #000", padding: "8px", textAlign: "center" }}>
-                    <div style={{ fontSize: "16px", fontWeight: "bold" }}>DANFE</div>
-                    <div style={{ fontSize: "7px", marginTop: "2px" }}>
-                      Documento Auxiliar da Nota Fiscal Eletronica
-                    </div>
-                    <div style={{ fontSize: "8px", marginTop: "4px" }}>
-                      0 - ENTRADA | <strong>1 - SAIDA</strong>
-                    </div>
-                    <div style={{ fontSize: "18px", fontWeight: "bold", marginTop: "4px" }}>
-                      N. {String(nfe.numero_nfe).padStart(9, "0")}
-                    </div>
-                    <div style={{ fontSize: "9px" }}>
-                      Serie: {nfe.serie || 1} | Folha 1/1
-                    </div>
-                  </div>
-                  <div style={{ width: "30%", padding: "6px" }}>
-                    <div style={{ fontSize: "7px", fontWeight: "bold", marginBottom: "4px" }}>CHAVE DE ACESSO</div>
-                    <div style={{ fontFamily: "monospace", fontSize: "7px", letterSpacing: "0.5px", wordBreak: "break-all" }}>
-                      {formatChaveAcesso(nfe.chave_acesso || "")}
-                    </div>
-                    {nfe.protocolo && (
-                      <div style={{ marginTop: "6px" }}>
-                        <div style={{ fontSize: "7px", fontWeight: "bold" }}>PROTOCOLO DE AUTORIZACAO</div>
-                        <div style={{ fontSize: "8px", fontFamily: "monospace" }}>{nfe.protocolo}</div>
-                        <div style={{ fontSize: "7px" }}>{formatDateBR(nfe.data_autorizacao)}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Natureza da operacao */}
-                <div style={{ borderBottom: "1px solid #000", padding: "3px 6px" }}>
-                  <div style={{ fontSize: "7px", color: "#666" }}>NATUREZA DA OPERACAO</div>
-                  <div style={{ fontSize: "9px", fontWeight: "500" }}>{nfe.natureza_operacao || "Venda"}</div>
-                </div>
-
-                {/* Destinatario */}
-                <div style={{ borderBottom: "1px solid #000" }}>
-                  <div style={{ fontSize: "7px", fontWeight: "bold", background: "#f0f0f0", padding: "2px 6px" }}>DESTINATARIO / REMETENTE</div>
-                  <div style={{ display: "flex", borderBottom: "1px solid #ccc" }}>
-                    <div style={{ flex: 3, padding: "2px 6px", borderRight: "1px solid #ccc" }}>
-                      <div style={{ fontSize: "7px", color: "#666" }}>RAZAO SOCIAL</div>
-                      <div style={{ fontSize: "9px" }}>{nfe.dest_razao_social || nfe.cliente_nome || "-"}</div>
-                    </div>
-                    <div style={{ flex: 1, padding: "2px 6px", borderRight: "1px solid #ccc" }}>
-                      <div style={{ fontSize: "7px", color: "#666" }}>CNPJ/CPF</div>
-                      <div style={{ fontSize: "9px" }}>{formatCnpjCpf(nfe.dest_cpf_cnpj || "")}</div>
-                    </div>
-                    <div style={{ flex: 1, padding: "2px 6px" }}>
-                      <div style={{ fontSize: "7px", color: "#666" }}>DATA EMISSAO</div>
-                      <div style={{ fontSize: "9px" }}>{formatDateBR(nfe.data_emissao || nfe.created_at)}</div>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex" }}>
-                    <div style={{ flex: 3, padding: "2px 6px", borderRight: "1px solid #ccc" }}>
-                      <div style={{ fontSize: "7px", color: "#666" }}>ENDERECO</div>
-                      <div style={{ fontSize: "9px" }}>
-                        {[nfe.dest_endereco, nfe.dest_numero].filter(Boolean).join(", ") || "-"}
-                      </div>
-                    </div>
-                    <div style={{ flex: 1, padding: "2px 6px", borderRight: "1px solid #ccc" }}>
-                      <div style={{ fontSize: "7px", color: "#666" }}>BAIRRO</div>
-                      <div style={{ fontSize: "9px" }}>{nfe.dest_bairro || "-"}</div>
-                    </div>
-                    <div style={{ flex: 1, padding: "2px 6px", borderRight: "1px solid #ccc" }}>
-                      <div style={{ fontSize: "7px", color: "#666" }}>MUNICIPIO</div>
-                      <div style={{ fontSize: "9px" }}>{nfe.dest_cidade || "-"}</div>
-                    </div>
-                    <div style={{ width: "40px", padding: "2px 6px" }}>
-                      <div style={{ fontSize: "7px", color: "#666" }}>UF</div>
-                      <div style={{ fontSize: "9px" }}>{nfe.dest_uf || "-"}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Itens */}
-                <div>
-                  <div style={{ fontSize: "7px", fontWeight: "bold", background: "#f0f0f0", padding: "2px 6px", borderBottom: "1px solid #000" }}>DADOS DOS PRODUTOS / SERVICOS</div>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "8px" }}>
-                    <thead>
-                      <tr>
-                        <th style={{ border: "1px solid #000", padding: "3px", fontSize: "7px", background: "#f0f0f0" }}>CODIGO</th>
-                        <th style={{ border: "1px solid #000", padding: "3px", fontSize: "7px", background: "#f0f0f0" }}>DESCRICAO DO PRODUTO/SERVICO</th>
-                        <th style={{ border: "1px solid #000", padding: "3px", fontSize: "7px", background: "#f0f0f0" }}>NCM</th>
-                        <th style={{ border: "1px solid #000", padding: "3px", fontSize: "7px", background: "#f0f0f0" }}>CFOP</th>
-                        <th style={{ border: "1px solid #000", padding: "3px", fontSize: "7px", background: "#f0f0f0" }}>UN</th>
-                        <th style={{ border: "1px solid #000", padding: "3px", fontSize: "7px", background: "#f0f0f0" }}>QTD</th>
-                        <th style={{ border: "1px solid #000", padding: "3px", fontSize: "7px", background: "#f0f0f0" }}>VL UNIT</th>
-                        <th style={{ border: "1px solid #000", padding: "3px", fontSize: "7px", background: "#f0f0f0" }}>VL TOTAL</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {itens.map((item: any, idx: number) => (
-                        <tr key={idx}>
-                          <td style={{ border: "1px solid #ccc", padding: "2px 4px", textAlign: "center" }}>{item.codigo_produto}</td>
-                          <td style={{ border: "1px solid #ccc", padding: "2px 4px" }}>{item.descricao}</td>
-                          <td style={{ border: "1px solid #ccc", padding: "2px 4px", textAlign: "center" }}>{item.ncm}</td>
-                          <td style={{ border: "1px solid #ccc", padding: "2px 4px", textAlign: "center" }}>{item.cfop || "5102"}</td>
-                          <td style={{ border: "1px solid #ccc", padding: "2px 4px", textAlign: "center" }}>{item.unidade}</td>
-                          <td style={{ border: "1px solid #ccc", padding: "2px 4px", textAlign: "right" }}>{Number(item.quantidade).toFixed(2)}</td>
-                          <td style={{ border: "1px solid #ccc", padding: "2px 4px", textAlign: "right" }}>{Number(item.valor_unitario).toFixed(4)}</td>
-                          <td style={{ border: "1px solid #ccc", padding: "2px 4px", textAlign: "right", fontWeight: "bold" }}>{Number(item.valor_total).toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Totais */}
-                <div style={{ borderTop: "2px solid #000", display: "flex" }}>
-                  <div style={{ flex: 1, padding: "3px 6px", borderRight: "1px solid #ccc" }}>
-                    <div style={{ fontSize: "7px", color: "#666" }}>VALOR TOTAL DOS PRODUTOS</div>
-                    <div style={{ fontSize: "11px", fontWeight: "bold" }}>
-                      {formatCurrency(Number(nfe.valor_produtos) || Number(nfe.valor_total))}
-                    </div>
-                  </div>
-                  <div style={{ flex: 1, padding: "3px 6px", borderRight: "1px solid #ccc" }}>
-                    <div style={{ fontSize: "7px", color: "#666" }}>VALOR TOTAL DA NOTA</div>
-                    <div style={{ fontSize: "11px", fontWeight: "bold" }}>
-                      {formatCurrency(Number(nfe.valor_total) || Number(nfe.valor_produtos))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Info complementar */}
-                {nfe.info_complementar && (
-                  <div style={{ borderTop: "1px solid #000", padding: "4px 6px" }}>
-                    <div style={{ fontSize: "7px", fontWeight: "bold" }}>INFORMACOES COMPLEMENTARES</div>
-                    <div style={{ fontSize: "8px", marginTop: "2px" }}>{nfe.info_complementar}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-12">
-            <Package className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500">NF-e nao encontrada</p>
           </div>
+        ) : (
+          <div className="py-8 text-center text-gray-500">NF-e nao encontrada</div>
         )}
       </DialogContent>
     </Dialog>
   )
+}
+
+// ============================================================
+// Componente que renderiza o layout oficial do DANFE
+// Modelo baseado no DANFE padrao SEFAZ (conforme anexo do usuario)
+// ============================================================
+function DanfeLayout({ nfe, itens, emitente, logo }: { nfe: any; itens: any[]; emitente: any; logo: string | null }) {
+  const isCancelada = nfe.status === "cancelada"
+  const numeroNfe = String(nfe.numero_nfe || "").padStart(9, "0")
+  const serie = nfe.serie || 1
+
+  const enderecoEmitente = [emitente?.endereco, emitente?.numero_endereco].filter(Boolean).join(", ")
+  const bairroEmitente = emitente?.bairro || ""
+  const cidadeEmitente = emitente?.cidade || ""
+  const ufEmitente = emitente?.uf || "SP"
+  const cepEmitente = formatCep(emitente?.cep || "")
+
+  const enderecoDestinatario = [nfe.dest_endereco, nfe.dest_numero].filter(Boolean).join(", ")
+
+  const valorProdutos = Number(nfe.valor_produtos) || Number(nfe.valor_total) || 0
+  const valorFrete = Number(nfe.valor_frete) || 0
+  const valorSeguro = Number(nfe.valor_seguro) || 0
+  const valorDesconto = Number(nfe.valor_desconto) || 0
+  const valorOutras = Number(nfe.valor_outras) || 0
+  const valorIpi = Number(nfe.valor_ipi) || 0
+  const valorIcms = Number(nfe.valor_icms) || 0
+  const valorIcmsSt = Number(nfe.valor_icms_st) || 0
+  const baseIcms = Number(nfe.base_icms) || 0
+  const baseIcmsSt = Number(nfe.base_icms_st) || 0
+  const valorTotal = Number(nfe.valor_total) || valorProdutos
+
+  return (
+    <div style={{
+      fontFamily: "Arial, Helvetica, sans-serif",
+      fontSize: "9px",
+      color: "#000",
+      maxWidth: "100%",
+      margin: "0 auto",
+      lineHeight: 1.3,
+    }}>
+      {/* ===== CANHOTO DE RECEBIMENTO ===== */}
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000" }}>
+        <tbody>
+          <tr>
+            <td style={{ padding: "4px 8px", borderRight: "1px solid #000", width: "75%", verticalAlign: "top" }}>
+              <FieldLabel>RECEBEMOS DE {emitente?.razao_social || emitente?.nome_fantasia || ""} OS PRODUTOS CONSTANTES NA NOTA FISCAL INDICADA AO LADO.</FieldLabel>
+              <div style={{ display: "flex", gap: "20px", marginTop: "8px" }}>
+                <div style={{ flex: 1 }}>
+                  <FieldLabel>DATA DE RECEBIMENTO</FieldLabel>
+                  <div style={{ borderBottom: "1px solid #999", height: "14px", marginTop: "2px" }} />
+                </div>
+                <div style={{ flex: 2 }}>
+                  <FieldLabel>IDENTIFICACAO E ASSINATURA DO RECEBEDOR</FieldLabel>
+                  <div style={{ borderBottom: "1px solid #999", height: "14px", marginTop: "2px" }} />
+                </div>
+              </div>
+            </td>
+            <td style={{ padding: "6px 8px", textAlign: "center", verticalAlign: "middle" }}>
+              <FieldLabel>NF-e</FieldLabel>
+              <div style={{ fontSize: "14px", fontWeight: "bold" }}>N. {numeroNfe}</div>
+              <div style={{ fontSize: "9px" }}>SERIE: {serie}</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Linha tracejada de corte */}
+      <div style={{ borderBottom: "1px dashed #999", margin: "4px 0" }} />
+
+      {/* ===== CABECALHO PRINCIPAL ===== */}
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid #000" }}>
+        <tbody>
+          <tr>
+            {/* Coluna esquerda: Logo + Dados do emitente */}
+            <td style={{ width: "38%", borderRight: "1px solid #000", padding: "6px 8px", verticalAlign: "top" }}>
+              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                {logo && (
+                  <img
+                    src={logo}
+                    alt="Logo"
+                    style={{ maxHeight: "50px", maxWidth: "60px", objectFit: "contain" }}
+                    crossOrigin="anonymous"
+                  />
+                )}
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: "bold" }}>
+                    {emitente?.razao_social || emitente?.nome_fantasia || ""}
+                  </div>
+                  <div style={{ fontSize: "8px", marginTop: "2px", lineHeight: 1.4 }}>
+                    {enderecoEmitente}{bairroEmitente ? ` - ${bairroEmitente}` : ""}
+                    <br />
+                    {cidadeEmitente} - {ufEmitente}
+                    <br />
+                    CEP: {cepEmitente}
+                  </div>
+                </div>
+              </div>
+            </td>
+            {/* Coluna centro: DANFE info */}
+            <td style={{ width: "28%", borderRight: "1px solid #000", padding: "6px 8px", textAlign: "center", verticalAlign: "top" }}>
+              <div style={{ fontSize: "16px", fontWeight: "bold", letterSpacing: "1px" }}>DANFE</div>
+              <div style={{ fontSize: "7px", marginTop: "1px", lineHeight: 1.3 }}>
+                DOCUMENTO AUXILIAR<br />DE NOTA FISCAL<br />ELETRONICA
+              </div>
+              <div style={{ marginTop: "4px", fontSize: "9px" }}>
+                <span>0 - ENTRADA</span>
+                <span style={{ margin: "0 6px" }}>|</span>
+                <strong>1 - SAIDA</strong>
+              </div>
+              <div style={{ fontSize: "18px", fontWeight: "bold", marginTop: "4px" }}>
+                N. {numeroNfe}
+              </div>
+              <div style={{ fontSize: "9px" }}>SERIE: {serie}</div>
+              <div style={{ fontSize: "8px", marginTop: "2px" }}>FOLHA 1 / 1</div>
+            </td>
+            {/* Coluna direita: Chave + Protocolo */}
+            <td style={{ width: "34%", padding: "6px 8px", verticalAlign: "top" }}>
+              <FieldLabel>CHAVE DE ACESSO</FieldLabel>
+              <div style={{
+                fontFamily: "monospace",
+                fontSize: "8px",
+                letterSpacing: "0.3px",
+                wordBreak: "break-all",
+                marginTop: "2px",
+                lineHeight: 1.5,
+                fontWeight: "bold",
+              }}>
+                {formatChaveAcesso(nfe.chave_acesso || "")}
+              </div>
+              <div style={{ marginTop: "6px", padding: "4px", border: "1px solid #ccc", fontSize: "7px", textAlign: "center", lineHeight: 1.4 }}>
+                Consulta de autenticidade no portal nacional da NF-e<br />
+                <strong>www.nfe.fazenda.gov.br/portal</strong> ou no site da Sefaz Autorizadora.
+              </div>
+              {nfe.protocolo && (
+                <div style={{ marginTop: "6px" }}>
+                  <FieldLabel>PROTOCOLO DE AUTORIZACAO DE USO</FieldLabel>
+                  <div style={{ fontSize: "9px", fontFamily: "monospace", fontWeight: "bold", marginTop: "1px" }}>
+                    {nfe.protocolo} - {formatDateTimeBR(nfe.data_autorizacao || nfe.data_emissao)}
+                  </div>
+                </div>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== NATUREZA DA OPERACAO + IE + CNPJ ===== */}
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "60%" }}>
+              <FieldLabel>NATUREZA DA OPERACAO</FieldLabel>
+              <FieldValue bold>{nfe.natureza_operacao || "Venda"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, width: "40%" }}>
+              <FieldLabel>PROTOCOLO DE AUTORIZACAO DE USO</FieldLabel>
+              <FieldValue>{nfe.protocolo ? `${nfe.protocolo}` : "-"}</FieldValue>
+            </td>
+          </tr>
+          <tr>
+            <td colSpan={2} style={{ padding: 0 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <tbody>
+                  <tr>
+                    <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999", width: "34%" }}>
+                      <FieldLabel>INSCRICAO ESTADUAL DE SUBST. TRIBUTARIA</FieldLabel>
+                      <FieldValue>{emitente?.inscricao_estadual_st || "-"}</FieldValue>
+                    </td>
+                    <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999", width: "33%" }}>
+                      <FieldLabel>INSCRICAO ESTADUAL</FieldLabel>
+                      <FieldValue>{emitente?.inscricao_estadual || "-"}</FieldValue>
+                    </td>
+                    <td style={{ ...cellStyle, borderTop: "1px solid #999", width: "33%" }}>
+                      <FieldLabel>CNPJ / CPF</FieldLabel>
+                      <FieldValue>{formatCnpjCpf(emitente?.cnpj || "")}</FieldValue>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== DESTINATARIO / REMETENTE ===== */}
+      <SectionHeader>DESTINATARIO / REMETENTE</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "50%" }}>
+              <FieldLabel>NOME / RAZAO SOCIAL</FieldLabel>
+              <FieldValue bold>{nfe.dest_razao_social || nfe.cliente_nome || "-"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "25%" }}>
+              <FieldLabel>CNPJ / CPF</FieldLabel>
+              <FieldValue>{formatCnpjCpf(nfe.dest_cpf_cnpj || "")}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, width: "25%" }}>
+              <FieldLabel>DATA EMISSAO</FieldLabel>
+              <FieldValue>{formatDateBR(nfe.data_emissao || nfe.created_at)}</FieldValue>
+            </td>
+          </tr>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>ENDERECO</FieldLabel>
+              <FieldValue>{enderecoDestinatario || "-"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>BAIRRO / DISTRITO</FieldLabel>
+              <FieldValue>{nfe.dest_bairro || "-"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderTop: "1px solid #999" }}>
+              <FieldLabel>CEP</FieldLabel>
+              <FieldValue>{formatCep(nfe.dest_cep || "")}</FieldValue>
+            </td>
+          </tr>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>MUNICIPIO</FieldLabel>
+              <FieldValue>{nfe.dest_cidade || "-"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>FONE / FAX</FieldLabel>
+              <FieldValue>{nfe.dest_telefone || "-"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderTop: "1px solid #999" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <tbody>
+                  <tr>
+                    <td style={{ width: "40%", verticalAlign: "top" }}>
+                      <FieldLabel>UF</FieldLabel>
+                      <FieldValue>{nfe.dest_uf || "-"}</FieldValue>
+                    </td>
+                    <td style={{ verticalAlign: "top" }}>
+                      <FieldLabel>INSCRICAO ESTADUAL</FieldLabel>
+                      <FieldValue>{nfe.dest_inscricao_estadual || "-"}</FieldValue>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td colSpan={3} style={{ ...cellStyle, borderTop: "1px solid #999" }}>
+              <FieldLabel>DATA ENTRADA / SAIDA</FieldLabel>
+              <FieldValue>{formatDateBR(nfe.data_emissao || nfe.created_at)}</FieldValue>
+              <span style={{ float: "right" }}>
+                <FieldLabel>HORA ENTRADA / SAIDA</FieldLabel>
+                <FieldValue>{formatTimeBR(nfe.data_emissao || nfe.created_at)}</FieldValue>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== FATURA / DUPLICATA ===== */}
+      <SectionHeader>FATURA / DUPLICATA</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          <tr>
+            <td style={{ ...cellStyle, minHeight: "16px" }}>
+              <FieldValue>{nfe.modalidade_frete === "boleto" ? "Boleto bancario" : (nfe.info_pagamento || "-")}</FieldValue>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== CALCULO DO IMPOSTO ===== */}
+      <SectionHeader>CALCULO DO IMPOSTO</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>BASE DE CALCULO DO ICMS</FieldLabel>
+              <FieldValue>{formatCurrency(baseIcms)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>VALOR DO ICMS</FieldLabel>
+              <FieldValue>{formatCurrency(valorIcms)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>BASE DE CALCULO DO ICMS SUBST.</FieldLabel>
+              <FieldValue>{formatCurrency(baseIcmsSt)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>VALOR DO ICMS SUBST.</FieldLabel>
+              <FieldValue>{formatCurrency(valorIcmsSt)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, textAlign: "right" }}>
+              <FieldLabel>VALOR TOTAL DOS PRODUTOS</FieldLabel>
+              <FieldValue bold>{formatCurrency(valorProdutos)}</FieldValue>
+            </td>
+          </tr>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>VALOR DO FRETE</FieldLabel>
+              <FieldValue>{formatCurrency(valorFrete)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>VALOR DO SEGURO</FieldLabel>
+              <FieldValue>{formatCurrency(valorSeguro)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>DESCONTO</FieldLabel>
+              <FieldValue>{formatCurrency(valorDesconto)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>OUTRAS DESPESAS ACESSORIAS</FieldLabel>
+              <FieldValue>{formatCurrency(valorOutras)}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderTop: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>VALOR TOTAL DO IPI</FieldLabel>
+              <FieldValue>{formatCurrency(valorIpi)}</FieldValue>
+            </td>
+          </tr>
+          <tr>
+            <td colSpan={5} style={{ ...cellStyle, borderTop: "1px solid #999", textAlign: "right" }}>
+              <FieldLabel>VALOR TOTAL DA NOTA</FieldLabel>
+              <div style={{ fontSize: "13px", fontWeight: "bold" }}>
+                {formatCurrency(valorTotal)}
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== TRANSPORTADOR / VOLUMES ===== */}
+      <SectionHeader>TRANSPORTADOR / VOLUMES TRANSPORTADOS</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          <tr>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "15%" }}>
+              <FieldLabel>FRETE POR CONTA</FieldLabel>
+              <FieldValue>{nfe.modalidade_frete === "0" ? "0-EMITENTE" : "9-SEM FRETE"}</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "15%" }}>
+              <FieldLabel>CODIGO ANTT</FieldLabel>
+              <FieldValue>-</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "15%" }}>
+              <FieldLabel>PLACA DO VEICULO</FieldLabel>
+              <FieldValue>-</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "5%" }}>
+              <FieldLabel>UF</FieldLabel>
+              <FieldValue>-</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", width: "25%" }}>
+              <FieldLabel>CNPJ / CPF</FieldLabel>
+              <FieldValue>-</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, width: "25%" }}>
+              <FieldLabel>VALOR DO FRETE</FieldLabel>
+              <FieldValue>{formatCurrency(valorFrete)}</FieldValue>
+            </td>
+          </tr>
+          <tr>
+            <td colSpan={2} style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>QUANTIDADE</FieldLabel>
+              <FieldValue>-</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>ESPECIE</FieldLabel>
+              <FieldValue>-</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>MARCA</FieldLabel>
+              <FieldValue>-</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderRight: "1px solid #999", borderTop: "1px solid #999" }}>
+              <FieldLabel>PESO BRUTO</FieldLabel>
+              <FieldValue>-</FieldValue>
+            </td>
+            <td style={{ ...cellStyle, borderTop: "1px solid #999" }}>
+              <FieldLabel>PESO LIQUIDO</FieldLabel>
+              <FieldValue>-</FieldValue>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== DADOS DOS PRODUTOS ===== */}
+      <SectionHeader>DADOS DOS PRODUTOS / SERVICOS</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none", fontSize: "8px" }}>
+        <thead>
+          <tr style={{ background: "#f0f0f0" }}>
+            <th style={thStyle}>CODIGO</th>
+            <th style={{ ...thStyle, textAlign: "left", width: "30%" }}>DESCRICAO DOS PRODUTOS</th>
+            <th style={thStyle}>NCM/SH</th>
+            <th style={thStyle}>O/CSOSN</th>
+            <th style={thStyle}>CFOP</th>
+            <th style={thStyle}>UNID</th>
+            <th style={thStyle}>QUANT.</th>
+            <th style={thStyle}>VALOR UNITARIO</th>
+            <th style={thStyle}>VALOR TOTAL</th>
+            <th style={thStyle}>BASE ICMS</th>
+            <th style={thStyle}>ALIQUOTA ICMS</th>
+            <th style={thStyle}>VALOR IPI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {itens.map((item: any, idx: number) => (
+            <tr key={idx}>
+              <td style={tdStyle}>{item.codigo_produto || "-"}</td>
+              <td style={{ ...tdStyle, textAlign: "left" }}>{item.descricao || "-"}</td>
+              <td style={tdStyle}>{item.ncm || "-"}</td>
+              <td style={tdStyle}>{item.csosn || item.cst || "0102"}</td>
+              <td style={tdStyle}>{item.cfop || "5102"}</td>
+              <td style={tdStyle}>{item.unidade || "UN"}</td>
+              <td style={{ ...tdStyle, textAlign: "right" }}>{Number(item.quantidade || 0).toFixed(0)}</td>
+              <td style={{ ...tdStyle, textAlign: "right" }}>{Number(item.valor_unitario || 0).toFixed(2)}</td>
+              <td style={{ ...tdStyle, textAlign: "right", fontWeight: "bold" }}>{Number(item.valor_total || 0).toFixed(2)}</td>
+              <td style={{ ...tdStyle, textAlign: "right" }}>0,00</td>
+              <td style={{ ...tdStyle, textAlign: "right" }}>0,00</td>
+              <td style={{ ...tdStyle, textAlign: "right" }}>0,00</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* ===== DADOS ADICIONAIS ===== */}
+      <SectionHeader>DADOS ADICIONAIS</SectionHeader>
+      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #000", borderTop: "none" }}>
+        <tbody>
+          <tr>
+            <td style={{ padding: "6px 10px", width: "60%", borderRight: "1px solid #999", verticalAlign: "top", minHeight: "50px" }}>
+              <FieldLabel>INFORMACOES COMPLEMENTARES</FieldLabel>
+              <div style={{ fontSize: "8px", lineHeight: 1.5, marginTop: "3px", whiteSpace: "pre-wrap" }}>
+                {nfe.info_complementar || (
+                  <>
+                    Documento emitido por ME ou EPP optante pelo SIMPLES NACIONAL conforme LC 123/2006.
+                    {"\n"}Nao gera direito a credito fiscal de IPI.
+                  </>
+                )}
+              </div>
+            </td>
+            <td style={{ padding: "6px 10px", verticalAlign: "top" }}>
+              <FieldLabel>RESERVADO AO FISCO</FieldLabel>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* ===== CANCELAMENTO ===== */}
+      {isCancelada && (
+        <table style={{ width: "100%", borderCollapse: "collapse", border: "2px solid #dc2626", marginTop: 4 }}>
+          <tbody>
+            <tr>
+              <td style={{ padding: "8px 16px", background: "#fef2f2", textAlign: "center" }}>
+                <div style={{ fontSize: "14px", fontWeight: "bold", color: "#dc2626", marginBottom: 2 }}>
+                  NOTA FISCAL CANCELADA
+                </div>
+                {nfe.data_cancelamento && (
+                  <div style={{ fontSize: "10px", color: "#991b1b" }}>
+                    Data do cancelamento: {formatDateTimeBR(nfe.data_cancelamento)}
+                  </div>
+                )}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {/* ===== RODAPE ===== */}
+      <div style={{
+        marginTop: 6,
+        padding: "4px 12px",
+        textAlign: "center",
+        fontSize: "7px",
+        color: "#555",
+        lineHeight: 1.5,
+        borderTop: "1px solid #000",
+      }}>
+        <div>Consulte a autenticidade desta NF-e em: <strong>www.nfe.fazenda.gov.br/portal</strong></div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// Sub-componentes auxiliares
+// ============================================================
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      background: "#e8e8e8",
+      color: "#000",
+      fontSize: "8px",
+      fontWeight: "bold",
+      padding: "3px 10px",
+      letterSpacing: "0.3px",
+      textTransform: "uppercase",
+      border: "1px solid #000",
+      borderBottom: "none",
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: "7px", color: "#555", marginBottom: 1, textTransform: "uppercase" }}>
+      {children}
+    </div>
+  )
+}
+
+function FieldValue({ children, bold }: { children: React.ReactNode; bold?: boolean }) {
+  return (
+    <div style={{ fontSize: "9px", fontWeight: bold ? "bold" : "normal", color: "#000" }}>
+      {children}
+    </div>
+  )
+}
+
+// Estilos compartilhados
+const cellStyle: React.CSSProperties = {
+  padding: "4px 8px",
+  verticalAlign: "top",
+}
+
+const thStyle: React.CSSProperties = {
+  border: "1px solid #000",
+  padding: "3px 4px",
+  textAlign: "center",
+  fontSize: "7px",
+  fontWeight: "bold",
+  textTransform: "uppercase",
+}
+
+const tdStyle: React.CSSProperties = {
+  border: "1px solid #ccc",
+  padding: "2px 4px",
+  textAlign: "center",
+  fontSize: "8px",
+}
+
+// ============================================================
+// CSS para impressao
+// ============================================================
+function getPrintStyles(): string {
+  return `
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 9px;
+      color: #000;
+      padding: 8px;
+      line-height: 1.3;
+    }
+    table { border-collapse: collapse; }
+    div[style*="background"] { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    td[style*="background"] { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  `
 }

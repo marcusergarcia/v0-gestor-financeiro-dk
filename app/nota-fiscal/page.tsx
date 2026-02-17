@@ -45,6 +45,7 @@ import { DetalheNfseDialog } from "@/components/nfse/detalhe-nfse-dialog"
 import { ImprimirNfseDialog } from "@/components/nfse/imprimir-nfse-dialog"
 import { NovoBoletoDialog } from "@/components/financeiro/novo-boleto-dialog"
 import { VisualizarBoletosDialog } from "@/components/financeiro/visualizar-boletos-dialog"
+import { EmitirNfeDialog } from "@/components/nfe/emitir-nfe-dialog"
 import { DetalheNfeDialog } from "@/components/nfe/detalhe-nfe-dialog"
 import { DanfeDialog } from "@/components/nfe/danfe-dialog"
 import Link from "next/link"
@@ -108,6 +109,7 @@ export default function NotaFiscalPage() {
   const [notaImprimirNfse, setNotaImprimirNfse] = useState<number | null>(null)
 
   // NF-e states
+  const [emitirNfeOpen, setEmitirNfeOpen] = useState(false)
   const [detalheNfeOpen, setDetalheNfeOpen] = useState(false)
   const [nfeSelecionada, setNfeSelecionada] = useState<number | null>(null)
   const [danfeOpen, setDanfeOpen] = useState(false)
@@ -519,14 +521,24 @@ export default function NotaFiscalPage() {
               <p className="text-gray-600 mt-1">NFS-e (Servico) e NF-e (Material)</p>
             </div>
           </div>
-          <Button
-            onClick={() => setEmitirNfseOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden md:inline">Emitir NFS-e</span>
-            <span className="md:hidden">Nova</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setEmitirNfseOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden md:inline">Emitir NFS-e</span>
+              <span className="md:hidden">NFS-e</span>
+            </Button>
+            <Button
+              onClick={() => setEmitirNfeOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden md:inline">Emitir NF-e</span>
+              <span className="md:hidden">NF-e</span>
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -703,15 +715,24 @@ export default function NotaFiscalPage() {
                 <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-600">Nenhuma nota fiscal encontrada</h3>
                 <p className="text-gray-500 mt-1">
-                  Emita notas a partir de orcamentos aprovados ou clique em "Emitir NFS-e" para uma nota avulsa.
+                  Emita notas a partir de orcamentos aprovados ou clique nos botoes abaixo para uma nota avulsa.
                 </p>
-                <Button
-                  onClick={() => setEmitirNfseOpen(true)}
-                  className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Emitir NFS-e
-                </Button>
+                <div className="flex items-center gap-2 justify-center mt-4">
+                  <Button
+                    onClick={() => setEmitirNfseOpen(true)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Emitir NFS-e
+                  </Button>
+                  <Button
+                    onClick={() => setEmitirNfeOpen(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Emitir NF-e
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -858,10 +879,10 @@ export default function NotaFiscalPage() {
                                 <Printer className="h-4 w-4" />
                               </Button>
                             )}
-                            {/* Boleto (somente NFS-e emitida) */}
-                            {nota.tipo === "nfse" && nota.status === "emitida" && (() => {
-                              const nfseNum = String(nota.numero_nfse || "")
-                              const boletoInfo = boletoStatusMap[nfseNum]
+                            {/* Boleto (NFS-e emitida ou NF-e autorizada) */}
+                            {((nota.tipo === "nfse" && nota.status === "emitida") || (nota.tipo === "nfe" && nota.status === "autorizada")) && (() => {
+                              const notaNum = nota.tipo === "nfse" ? String(nota.numero_nfse || "") : String(nota.numero_nfe || "")
+                              const boletoInfo = boletoStatusMap[notaNum]
 
                               if (boletoInfo?.temBoleto && boletoInfo.aguardandoPagamento) {
                                 return (
@@ -870,7 +891,7 @@ export default function NotaFiscalPage() {
                                     size="icon"
                                     className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
                                     onClick={() => {
-                                      setVisualizarBoletosNumero(nfseNum)
+                                      setVisualizarBoletosNumero(notaNum)
                                       setVisualizarBoletosOpen(true)
                                     }}
                                     title="Imprimir Boleto / Parcelas"
@@ -897,8 +918,9 @@ export default function NotaFiscalPage() {
                                 </Button>
                               )
                             })()}
-                            {/* Cancelar (NFS-e emitida) */}
-                            {nota.tipo === "nfse" && nota.status === "emitida" && (
+                            {/* Cancelar (NFS-e emitida ou NF-e autorizada) */}
+                            {((nota.tipo === "nfse" && nota.status === "emitida") ||
+                              (nota.tipo === "nfe" && nota.status === "autorizada")) && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -907,7 +929,7 @@ export default function NotaFiscalPage() {
                                   setNotaCancelar(nota)
                                   setCancelarOpen(true)
                                 }}
-                                title="Cancelar NFS-e"
+                                title={`Cancelar ${nota.tipo === "nfse" ? "NFS-e" : "NF-e"}`}
                               >
                                 <XCircle className="h-4 w-4" />
                               </Button>
@@ -943,6 +965,13 @@ export default function NotaFiscalPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog Emitir NF-e (Material) */}
+      <EmitirNfeDialog
+        open={emitirNfeOpen}
+        onOpenChange={setEmitirNfeOpen}
+        onSuccess={() => fetchTodasNotas()}
+      />
 
       {/* Dialogs NFS-e */}
       <EmitirNfseDialog
