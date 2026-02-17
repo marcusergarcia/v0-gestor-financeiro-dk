@@ -247,7 +247,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<finNFe>1</finNFe>` // 1=NF-e normal
   xml += `<indFinal>1</indFinal>` // 1=Consumidor final
   xml += `<indPres>2</indPres>` // 2=Nao presencial (internet)
-  // indIntermed omitido: sem intermediador (NT 2020.006 - campo opcional, omitir quando nao ha intermediario)
+  xml += `<indIntermed>0</indIntermed>` // 0=Operacao sem intermediador (NT 2020.006 - obrigatorio no PL_009_V4)
   xml += `<procEmi>0</procEmi>` // 0=Aplicativo do contribuinte
   xml += `<verProc>GestorFinanceiro 1.0</verProc>`
   xml += `</ide>`
