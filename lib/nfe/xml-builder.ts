@@ -270,14 +270,8 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<xMun>${escapeXml(dados.emitente.endereco.municipio, 60)}</xMun>`
   xml += `<UF>${dados.emitente.endereco.uf}</UF>`
   xml += `<CEP>${dados.emitente.endereco.cep.replace(/\D/g, "").padStart(8, "0")}</CEP>`
-  xml += `<cPais>1058</cPais>`
-  xml += `<xPais>BRASIL</xPais>`
-  if (dados.emitente.telefone) {
-    const foneDigits = dados.emitente.telefone.replace(/\D/g, "")
-    if (foneDigits.length >= 6 && foneDigits.length <= 14) {
-      xml += `<fone>${foneDigits}</fone>`
-    }
-  }
+  // cPais, xPais, fone REMOVIDOS: XML autorizado (Contabilizei) nao inclui esses campos
+  // A SEFAZ SP (PL_008i2) rejeita com erro 225 quando presentes
   xml += `</enderEmit>`
   xml += `<IE>${dados.emitente.inscricaoEstadual.replace(/\D/g, "")}</IE>`
   xml += `<CRT>${dados.emitente.crt}</CRT>`
@@ -303,14 +297,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<xMun>${escapeXml(dados.destinatario.endereco.municipio, 60)}</xMun>`
     xml += `<UF>${dados.destinatario.endereco.uf}</UF>`
     xml += `<CEP>${dados.destinatario.endereco.cep.replace(/\D/g, "").padStart(8, "0")}</CEP>`
-    xml += `<cPais>1058</cPais>`
-    xml += `<xPais>BRASIL</xPais>`
-    if (dados.destinatario.telefone) {
-      const foneDigits = dados.destinatario.telefone.replace(/\D/g, "")
-      if (foneDigits.length >= 6 && foneDigits.length <= 14) {
-        xml += `<fone>${foneDigits}</fone>`
-      }
-    }
+    // cPais, xPais, fone REMOVIDOS: XML autorizado nao inclui esses campos
     xml += `</enderDest>`
   }
   xml += `<indIEDest>${dados.destinatario.indicadorIE}</indIEDest>`
@@ -358,8 +345,6 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<CSOSN>102</CSOSN>` // 102=Tributada sem permissao de credito
     xml += `</ICMSSN102>`
     xml += `</ICMS>`
-    // IPI omitido para Simples Nacional (CRT=1) com CSOSN 102
-    // A SEFAZ nao exige IPI para operacoes do Simples Nacional
     xml += `<PIS>`
     xml += `<PISNT>`
     xml += `<CST>07</CST>` // 07=Operacao Isenta da Contribuicao (Simples Nacional)
@@ -370,6 +355,13 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<CST>07</CST>` // 07=Operacao Isenta da Contribuicao (Simples Nacional)
     xml += `</COFINSNT>`
     xml += `</COFINS>`
+    // IPI obrigatorio conforme XML autorizado (Contabilizei NF-e 155)
+    xml += `<IPI>`
+    xml += `<cEnq>999</cEnq>` // 999=Tributacao normal (outros)
+    xml += `<IPINT>`
+    xml += `<CST>53</CST>` // 53=Saida nao tributada
+    xml += `</IPINT>`
+    xml += `</IPI>`
     xml += `</imposto>`
 
     xml += `</det>`
@@ -381,7 +373,9 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<vBC>0.00</vBC>`
   xml += `<vICMS>0.00</vICMS>`
   xml += `<vICMSDeson>0.00</vICMSDeson>`
-  // vFCPUFDest, vICMSUFDest, vICMSUFRemet omitidos (opcionais, operacao interna sem DIFAL)
+  xml += `<vFCPUFDest>0.00</vFCPUFDest>`
+  xml += `<vICMSUFDest>0.00</vICMSUFDest>`
+  xml += `<vICMSUFRemet>0.00</vICMSUFRemet>`
   xml += `<vFCP>0.00</vFCP>`
   xml += `<vBCST>0.00</vBCST>`
   xml += `<vST>0.00</vST>`
@@ -419,11 +413,14 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `</pag>`
 
   // === infAdic - Informacoes adicionais ===
-  if (dados.informacoesAdicionais) {
-    xml += `<infAdic>`
-    xml += `<infCpl>${escapeXml(dados.informacoesAdicionais, 5000)}</infCpl>`
-    xml += `</infAdic>`
-  }
+  // Mensagem padrao obrigatoria para Simples Nacional (conforme XML autorizado)
+  const msgSN = "Documento emitido por ME ou EPP optante pelo Simples Nacional."
+  const infCplTexto = dados.informacoesAdicionais
+    ? `${dados.informacoesAdicionais} | ${msgSN}`
+    : msgSN
+  xml += `<infAdic>`
+  xml += `<infCpl>${escapeXml(infCplTexto, 5000)}</infCpl>`
+  xml += `</infAdic>`
 
   xml += `</infNFe>`
   xml += `</NFe>`
@@ -436,13 +433,10 @@ export function gerarXmlNFe(dados: DadosNFe): {
  * Envelope para enviar ao web service NFeAutorizacao4
  */
 export function gerarXmlEnviNFe(xmlNFeAssinado: string, idLote: string): string {
-  // Remover xmlns duplicado do <NFe> quando ja esta declarado no <enviNFe>
-  // O SEFAZ pode rejeitar (erro 225) se houver declaracao de namespace redundante
-  const xmlNFeLimpo = xmlNFeAssinado.replace(
-    '<NFe xmlns="http://www.portalfiscal.inf.br/nfe">',
-    "<NFe>"
-  )
-  return `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>${idLote}</idLote><indSinc>1</indSinc>${xmlNFeLimpo}</enviNFe>`
+  // MANTER o xmlns no <NFe> - a assinatura digital foi calculada com ele.
+  // Remover o xmlns invalida o digest da assinatura (SEFAZ retorna erro 225).
+  // O XML autorizado do Contabilizei tambem mantem xmlns no <NFe>.
+  return `<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>${idLote}</idLote><indSinc>1</indSinc>${xmlNFeAssinado}</enviNFe>`
 }
 
 /**
