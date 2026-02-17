@@ -19,6 +19,7 @@ export interface DadosEmitente {
   nomeFantasia?: string
   inscricaoEstadual: string
   crt: number // 1=Simples Nacional, 2=SN excesso, 3=Regime Normal
+  telefone?: string // Telefone do emitente (somente digitos)
   endereco: {
     logradouro: string
     numero: string
@@ -74,6 +75,10 @@ export interface DadosNFe {
   numeroNF: number
   naturezaOperacao: string // "Venda" padrao
   tipoAmbiente: number // 1=Producao, 2=Homologacao
+  // Data/hora de emissao no fuso de Sao Paulo (America/Sao_Paulo)
+  // Formato: YYYY-MM-DD (usado para chave de acesso e datas)
+  dataEmissaoSP?: string // YYYY-MM-DD no fuso SP
+  dhEmiSP?: string // YYYY-MM-DDTHH:mm:ss-03:00 completo no fuso SP
 }
 
 // ==================== CONSTANTES ====================
@@ -172,14 +177,33 @@ export function gerarXmlNFe(dados: DadosNFe): {
   cNF: string
   cDV: string
 } {
-  const dataEmissao = new Date()
-  const dhEmi = formatDateTimeISO(dataEmissao)
-  const dhSaiEnt = formatDateTimeISO(new Date(dataEmissao.getTime() + 60000)) // +1 min
+  // Usar data pre-computada no fuso de SP (passada pela API route) ou gerar localmente
+  // A Vercel roda em UTC, entao new Date() pode retornar o dia seguinte quando em SP
+  // ainda e o dia anterior (ex: 22h SP = 01h UTC do dia seguinte).
+  let dhEmi: string
+  let dhSaiEnt: string
+  let dataParaChave: string // YYYY-MM-DD no fuso SP
+
+  if (dados.dhEmiSP && dados.dataEmissaoSP) {
+    // Usar data ja calculada no fuso correto de SP
+    dhEmi = dados.dhEmiSP
+    // dhSaiEnt: incrementar 1 minuto no segundo campo
+    const emiDate = new Date(dados.dhEmiSP)
+    emiDate.setMinutes(emiDate.getMinutes() + 1)
+    dhSaiEnt = formatDateTimeSP(emiDate)
+    dataParaChave = dados.dataEmissaoSP
+  } else {
+    // Fallback: calcular localmente (pode estar errado em UTC)
+    const dataEmissao = new Date()
+    dhEmi = formatDateTimeSP(dataEmissao)
+    dhSaiEnt = formatDateTimeSP(new Date(dataEmissao.getTime() + 60000))
+    dataParaChave = getDateStringSP(dataEmissao)
+  }
 
   // Gerar chave de acesso
   const { chave, cNF, cDV } = gerarChaveAcesso({
     cUF: "35", // SP
-    dataEmissao: dataEmissao.toISOString().substring(0, 10),
+    dataEmissao: dataParaChave,
     cnpj: dados.emitente.cnpj,
     mod: "55",
     serie: dados.serie,
@@ -223,7 +247,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<finNFe>1</finNFe>` // 1=NF-e normal
   xml += `<indFinal>1</indFinal>` // 1=Consumidor final
   xml += `<indPres>2</indPres>` // 2=Nao presencial (internet)
-  xml += `<indIntermed>0</indIntermed>` // 0=Sem intermediador
+  // indIntermed omitido: sem intermediador (NT 2020.006 - campo opcional, omitir quando nao ha intermediario)
   xml += `<procEmi>0</procEmi>` // 0=Aplicativo do contribuinte
   xml += `<verProc>GestorFinanceiro 1.0</verProc>`
   xml += `</ide>`
@@ -246,6 +270,11 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<xMun>${escapeXml(dados.emitente.endereco.municipio)}</xMun>`
   xml += `<UF>${dados.emitente.endereco.uf}</UF>`
   xml += `<CEP>${dados.emitente.endereco.cep.replace(/\D/g, "")}</CEP>`
+  xml += `<cPais>1058</cPais>`
+  xml += `<xPais>BRASIL</xPais>`
+  if (dados.emitente.telefone) {
+    xml += `<fone>${dados.emitente.telefone.replace(/\D/g, "")}</fone>`
+  }
   xml += `</enderEmit>`
   xml += `<IE>${dados.emitente.inscricaoEstadual.replace(/\D/g, "")}</IE>`
   xml += `<CRT>${dados.emitente.crt}</CRT>`
@@ -271,6 +300,11 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<xMun>${escapeXml(dados.destinatario.endereco.municipio)}</xMun>`
     xml += `<UF>${dados.destinatario.endereco.uf}</UF>`
     xml += `<CEP>${dados.destinatario.endereco.cep.replace(/\D/g, "")}</CEP>`
+    xml += `<cPais>1058</cPais>`
+    xml += `<xPais>BRASIL</xPais>`
+    if (dados.destinatario.telefone) {
+      xml += `<fone>${dados.destinatario.telefone.replace(/\D/g, "")}</fone>`
+    }
     xml += `</enderDest>`
   }
   xml += `<indIEDest>${dados.destinatario.indicadorIE}</indIEDest>`
@@ -294,13 +328,13 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<NCM>${item.ncm.replace(/\D/g, "")}</NCM>`
     xml += `<CFOP>${item.cfop}</CFOP>`
     xml += `<uCom>${escapeXml(item.unidade)}</uCom>`
-    xml += `<qCom>${item.quantidade}</qCom>`
-    xml += `<vUnCom>${item.valorUnitario}</vUnCom>`
-    xml += `<vProd>${item.valorTotal.toFixed(2)}</vProd>`
+    xml += `<qCom>${Number(item.quantidade).toFixed(4)}</qCom>`
+    xml += `<vUnCom>${Number(item.valorUnitario).toFixed(10)}</vUnCom>`
+    xml += `<vProd>${Number(item.valorTotal).toFixed(2)}</vProd>`
     xml += `<cEANTrib>${ean}</cEANTrib>`
     xml += `<uTrib>${escapeXml(item.unidade)}</uTrib>`
-    xml += `<qTrib>${item.quantidade}</qTrib>`
-    xml += `<vUnTrib>${item.valorUnitario}</vUnTrib>`
+    xml += `<qTrib>${Number(item.quantidade).toFixed(4)}</qTrib>`
+    xml += `<vUnTrib>${Number(item.valorUnitario).toFixed(10)}</vUnTrib>`
     xml += `<indTot>1</indTot>` // 1=Compoe total
     xml += `</prod>`
 
@@ -321,12 +355,12 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `</IPI>`
     xml += `<PIS>`
     xml += `<PISNT>`
-    xml += `<CST>99</CST>` // 99=Outras operacoes
+    xml += `<CST>49</CST>` // 49=Outras operacoes de saida (Simples Nacional)
     xml += `</PISNT>`
     xml += `</PIS>`
     xml += `<COFINS>`
     xml += `<COFINSNT>`
-    xml += `<CST>99</CST>`
+    xml += `<CST>49</CST>` // 49=Outras operacoes de saida (Simples Nacional)
     xml += `</COFINSNT>`
     xml += `</COFINS>`
     xml += `</imposto>`
@@ -424,7 +458,7 @@ export function gerarXmlCancelamento(dados: {
   sequenciaEvento?: number
 }): string {
   const nSeqEvento = dados.sequenciaEvento || 1
-  const dhEvento = formatDateTimeISO(new Date())
+  const dhEvento = formatDateTimeSP(new Date())
   const idEvento = `ID110111${dados.chaveAcesso}${nSeqEvento.toString().padStart(2, "0")}`
 
   let xml = `<envEvento xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.00">`
@@ -462,21 +496,40 @@ function escapeXml(str: string): string {
     .replace(/'/g, "&apos;")
 }
 
-function formatDateTimeISO(date: Date): string {
-  // Formato: 2026-02-10T22:23:01-03:00
-  const pad = (n: number) => n.toString().padStart(2, "0")
-  const year = date.getFullYear()
-  const month = pad(date.getMonth() + 1)
-  const day = pad(date.getDate())
-  const hours = pad(date.getHours())
-  const minutes = pad(date.getMinutes())
-  const seconds = pad(date.getSeconds())
+/**
+ * Formata uma data no formato ISO com fuso de Sao Paulo (-03:00)
+ * Usa Intl.DateTimeFormat para obter a hora correta em SP, independente do TZ do servidor.
+ * Em producao (Vercel), o servidor roda em UTC, entao new Date().getHours() retorna hora UTC.
+ * Formato de saida: 2026-02-10T22:23:01-03:00
+ */
+function formatDateTimeSP(date: Date): string {
+  const spFormatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })
+  const parts = spFormatter.formatToParts(date)
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || ""
 
-  // Timezone offset
-  const tzOffset = -date.getTimezoneOffset()
-  const tzSign = tzOffset >= 0 ? "+" : "-"
-  const tzHours = pad(Math.floor(Math.abs(tzOffset) / 60))
-  const tzMinutes = pad(Math.abs(tzOffset) % 60)
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}-03:00`
+}
 
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${tzSign}${tzHours}:${tzMinutes}`
+/**
+ * Retorna a data no formato YYYY-MM-DD no fuso de Sao Paulo
+ */
+function getDateStringSP(date: Date): string {
+  const spFormatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+  const parts = spFormatter.formatToParts(date)
+  const get = (type: string) => parts.find((p) => p.type === type)?.value || ""
+  return `${get("year")}-${get("month")}-${get("day")}`
 }
