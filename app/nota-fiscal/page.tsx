@@ -32,8 +32,9 @@ import {
   Send,
   RefreshCw,
   Printer,
-  Trash2,
   Receipt,
+  Package,
+  Wrench,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
@@ -44,28 +45,42 @@ import { DetalheNfseDialog } from "@/components/nfse/detalhe-nfse-dialog"
 import { ImprimirNfseDialog } from "@/components/nfse/imprimir-nfse-dialog"
 import { NovoBoletoDialog } from "@/components/financeiro/novo-boleto-dialog"
 import { VisualizarBoletosDialog } from "@/components/financeiro/visualizar-boletos-dialog"
+import { DetalheNfeDialog } from "@/components/nfe/detalhe-nfe-dialog"
+import { DanfeDialog } from "@/components/nfe/danfe-dialog"
 import Link from "next/link"
 
-interface NotaFiscal {
+// Tipo unificado para ambas as notas
+interface NotaUnificada {
   id: number
-  numero_nfse: string | null
-  numero_rps: number
-  serie_rps: string
-  codigo_verificacao: string | null
+  tipo: "nfse" | "nfe" // Tipo da nota
+  // Campos comuns
+  numero: string | null // numero_nfse ou numero_nfe
   origem: string
   origem_id: number | null
   origem_numero: string | null
   cliente_id: number | null
+  cliente_nome: string | null
   tomador_razao_social: string
   tomador_cpf_cnpj: string
-  valor_servicos: number
   valor_total: number
-  descricao_servico: string | null
   status: string
   data_emissao: string | null
   created_at: string
-  cliente_nome: string | null
   mensagem_erro: string | null
+  // Campos NFS-e
+  numero_nfse?: string | null
+  numero_rps?: number
+  serie_rps?: string
+  codigo_verificacao?: string | null
+  valor_servicos?: number
+  descricao_servico?: string | null
+  // Campos NF-e
+  numero_nfe?: number
+  serie?: number
+  chave_acesso?: string
+  protocolo?: string
+  valor_produtos?: number
+  natureza_operacao?: string
 }
 
 function formatDateBR(dateStr: string | null): string {
@@ -78,32 +93,44 @@ function formatDateBR(dateStr: string | null): string {
 }
 
 export default function NotaFiscalPage() {
-  const [notas, setNotas] = useState<NotaFiscal[]>([])
+  const [notas, setNotas] = useState<NotaUnificada[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("todos")
   const [origemFilter, setOrigemFilter] = useState("todos")
-  const [emitirOpen, setEmitirOpen] = useState(false)
-  const [detalheOpen, setDetalheOpen] = useState(false)
-  const [notaSelecionada, setNotaSelecionada] = useState<number | null>(null)
-  const [imprimirOpen, setImprimirOpen] = useState(false)
-  const [notaImprimir, setNotaImprimir] = useState<number | null>(null)
+  const [tipoFilter, setTipoFilter] = useState("todos")
+
+  // NFS-e states
+  const [emitirNfseOpen, setEmitirNfseOpen] = useState(false)
+  const [detalheNfseOpen, setDetalheNfseOpen] = useState(false)
+  const [nfseSelecionada, setNfseSelecionada] = useState<number | null>(null)
+  const [imprimirNfseOpen, setImprimirNfseOpen] = useState(false)
+  const [notaImprimirNfse, setNotaImprimirNfse] = useState<number | null>(null)
+
+  // NF-e states
+  const [detalheNfeOpen, setDetalheNfeOpen] = useState(false)
+  const [nfeSelecionada, setNfeSelecionada] = useState<number | null>(null)
+  const [danfeOpen, setDanfeOpen] = useState(false)
+  const [danfeNfeId, setDanfeNfeId] = useState<number | null>(null)
+
+  // Cancelamento
   const [cancelarOpen, setCancelarOpen] = useState(false)
-  const [notaCancelar, setNotaCancelar] = useState<NotaFiscal | null>(null)
+  const [notaCancelar, setNotaCancelar] = useState<NotaUnificada | null>(null)
   const [motivoCancelamento, setMotivoCancelamento] = useState("")
   const [cancelando, setCancelando] = useState(false)
+
   const [consultandoId, setConsultandoId] = useState<number | null>(null)
   const [logoMenu, setLogoMenu] = useState<string>("")
+
+  // Boleto
   const [boletoOpen, setBoletoOpen] = useState(false)
-  const [notaParaBoleto, setNotaParaBoleto] = useState<NotaFiscal | null>(null)
+  const [notaParaBoleto, setNotaParaBoleto] = useState<any>(null)
   const [visualizarBoletosOpen, setVisualizarBoletosOpen] = useState(false)
   const [visualizarBoletosNumero, setVisualizarBoletosNumero] = useState("")
-  // Mapa: numero_nfse -> { temBoleto: boolean, aguardandoPagamento: boolean }
   const [boletoStatusMap, setBoletoStatusMap] = useState<Record<string, { temBoleto: boolean; aguardandoPagamento: boolean }>>({})
 
   const { toast } = useToast()
 
-  // Stats
   const [stats, setStats] = useState({
     total: 0,
     emitidas: 0,
@@ -111,10 +138,12 @@ export default function NotaFiscalPage() {
     canceladas: 0,
     erros: 0,
     valorTotal: 0,
+    totalNfse: 0,
+    totalNfe: 0,
   })
 
   useEffect(() => {
-    fetchNotas()
+    fetchTodasNotas()
     loadLogoMenu()
   }, [])
 
@@ -137,24 +166,90 @@ export default function NotaFiscalPage() {
     }
   }
 
-  const fetchNotas = async () => {
+  const fetchTodasNotas = async () => {
     try {
-      const params = new URLSearchParams()
-      if (statusFilter !== "todos") params.set("status", statusFilter)
-      if (origemFilter !== "todos") params.set("origem", origemFilter)
-      if (searchTerm) params.set("search", searchTerm)
+      // Fetch NFS-e and NF-e em paralelo
+      const [nfseResponse, nfeResponse] = await Promise.all([
+        fetch("/api/nfse").catch(() => null),
+        fetch("/api/nfe").catch(() => null),
+      ])
 
-      const response = await fetch(`/api/nfse?${params.toString()}`)
-      const result = await response.json()
+      const notasUnificadas: NotaUnificada[] = []
 
-      if (result.success) {
-        const notasData = result.data || []
-        setNotas(notasData)
-        fetchBoletoStatus(notasData)
-      } else {
-        // Se der erro (tabelas não existem), mostrar lista vazia
-        setNotas([])
+      // Processar NFS-e
+      if (nfseResponse?.ok) {
+        const nfseResult = await nfseResponse.json()
+        if (nfseResult.success && nfseResult.data) {
+          for (const n of nfseResult.data) {
+            notasUnificadas.push({
+              id: n.id,
+              tipo: "nfse",
+              numero: n.numero_nfse || null,
+              numero_nfse: n.numero_nfse,
+              numero_rps: n.numero_rps,
+              serie_rps: n.serie_rps,
+              codigo_verificacao: n.codigo_verificacao,
+              origem: n.origem || "avulsa",
+              origem_id: n.origem_id,
+              origem_numero: n.origem_numero,
+              cliente_id: n.cliente_id,
+              cliente_nome: n.cliente_nome,
+              tomador_razao_social: n.tomador_razao_social || n.cliente_nome || "",
+              tomador_cpf_cnpj: n.tomador_cpf_cnpj || "",
+              valor_servicos: n.valor_servicos,
+              valor_total: Number(n.valor_total) || 0,
+              descricao_servico: n.descricao_servico,
+              status: n.status,
+              data_emissao: n.data_emissao,
+              created_at: n.created_at,
+              mensagem_erro: n.mensagem_erro,
+            })
+          }
+          // Fetch boleto status for NFS-e
+          fetchBoletoStatus(nfseResult.data)
+        }
       }
+
+      // Processar NF-e
+      if (nfeResponse?.ok) {
+        const nfeResult = await nfeResponse.json()
+        if (nfeResult.success && nfeResult.data) {
+          for (const n of nfeResult.data) {
+            notasUnificadas.push({
+              id: n.id,
+              tipo: "nfe",
+              numero: n.numero_nfe ? String(n.numero_nfe) : null,
+              numero_nfe: n.numero_nfe,
+              serie: n.serie,
+              chave_acesso: n.chave_acesso,
+              protocolo: n.protocolo,
+              origem: n.origem || "avulsa",
+              origem_id: n.origem_id,
+              origem_numero: n.origem_numero,
+              cliente_id: n.cliente_id,
+              cliente_nome: n.cliente_nome,
+              tomador_razao_social: n.dest_razao_social || n.cliente_nome || "",
+              tomador_cpf_cnpj: n.dest_cpf_cnpj || "",
+              valor_produtos: n.valor_produtos,
+              valor_total: Number(n.valor_total) || Number(n.valor_produtos) || 0,
+              natureza_operacao: n.natureza_operacao,
+              status: n.status,
+              data_emissao: n.data_emissao || n.data_autorizacao,
+              created_at: n.created_at,
+              mensagem_erro: n.mensagem_erro,
+            })
+          }
+        }
+      }
+
+      // Ordenar por data de criacao (mais recente primeiro)
+      notasUnificadas.sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime()
+        const dateB = new Date(b.created_at || 0).getTime()
+        return dateB - dateA
+      })
+
+      setNotas(notasUnificadas)
     } catch {
       setNotas([])
     } finally {
@@ -162,9 +257,9 @@ export default function NotaFiscalPage() {
     }
   }
 
-  const fetchBoletoStatus = async (notasList: NotaFiscal[]) => {
+  const fetchBoletoStatus = async (notasList: any[]) => {
     try {
-      const emitidas = notasList.filter((n) => n.status === "emitida" && n.numero_nfse)
+      const emitidas = notasList.filter((n: any) => n.status === "emitida" && n.numero_nfse)
       if (emitidas.length === 0) return
 
       const response = await fetch("/api/boletos/status-por-nota")
@@ -178,48 +273,57 @@ export default function NotaFiscalPage() {
   }
 
   const calcularStats = () => {
-    const emitidas = notas.filter((n) => n.status === "emitida")
+    const statusEmitida = notas.filter((n) => n.status === "emitida" || n.status === "autorizada")
     setStats({
       total: notas.length,
-      emitidas: emitidas.length,
+      emitidas: statusEmitida.length,
       pendentes: notas.filter((n) => n.status === "pendente" || n.status === "processando").length,
       canceladas: notas.filter((n) => n.status === "cancelada").length,
-      erros: notas.filter((n) => n.status === "erro").length,
-      valorTotal: emitidas.reduce((sum, n) => sum + Number(n.valor_total), 0),
+      erros: notas.filter((n) => n.status === "erro" || n.status === "rejeitada").length,
+      valorTotal: statusEmitida.reduce((sum, n) => sum + Number(n.valor_total), 0),
+      totalNfse: notas.filter((n) => n.tipo === "nfse").length,
+      totalNfe: notas.filter((n) => n.tipo === "nfe").length,
     })
   }
 
-  const handleConsultar = async (notaId: number) => {
+  const handleConsultarNfse = async (notaId: number) => {
     setConsultandoId(notaId)
     try {
-      const response = await fetch(`/api/nfse/${notaId}/consultar`, {
-        method: "POST",
-      })
+      const response = await fetch(`/api/nfse/${notaId}/consultar`, { method: "POST" })
       const result = await response.json()
 
       if (result.success) {
-        toast({
-          title: "NFS-e Encontrada!",
-          description: result.message,
-        })
-        fetchNotas()
+        toast({ title: "NFS-e Encontrada!", description: result.message })
+        fetchTodasNotas()
       } else {
         toast({
           title: "Consulta NFS-e",
           description: result.message,
           variant: result.data?.status === "processando" ? "default" : "destructive",
         })
-        // Se houve mudanca de status, atualizar lista
-        if (result.data?.status === "erro") {
-          fetchNotas()
-        }
+        if (result.data?.status === "erro") fetchTodasNotas()
       }
     } catch {
-      toast({
-        title: "Erro",
-        description: "Erro ao consultar status da NFS-e na prefeitura",
-        variant: "destructive",
-      })
+      toast({ title: "Erro", description: "Erro ao consultar status da NFS-e", variant: "destructive" })
+    } finally {
+      setConsultandoId(null)
+    }
+  }
+
+  const handleConsultarNfe = async (notaId: number) => {
+    setConsultandoId(notaId)
+    try {
+      const response = await fetch(`/api/nfe/${notaId}/consultar`, { method: "POST" })
+      const result = await response.json()
+
+      if (result.success) {
+        toast({ title: "NF-e Consultada!", description: `cStat: ${result.data?.cStat} - ${result.data?.xMotivo}` })
+        fetchTodasNotas()
+      } else {
+        toast({ title: "Consulta NF-e", description: result.message, variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Erro", description: "Erro ao consultar NF-e na SEFAZ", variant: "destructive" })
     } finally {
       setConsultandoId(null)
     }
@@ -232,33 +336,39 @@ export default function NotaFiscalPage() {
       return
     }
 
-    toast({ title: "Consultando...", description: `Consultando ${processando.length} nota(s) na prefeitura...` })
+    toast({ title: "Consultando...", description: `Consultando ${processando.length} nota(s)...` })
 
     for (const nota of processando) {
-      await handleConsultar(nota.id)
-      // Pequeno delay entre consultas para nao sobrecarregar
+      if (nota.tipo === "nfse") {
+        await handleConsultarNfse(nota.id)
+      } else {
+        await handleConsultarNfe(nota.id)
+      }
       await new Promise((r) => setTimeout(r, 1000))
     }
 
-    fetchNotas()
+    fetchTodasNotas()
   }
 
   const handleCancelar = async () => {
     if (!notaCancelar) return
     setCancelando(true)
     try {
-      const response = await fetch(`/api/nfse/${notaCancelar.id}/cancelar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ motivo: motivoCancelamento }),
-      })
-      const result = await response.json()
-
-      if (result.success) {
-        toast({ title: "NFS-e cancelada", description: "Nota fiscal cancelada com sucesso" })
-        fetchNotas()
+      if (notaCancelar.tipo === "nfse") {
+        const response = await fetch(`/api/nfse/${notaCancelar.id}/cancelar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ motivo: motivoCancelamento }),
+        })
+        const result = await response.json()
+        if (result.success) {
+          toast({ title: "NFS-e cancelada", description: "Nota fiscal de servico cancelada com sucesso" })
+          fetchTodasNotas()
+        } else {
+          toast({ title: "Erro", description: result.message, variant: "destructive" })
+        }
       } else {
-        toast({ title: "Erro", description: result.message, variant: "destructive" })
+        toast({ title: "Info", description: "Cancelamento de NF-e sera implementado em breve." })
       }
     } catch {
       toast({ title: "Erro", description: "Erro ao cancelar nota fiscal", variant: "destructive" })
@@ -273,10 +383,11 @@ export default function NotaFiscalPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "emitida":
+      case "autorizada":
         return (
           <Badge className="bg-green-100 text-green-700 border-green-300 gap-1">
             <CheckCircle2 className="h-3 w-3" />
-            Emitida
+            {status === "autorizada" ? "Autorizada" : "Emitida"}
           </Badge>
         )
       case "processando":
@@ -301,10 +412,11 @@ export default function NotaFiscalPage() {
           </Badge>
         )
       case "erro":
+      case "rejeitada":
         return (
           <Badge className="bg-red-100 text-red-700 border-red-300 gap-1">
             <AlertCircle className="h-3 w-3" />
-            Erro
+            {status === "rejeitada" ? "Rejeitada" : "Erro"}
           </Badge>
         )
       default:
@@ -312,34 +424,80 @@ export default function NotaFiscalPage() {
     }
   }
 
+  const getTipoBadge = (tipo: "nfse" | "nfe") => {
+    if (tipo === "nfse") {
+      return (
+        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 gap-1 text-[10px]">
+          <Wrench className="h-3 w-3" />
+          NFS-e
+        </Badge>
+      )
+    }
+    return (
+      <Badge className="bg-blue-100 text-blue-700 border-blue-300 gap-1 text-[10px]">
+        <Package className="h-3 w-3" />
+        NF-e
+      </Badge>
+    )
+  }
+
   const getOrigemLabel = (origem: string) => {
     switch (origem) {
-      case "orcamento":
-        return "Orcamento"
-      case "ordem_servico":
-        return "O.S."
-      case "boleto":
-        return "Boleto"
-      case "avulsa":
-        return "Avulsa"
-      default:
-        return origem
+      case "orcamento": return "Orcamento"
+      case "ordem_servico": return "O.S."
+      case "boleto": return "Boleto"
+      case "avulsa": return "Avulsa"
+      default: return origem
     }
   }
 
   const notasFiltradas = notas.filter((nota) => {
+    // Filtro de tipo
+    if (tipoFilter !== "todos" && nota.tipo !== tipoFilter) return false
+    // Filtro de status
+    if (statusFilter !== "todos") {
+      if (statusFilter === "emitida" && nota.status !== "emitida" && nota.status !== "autorizada") return false
+      if (statusFilter === "erro" && nota.status !== "erro" && nota.status !== "rejeitada") return false
+      if (statusFilter !== "emitida" && statusFilter !== "erro" && nota.status !== statusFilter) return false
+    }
+    // Filtro de origem
+    if (origemFilter !== "todos" && nota.origem !== origemFilter) return false
+    // Filtro de busca
     if (searchTerm) {
       const search = searchTerm.toLowerCase()
       const matchSearch =
+        nota.numero?.toLowerCase().includes(search) ||
         nota.numero_nfse?.toLowerCase().includes(search) ||
+        String(nota.numero_nfe || "").includes(search) ||
         nota.tomador_razao_social?.toLowerCase().includes(search) ||
         nota.cliente_nome?.toLowerCase().includes(search) ||
-        String(nota.numero_rps).includes(search) ||
-        nota.tomador_cpf_cnpj?.includes(search)
+        String(nota.numero_rps || "").includes(search) ||
+        nota.tomador_cpf_cnpj?.includes(search) ||
+        nota.chave_acesso?.includes(search)
       if (!matchSearch) return false
     }
     return true
   })
+
+  const handleVerDetalhes = (nota: NotaUnificada) => {
+    if (nota.tipo === "nfse") {
+      setNfseSelecionada(nota.id)
+      setDetalheNfseOpen(true)
+    } else {
+      setNfeSelecionada(nota.id)
+      setDetalheNfeOpen(true)
+    }
+  }
+
+  const handleImprimir = (nota: NotaUnificada) => {
+    if (nota.tipo === "nfse") {
+      setNotaImprimirNfse(nota.id)
+      setImprimirNfseOpen(true)
+    } else {
+      setDanfeNfeId(nota.id)
+      setDanfeOpen(true)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -358,12 +516,12 @@ export default function NotaFiscalPage() {
               <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
                 Notas Fiscais
               </h1>
-              <p className="text-gray-600 mt-1">Emissao e gerenciamento de NFS-e</p>
+              <p className="text-gray-600 mt-1">NFS-e (Servico) e NF-e (Material)</p>
             </div>
           </div>
           <Button
-            onClick={() => setEmitirOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-700"
+            onClick={() => setEmitirNfseOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
           >
             <Plus className="h-4 w-4 mr-2" />
             <span className="hidden md:inline">Emitir NFS-e</span>
@@ -372,7 +530,7 @@ export default function NotaFiscalPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
           <Card className="border-0 shadow-md bg-white">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -382,6 +540,32 @@ export default function NotaFiscalPage() {
                 <div>
                   <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
                   <p className="text-xs text-gray-500">Total</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md bg-white">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <Wrench className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-emerald-700">{stats.totalNfse}</p>
+                  <p className="text-xs text-gray-500">NFS-e</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md bg-white">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Package className="h-5 w-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-blue-700">{stats.totalNfe}</p>
+                  <p className="text-xs text-gray-500">NF-e</p>
                 </div>
               </div>
             </CardContent>
@@ -402,19 +586,6 @@ export default function NotaFiscalPage() {
           <Card className="border-0 shadow-md bg-white">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <XCircle className="h-5 w-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-red-700">{stats.canceladas}</p>
-                  <p className="text-xs text-gray-500">Canceladas</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-md bg-white">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
                 <div className="p-2 bg-amber-100 rounded-lg">
                   <AlertCircle className="h-5 w-5 text-amber-600" />
                 </div>
@@ -425,7 +596,7 @@ export default function NotaFiscalPage() {
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-md bg-white col-span-2 md:col-span-1">
+          <Card className="border-0 shadow-md bg-white">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-emerald-100 rounded-lg">
@@ -433,7 +604,7 @@ export default function NotaFiscalPage() {
                 </div>
                 <div>
                   <p className="text-lg font-bold text-emerald-700">{formatCurrency(stats.valorTotal)}</p>
-                  <p className="text-xs text-gray-500">Valor Emitido</p>
+                  <p className="text-xs text-gray-500">Valor Total</p>
                 </div>
               </div>
             </CardContent>
@@ -465,7 +636,7 @@ export default function NotaFiscalPage() {
                     Consultar Pendentes ({stats.pendentes})
                   </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchNotas() }}>
+                <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchTodasNotas() }}>
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Atualizar
                 </Button>
@@ -478,26 +649,36 @@ export default function NotaFiscalPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Buscar por numero, nome, CNPJ..."
+                  placeholder="Buscar por numero, nome, CNPJ, chave de acesso..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setTimeout(fetchNotas, 100) }}>
+              <Select value={tipoFilter} onValueChange={setTipoFilter}>
+                <SelectTrigger className="w-full md:w-36">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos Tipos</SelectItem>
+                  <SelectItem value="nfse">NFS-e</SelectItem>
+                  <SelectItem value="nfe">NF-e</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full md:w-40">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos Status</SelectItem>
-                  <SelectItem value="emitida">Emitida</SelectItem>
+                  <SelectItem value="emitida">Emitida/Autorizada</SelectItem>
                   <SelectItem value="pendente">Pendente</SelectItem>
                   <SelectItem value="processando">Processando</SelectItem>
-                  <SelectItem value="erro">Erro</SelectItem>
+                  <SelectItem value="erro">Erro/Rejeitada</SelectItem>
                   <SelectItem value="cancelada">Cancelada</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={origemFilter} onValueChange={(v) => { setOrigemFilter(v); setTimeout(fetchNotas, 100) }}>
+              <Select value={origemFilter} onValueChange={setOrigemFilter}>
                 <SelectTrigger className="w-full md:w-40">
                   <SelectValue placeholder="Origem" />
                 </SelectTrigger>
@@ -505,7 +686,6 @@ export default function NotaFiscalPage() {
                   <SelectItem value="todos">Todas Origens</SelectItem>
                   <SelectItem value="orcamento">Orcamento</SelectItem>
                   <SelectItem value="ordem_servico">O.S.</SelectItem>
-                  <SelectItem value="boleto">Boleto</SelectItem>
                   <SelectItem value="avulsa">Avulsa</SelectItem>
                 </SelectContent>
               </Select>
@@ -523,11 +703,11 @@ export default function NotaFiscalPage() {
                 <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-semibold text-gray-600">Nenhuma nota fiscal encontrada</h3>
                 <p className="text-gray-500 mt-1">
-                  Clique em "Emitir NFS-e" para emitir sua primeira nota fiscal de servico.
+                  Emita notas a partir de orcamentos aprovados ou clique em "Emitir NFS-e" para uma nota avulsa.
                 </p>
                 <Button
-                  onClick={() => setEmitirOpen(true)}
-                  className="mt-4 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => setEmitirNfseOpen(true)}
+                  className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Emitir NFS-e
@@ -538,8 +718,9 @@ export default function NotaFiscalPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>NFS-e / RPS</TableHead>
-                      <TableHead>Tomador</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Numero</TableHead>
+                      <TableHead>Cliente</TableHead>
                       <TableHead>Origem</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
                       <TableHead>Status</TableHead>
@@ -549,38 +730,60 @@ export default function NotaFiscalPage() {
                   </TableHeader>
                   <TableBody>
                     {notasFiltradas.map((nota) => (
-                      <TableRow key={nota.id} className="hover:bg-gray-50">
+                      <TableRow key={`${nota.tipo}-${nota.id}`} className="hover:bg-gray-50">
+                        <TableCell>
+                          {getTipoBadge(nota.tipo)}
+                        </TableCell>
                         <TableCell>
                           <div>
-                            {nota.numero_nfse ? (
-                              <span className="font-semibold text-emerald-700">
-                                NFS-e {String(nota.numero_nfse).padStart(8, "0")}
-                              </span>
-                            ) : (nota.status === "processando" || nota.status === "erro") ? (
-                              <button
-                                className="text-blue-600 text-xs font-medium hover:underline flex items-center gap-1"
-                                onClick={() => handleConsultar(nota.id)}
-                                disabled={consultandoId === nota.id}
-                              >
-                                {consultandoId === nota.id ? (
-                                  <Loader2 className="h-3 w-3 animate-spin" />
+                            {nota.tipo === "nfse" ? (
+                              <>
+                                {nota.numero_nfse ? (
+                                  <span className="font-semibold text-emerald-700">
+                                    {String(nota.numero_nfse).padStart(8, "0")}
+                                  </span>
+                                ) : (nota.status === "processando" || nota.status === "erro") ? (
+                                  <button
+                                    className="text-blue-600 text-xs font-medium hover:underline flex items-center gap-1"
+                                    onClick={() => handleConsultarNfse(nota.id)}
+                                    disabled={consultandoId === nota.id}
+                                  >
+                                    {consultandoId === nota.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="h-3 w-3" />
+                                    )}
+                                    Consultar
+                                  </button>
                                 ) : (
-                                  <RefreshCw className="h-3 w-3" />
+                                  <span className="text-gray-400 text-xs italic">-</span>
                                 )}
-                                Consultar na prefeitura
-                              </button>
+                                <p className="text-xs text-gray-400">RPS: {nota.serie_rps || "11"}.{String(nota.numero_rps || 0).padStart(8, "0")}</p>
+                              </>
                             ) : (
-                              <span className="text-gray-400 text-xs italic">-</span>
+                              <>
+                                {nota.numero_nfe ? (
+                                  <span className="font-semibold text-blue-700">
+                                    {String(nota.numero_nfe).padStart(9, "0")}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 text-xs italic">-</span>
+                                )}
+                                {nota.serie && (
+                                  <p className="text-xs text-gray-400">Serie: {nota.serie}</p>
+                                )}
+                              </>
                             )}
-                            <p className="text-xs text-gray-400">RPS: {nota.serie_rps || "11"}.{String(nota.numero_rps).padStart(8, "0")}</p>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div>
                             <p className="font-medium text-sm truncate max-w-[200px]">
-                              {nota.tomador_razao_social || nota.cliente_nome}
+                              {nota.tomador_razao_social || nota.cliente_nome || "-"}
                             </p>
-                            <p className="text-xs text-gray-400">{nota.tomador_cpf_cnpj}</p>
+                            {nota.tomador_cpf_cnpj && (
+                              <p className="text-xs text-gray-400">{nota.tomador_cpf_cnpj}</p>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -598,12 +801,13 @@ export default function NotaFiscalPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-end gap-1">
-                            {(nota.status === "processando" || nota.status === "erro") && !nota.numero_nfse && (
+                            {/* Consultar (NFS-e processando/erro) */}
+                            {nota.tipo === "nfse" && (nota.status === "processando" || nota.status === "erro") && !nota.numero_nfse && (
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                onClick={() => handleConsultar(nota.id)}
+                                onClick={() => handleConsultarNfse(nota.id)}
                                 disabled={consultandoId === nota.id}
                                 title="Consultar status na prefeitura"
                               >
@@ -614,38 +818,52 @@ export default function NotaFiscalPage() {
                                 )}
                               </Button>
                             )}
+                            {/* Consultar (NF-e processando/rejeitada) */}
+                            {nota.tipo === "nfe" && (nota.status === "processando" || nota.status === "rejeitada") && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => handleConsultarNfe(nota.id)}
+                                disabled={consultandoId === nota.id}
+                                title="Consultar status na SEFAZ"
+                              >
+                                {consultandoId === nota.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                            {/* Ver detalhes */}
                             <Button
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              onClick={() => {
-                                setNotaSelecionada(nota.id)
-                                setDetalheOpen(true)
-                              }}
+                              onClick={() => handleVerDetalhes(nota)}
                               title="Ver detalhes"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            {(nota.status === "emitida" || nota.status === "cancelada") && (
+                            {/* Imprimir (NFS-e emitida/cancelada ou NF-e autorizada) */}
+                            {((nota.tipo === "nfse" && (nota.status === "emitida" || nota.status === "cancelada")) ||
+                              (nota.tipo === "nfe" && nota.status === "autorizada")) && (
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                onClick={() => {
-                                  setNotaImprimir(nota.id)
-                                  setImprimirOpen(true)
-                                }}
-                                title="Imprimir NFS-e"
+                                onClick={() => handleImprimir(nota)}
+                                title={nota.tipo === "nfse" ? "Imprimir NFS-e" : "Imprimir DANFE"}
                               >
                                 <Printer className="h-4 w-4" />
                               </Button>
                             )}
-                            {nota.status === "emitida" && (() => {
+                            {/* Boleto (somente NFS-e emitida) */}
+                            {nota.tipo === "nfse" && nota.status === "emitida" && (() => {
                               const nfseNum = String(nota.numero_nfse || "")
                               const boletoInfo = boletoStatusMap[nfseNum]
 
                               if (boletoInfo?.temBoleto && boletoInfo.aguardandoPagamento) {
-                                // Boleto enviado ao Asaas e aguardando pagamento - mostrar imprimir
                                 return (
                                   <Button
                                     variant="ghost"
@@ -662,12 +880,8 @@ export default function NotaFiscalPage() {
                                 )
                               }
 
-                              if (boletoInfo?.temBoleto) {
-                                // Boleto existe mas nao esta aguardando pagamento - nao mostrar nada
-                                return null
-                              }
+                              if (boletoInfo?.temBoleto) return null
 
-                              // Sem boleto - mostrar gerar boleto
                               return (
                                 <Button
                                   variant="ghost"
@@ -683,7 +897,8 @@ export default function NotaFiscalPage() {
                                 </Button>
                               )
                             })()}
-                            {nota.status === "emitida" && (
+                            {/* Cancelar (NFS-e emitida) */}
+                            {nota.tipo === "nfse" && nota.status === "emitida" && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -714,13 +929,12 @@ export default function NotaFiscalPage() {
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
               <div>
-                <h4 className="font-medium text-blue-800">Credenciamento na Prefeitura de Sao Paulo</h4>
+                <h4 className="font-medium text-blue-800">Sobre as Notas Fiscais</h4>
                 <p className="text-sm text-blue-700 mt-1">
-                  Para emitir notas em producao, voce precisa solicitar acesso ao Web Service da NFS-e
-                  no portal da Prefeitura de SP e cadastrar o IP do seu servidor.
-                  Configure o certificado digital e os dados fiscais em{" "}
+                  <strong>NFS-e (Servico)</strong>: emitida via Prefeitura de SP para mao de obra. <strong>NF-e (Material)</strong>: emitida via SEFAZ para materiais.
+                  Configure certificados e dados fiscais em{" "}
                   <Link href="/configuracoes" className="underline font-medium">
-                    Configuracoes &gt; NFS-e
+                    Configuracoes
                   </Link>
                   .
                 </p>
@@ -730,20 +944,20 @@ export default function NotaFiscalPage() {
         </Card>
       </div>
 
-      {/* Dialogs */}
+      {/* Dialogs NFS-e */}
       <EmitirNfseDialog
-        open={emitirOpen}
-        onOpenChange={setEmitirOpen}
-        onSuccess={() => fetchNotas()}
+        open={emitirNfseOpen}
+        onOpenChange={setEmitirNfseOpen}
+        onSuccess={() => fetchTodasNotas()}
       />
 
       <DetalheNfseDialog
-        open={detalheOpen}
-        onOpenChange={setDetalheOpen}
-        notaId={notaSelecionada}
+        open={detalheNfseOpen}
+        onOpenChange={setDetalheNfseOpen}
+        notaId={nfseSelecionada}
         onPrint={(id) => {
-          setNotaImprimir(id)
-          setImprimirOpen(true)
+          setNotaImprimirNfse(id)
+          setImprimirNfseOpen(true)
         }}
         onBoleto={(nota) => {
           setNotaParaBoleto(nota)
@@ -752,11 +966,29 @@ export default function NotaFiscalPage() {
       />
 
       <ImprimirNfseDialog
-        open={imprimirOpen}
-        onOpenChange={setImprimirOpen}
-        notaId={notaImprimir}
+        open={imprimirNfseOpen}
+        onOpenChange={setImprimirNfseOpen}
+        notaId={notaImprimirNfse}
       />
 
+      {/* Dialogs NF-e */}
+      <DetalheNfeDialog
+        open={detalheNfeOpen}
+        onOpenChange={setDetalheNfeOpen}
+        nfeId={nfeSelecionada}
+        onPrint={(id) => {
+          setDanfeNfeId(id)
+          setDanfeOpen(true)
+        }}
+      />
+
+      <DanfeDialog
+        open={danfeOpen}
+        onOpenChange={setDanfeOpen}
+        nfeId={danfeNfeId}
+      />
+
+      {/* Boletos */}
       <NovoBoletoDialog
         open={boletoOpen}
         onOpenChange={(open) => {
@@ -767,7 +999,7 @@ export default function NotaFiscalPage() {
         onSuccess={() => {
           setBoletoOpen(false)
           setNotaParaBoleto(null)
-          fetchNotas()
+          fetchTodasNotas()
         }}
       />
 
@@ -781,10 +1013,12 @@ export default function NotaFiscalPage() {
       <AlertDialog open={cancelarOpen} onOpenChange={setCancelarOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancelar NFS-e</AlertDialogTitle>
+            <AlertDialogTitle>
+              Cancelar {notaCancelar?.tipo === "nfse" ? "NFS-e" : "NF-e"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja cancelar a NFS-e{" "}
-              {notaCancelar?.numero_nfse || `RPS ${notaCancelar?.numero_rps}`}?
+              Tem certeza que deseja cancelar a {notaCancelar?.tipo === "nfse" ? "NFS-e" : "NF-e"}{" "}
+              {notaCancelar?.numero || `#${notaCancelar?.id}`}?
               Esta acao nao pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -802,7 +1036,7 @@ export default function NotaFiscalPage() {
             <AlertDialogAction
               onClick={handleCancelar}
               disabled={cancelando || !motivoCancelamento}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
               {cancelando ? (
                 <>
