@@ -410,7 +410,8 @@ export function gerarXmlNFe(dados: DadosNFe): {
   // === pag - Pagamento ===
   xml += `<pag>`
   xml += `<detPag>`
-  xml += `<indPag>0</indPag>` // 0=A vista
+  // indPag REMOVIDO: campo nao existe no schema PL_008i2 usado pela SEFAZ SP
+  // (removido pela NT 2016.002, re-adicionado apenas no PL_009)
   xml += `<tPag>99</tPag>` // 99=Outros
   xml += `<xPag>Outros</xPag>` // Descricao obrigatoria quando tPag=99 (rejeicao 441)
   xml += `<vPag>${vNF.toFixed(2)}</vPag>`
