@@ -8,9 +8,9 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME,
   port: Number.parseInt(process.env.DB_PORT || "3306"),
   // Configurações ajustadas para produção (Vercel)
-  connectionLimit: 10, // Reduzido para ambientes serverless
-  maxIdle: 5,
-  idleTimeout: 60000,
+  connectionLimit: 5,
+  maxIdle: 2,
+  idleTimeout: 30000,
   queueLimit: 0,
   ssl:
     process.env.DB_SSL === "true"
@@ -18,29 +18,39 @@ const pool = mysql.createPool({
           rejectUnauthorized: process.env.NODE_ENV === "production",
         }
       : undefined,
-  // Configurações de retry
-  connectTimeout: 30000,
+  // Configurações de retry com timeout maior
+  connectTimeout: 60000,
   waitForConnections: true,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0,
-  charset: "utf8mb4", // Removida opção 'timeout' que causava warning no MySQL2
+  keepAliveInitialDelay: 10000,
+  charset: "utf8mb4",
 })
 
-// Verificar conexão no startup
-pool
-  .getConnection()
-  .then((connection) => {
-    console.log("✅ Conexão com banco de dados estabelecida")
-    connection.release()
-  })
-  .catch((error) => {
-    console.error("❌ Erro ao conectar ao banco de dados:", error)
-    console.error("Variáveis de ambiente:")
-    console.error("DB_HOST:", process.env.DB_HOST)
-    console.error("DB_USER:", process.env.DB_USER)
-    console.error("DB_NAME:", process.env.DB_NAME)
-    console.error("DB_PORT:", process.env.DB_PORT)
-  })
+// Verificar conexão no startup com retry
+const verificarConexao = async (tentativas = 3) => {
+  for (let i = 1; i <= tentativas; i++) {
+    try {
+      const connection = await pool.getConnection()
+      console.log("✅ Conexão com banco de dados estabelecida")
+      connection.release()
+      return
+    } catch (error) {
+      console.error(`❌ Tentativa ${i}/${tentativas} - Erro ao conectar ao banco de dados:`, error)
+      if (i === tentativas) {
+        console.error("Variáveis de ambiente:")
+        console.error("DB_HOST:", process.env.DB_HOST)
+        console.error("DB_USER:", process.env.DB_USER)
+        console.error("DB_NAME:", process.env.DB_NAME)
+        console.error("DB_PORT:", process.env.DB_PORT)
+      } else {
+        // Esperar antes de tentar novamente
+        await new Promise((resolve) => setTimeout(resolve, 3000 * i))
+      }
+    }
+  }
+}
+
+verificarConexao()
 
 export { pool }
 
@@ -51,19 +61,33 @@ export async function createConnection() {
 export const getConnection = createConnection
 
 export async function query(sql: string, params?: any[]) {
-  let connection
-  try {
-    connection = await pool.getConnection()
-    const [rows] = await connection.execute(sql, params)
-    return rows
-  } catch (error) {
-    console.error("Database query error:", error)
-    throw error
-  } finally {
-    if (connection) {
-      connection.release()
+  const maxRetries = 2
+  let lastError: any
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    let connection
+    try {
+      connection = await pool.getConnection()
+      const [rows] = await connection.execute(sql, params)
+      return rows
+    } catch (error: any) {
+      lastError = error
+      console.error(`Database query error (attempt ${attempt + 1}/${maxRetries + 1}):`, error?.code || error?.message)
+      
+      // Retry only on connection errors
+      if (attempt < maxRetries && (error?.code === 'ETIMEDOUT' || error?.code === 'ECONNREFUSED' || error?.code === 'PROTOCOL_CONNECTION_LOST')) {
+        await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)))
+        continue
+      }
+      throw error
+    } finally {
+      if (connection) {
+        connection.release()
+      }
     }
   }
+
+  throw lastError
 }
 
 export default pool

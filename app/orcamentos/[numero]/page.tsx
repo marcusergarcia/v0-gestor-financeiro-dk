@@ -480,9 +480,18 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
                 Emitir NFS-e
               </Button>
             )}
+            {orcamento.situacao === "aprovado" && calcularSubtotalMaterial() > 0 && (
+              <Button
+                onClick={() => setNfeDialogOpen(true)}
+                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg"
+              >
+                <PackageIcon className="h-4 w-4 mr-2" />
+                Emitir NF-e
+              </Button>
+            )}
             <Button
               onClick={() => setShowPrintEditor(true)}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg"
+              className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-lg"
             >
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
@@ -1016,18 +1025,30 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
           cliente_cidade: orcamento.cliente_cidade,
           cliente_uf: orcamento.cliente_estado,
           cliente_cep: orcamento.cliente_cep,
-          itens: itens
-            .filter((item) => safeNumber(item.valor_unitario) > 0)
-            .map((item) => ({
-              produto_id: Number(item.produto_id),
-              codigo_produto: item.produto?.codigo || "",
-              descricao: item.produto?.descricao || "",
-              ncm: item.produto?.ncm || "00000000",
-              unidade: item.produto?.unidade || "UN",
-              quantidade: safeNumber(item.quantidade),
-              valor_unitario: safeNumber(item.valor_unitario),
-              valor_total: safeNumber(item.quantidade) * safeNumber(item.valor_unitario),
-            })),
+          itens: (() => {
+            // Calcular fator de ajuste para que a soma dos itens = subtotal material
+            const valorMaterialBruto = itens.reduce(
+              (acc, item) => acc + safeNumber(item.quantidade) * safeNumber(item.valor_unitario), 0
+            )
+            const subtotalMaterial = calcularSubtotalMaterial()
+            const fatorAjuste = valorMaterialBruto > 0 ? subtotalMaterial / valorMaterialBruto : 1
+
+            return itens
+              .filter((item) => safeNumber(item.valor_unitario) > 0)
+              .map((item) => {
+                const valorUnitarioAjustado = safeNumber(item.valor_unitario) * fatorAjuste
+                return {
+                  produto_id: Number(item.produto_id),
+                  codigo_produto: item.produto?.codigo || "",
+                  descricao: item.produto?.descricao || "",
+                  ncm: item.produto?.ncm || "00000000",
+                  unidade: item.produto?.unidade || "UN",
+                  quantidade: safeNumber(item.quantidade),
+                  valor_unitario: valorUnitarioAjustado,
+                  valor_total: safeNumber(item.quantidade) * valorUnitarioAjustado,
+                }
+              })
+          })(),
           valor_material: calcularSubtotalMaterial(),
         }}
       />
