@@ -113,9 +113,14 @@ export async function POST(request: NextRequest) {
     const dhEmiSP = `${dataEmissaoSP}T${getPart("hour")}:${getPart("minute")}:${getPart("second")}-03:00`
     console.log("[v0] NF-e: Data emissao SP:", dataEmissaoSP, "dhEmi:", dhEmiSP, "| UTC:", agora.toISOString())
 
+    // Garantir que CNPJ tenha exatamente 14 digitos (padStart com zero a esquerda)
+    // O DB pode armazenar sem leading zero dependendo de como foi inserido
+    const cnpjEmitente = (config.cnpj || "").replace(/\D/g, "").padStart(14, "0")
+    console.log("[v0] NF-e: CNPJ config.cnpj raw:", JSON.stringify(config.cnpj), "| formatado:", cnpjEmitente, "| length:", cnpjEmitente.length)
+
     // Montar emitente a partir da config
     const emitente: DadosEmitente = {
-      cnpj: config.cnpj,
+      cnpj: cnpjEmitente,
       razaoSocial: config.razao_social,
       nomeFantasia: config.nome_fantasia || undefined,
       inscricaoEstadual: config.inscricao_estadual,
@@ -133,10 +138,15 @@ export async function POST(request: NextRequest) {
       },
     }
 
-    // Montar destinatario
+    // Montar destinatario - garantir padding correto do CPF/CNPJ
+    const tipoDoc = dest_tipo || "PJ"
+    const cpfCnpjRaw = (dest_cpf_cnpj || "").replace(/\D/g, "")
+    const cpfCnpjDest = tipoDoc === "PJ" ? cpfCnpjRaw.padStart(14, "0") : cpfCnpjRaw.padStart(11, "0")
+    console.log("[v0] NF-e: Dest CPF/CNPJ raw:", JSON.stringify(dest_cpf_cnpj), "| formatado:", cpfCnpjDest, "| tipo:", tipoDoc)
+
     const destinatario: DadosDestinatario = {
-      tipo: dest_tipo || "PJ",
-      cpfCnpj: (dest_cpf_cnpj || "").replace(/\D/g, ""),
+      tipo: tipoDoc,
+      cpfCnpj: cpfCnpjDest,
       razaoSocial: dest_razao_social || "",
       inscricaoEstadual: dest_inscricao_estadual || undefined,
       indicadorIE: dest_ind_ie_dest || 9,
@@ -243,9 +253,9 @@ export async function POST(request: NextRequest) {
       [
         numeroNFe, serie, chaveAcesso,
         origem || "avulsa", origem_id || null, origem_numero || null,
-        config.cnpj, config.inscricao_estadual,
-        cliente_id || null, dest_tipo || "PJ",
-        (dest_cpf_cnpj || "").replace(/\D/g, ""),
+        cnpjEmitente, config.inscricao_estadual,
+        cliente_id || null, tipoDoc,
+        cpfCnpjDest,
         ambiente === 2 ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL" : (dest_razao_social || ""),
         dest_email || null, dest_telefone || null,
         dest_inscricao_estadual || null, dest_ind_ie_dest || 9,
@@ -280,9 +290,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Debug: Log do XML assinado e envelope para troubleshooting
-    console.log("[v0] NF-e: XML NFe assinado (primeiros 1000):", xmlAssinado.substring(0, 1000))
+    // Debug: Log do XML COMPLETO para troubleshooting de schema
+    // Dividir em pedacos de 2000 chars pois Vercel pode truncar logs longos
     console.log("[v0] NF-e: XML enviNFe tamanho:", xmlEnviNFe.length, "bytes")
+    const xmlParaLog = xmlEnviNFe
+    const chunkSize = 2000
+    for (let i = 0; i < xmlParaLog.length; i += chunkSize) {
+      const chunk = xmlParaLog.substring(i, i + chunkSize)
+      console.log(`[v0] NF-e XML[${i}-${Math.min(i + chunkSize, xmlParaLog.length)}]:`, chunk)
+    }
 
     // Enviar para a SEFAZ
     console.log("[v0] NF-e: Enviando para SEFAZ SP...")

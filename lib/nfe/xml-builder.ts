@@ -353,12 +353,8 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<CSOSN>102</CSOSN>` // 102=Tributada sem permissao de credito
     xml += `</ICMSSN102>`
     xml += `</ICMS>`
-    xml += `<IPI>`
-    xml += `<cEnq>999</cEnq>` // 999=Outros
-    xml += `<IPINT>`
-    xml += `<CST>53</CST>` // 53=Saida nao tributada
-    xml += `</IPINT>`
-    xml += `</IPI>`
+    // IPI omitido para Simples Nacional (CRT=1) com CSOSN 102
+    // A SEFAZ nao exige IPI para operacoes do Simples Nacional
     xml += `<PIS>`
     xml += `<PISNT>`
     xml += `<CST>07</CST>` // 07=Operacao Isenta da Contribuicao (Simples Nacional)
@@ -380,9 +376,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<vBC>0.00</vBC>`
   xml += `<vICMS>0.00</vICMS>`
   xml += `<vICMSDeson>0.00</vICMSDeson>`
-  xml += `<vFCPUFDest>0.00</vFCPUFDest>`
-  xml += `<vICMSUFDest>0.00</vICMSUFDest>`
-  xml += `<vICMSUFRemet>0.00</vICMSUFRemet>`
+  // vFCPUFDest, vICMSUFDest, vICMSUFRemet omitidos (opcionais, operacao interna sem DIFAL)
   xml += `<vFCP>0.00</vFCP>`
   xml += `<vBCST>0.00</vBCST>`
   xml += `<vST>0.00</vST>`
