@@ -20,6 +20,7 @@ import {
   Hash,
   Info,
   Package,
+  Upload,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
@@ -44,6 +45,9 @@ interface NfeConfig {
   ambiente: number
   info_complementar: string
   natureza_operacao: string
+  certificado_base64?: string
+  certificado_senha: string
+  certificado_validade?: string
 }
 
 const defaultConfig: NfeConfig = {
@@ -66,12 +70,15 @@ const defaultConfig: NfeConfig = {
   ambiente: 2,
   info_complementar: "DOCUMENTO EMITIDO POR ME OU EPP OPTANTE PELO SIMPLES NACIONAL. NAO GERA DIREITO A CREDITO FISCAL DE IPI.",
   natureza_operacao: "Venda",
+  certificado_senha: "",
 }
 
 export function NfeTab() {
   const [config, setConfig] = useState<NfeConfig>(defaultConfig)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [certificadoFile, setCertificadoFile] = useState<string | null>(null)
+  const [certificadoNome, setCertificadoNome] = useState<string>("")
   const { toast } = useToast()
 
   useEffect(() => {
@@ -93,6 +100,29 @@ export function NfeTab() {
     }
   }
 
+  const handleCertificadoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.name.endsWith(".pfx") && !file.name.endsWith(".p12")) {
+      toast({
+        title: "Arquivo invalido",
+        description: "Selecione um arquivo .pfx ou .p12",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setCertificadoNome(file.name)
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1]
+      setCertificadoFile(base64)
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleSave = async () => {
     if (!config.razao_social || !config.cnpj || !config.inscricao_estadual) {
       toast({
@@ -105,10 +135,15 @@ export function NfeTab() {
 
     setSaving(true)
     try {
+      const payload = {
+        ...config,
+        certificado_base64: certificadoFile || config.certificado_base64,
+      }
+
       const response = await fetch("/api/nfe/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
+        body: JSON.stringify(payload),
       })
       const result = await response.json()
 
@@ -150,21 +185,77 @@ export function NfeTab() {
         </div>
       </div>
 
-      {/* Info box */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium">Certificado Digital</p>
-              <p className="mt-1">
-                O certificado digital A1 (.pfx) configurado na aba NFS-e sera reutilizado para a NF-e.
-                Nao e necessario fazer upload novamente.
-              </p>
-              <p className="mt-1">
-                <span className="font-medium">Simples Nacional:</span> CFOP 5102, CSOSN 102, Origem Nacional (0) - valores fixos aplicados automaticamente.
+      {/* Certificado Digital */}
+      <Card className="border-0 shadow-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-red-600" />
+            Certificado Digital A1
+          </CardTitle>
+          <CardDescription>
+            Upload do certificado digital para assinatura das NF-e
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Arquivo do Certificado (.pfx / .p12)</Label>
+              <div className="flex items-center gap-3">
+                <label
+                  htmlFor="nfe-cert-upload"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-md cursor-pointer transition-colors"
+                >
+                  <Upload className="h-4 w-4" />
+                  <span className="text-sm">Selecionar Arquivo</span>
+                </label>
+                <input
+                  id="nfe-cert-upload"
+                  type="file"
+                  accept=".pfx,.p12"
+                  onChange={handleCertificadoUpload}
+                  className="hidden"
+                />
+                {(certificadoNome || config.certificado_base64) && (
+                  <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    {certificadoNome || "Certificado configurado"}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nfe_cert_senha">Senha do Certificado</Label>
+              <Input
+                id="nfe_cert_senha"
+                type="password"
+                value={config.certificado_senha}
+                onChange={(e) => updateConfig("certificado_senha", e.target.value)}
+                placeholder="Senha do certificado .pfx"
+              />
+            </div>
+          </div>
+          {config.certificado_validade && (
+            <div className="p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <Info className="h-4 w-4 inline mr-1" />
+                Certificado valido ate: {new Date(config.certificado_validade).toLocaleDateString("pt-BR")}
               </p>
             </div>
+          )}
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-700">
+              <AlertCircle className="h-4 w-4 inline mr-1" />
+              O certificado digital A1 e necessario para assinar e transmitir NF-e ao SEFAZ.
+              Ele e armazenado de forma segura no banco de dados.
+            </p>
+          </div>
+
+          {/* Info Simples Nacional */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <Info className="h-4 w-4 inline mr-1" />
+              <span className="font-medium">Simples Nacional:</span> CFOP 5102, CSOSN 102, Origem Nacional (0) - valores fixos aplicados automaticamente.
+            </p>
           </div>
         </CardContent>
       </Card>

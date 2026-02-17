@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
       endereco, numero_endereco, complemento, bairro, cidade, uf, cep,
       codigo_municipio, telefone, crt, serie_nfe, proximo_numero_nfe,
       ambiente, info_complementar, natureza_operacao,
+      certificado_base64, certificado_senha, certificado_validade,
     } = body
 
     // Verificar se ja existe config
@@ -32,26 +33,44 @@ export async function POST(request: NextRequest) {
     const existingConfigs = existing as any[]
 
     if (existingConfigs.length > 0) {
-      // Update
+      // Update - build dynamic SET clause to only update cert fields when provided
+      const setClauses = [
+        "razao_social = ?", "nome_fantasia = ?", "cnpj = ?", "inscricao_estadual = ?",
+        "endereco = ?", "numero_endereco = ?", "complemento = ?", "bairro = ?",
+        "cidade = ?", "uf = ?", "cep = ?", "codigo_municipio = ?", "telefone = ?",
+        "crt = ?", "serie_nfe = ?", "proximo_numero_nfe = ?", "ambiente = ?",
+        "info_complementar = ?", "natureza_operacao = ?",
+      ]
+      const setValues: any[] = [
+        razao_social, nome_fantasia || null, (cnpj || "").replace(/\D/g, ""),
+        (inscricao_estadual || "").replace(/\D/g, ""),
+        endereco || null, numero_endereco || null, complemento || null,
+        bairro || null, cidade || "Sao Paulo", uf || "SP",
+        (cep || "").replace(/\D/g, "") || null, codigo_municipio || "3550308",
+        telefone || null, crt || 1, serie_nfe || 1,
+        proximo_numero_nfe || existingConfigs[0].proximo_numero_nfe || 1,
+        ambiente || 2, info_complementar || null, natureza_operacao || "Venda",
+      ]
+
+      // Only update certificate fields when they are provided
+      if (certificado_base64) {
+        setClauses.push("certificado_base64 = ?")
+        setValues.push(certificado_base64)
+      }
+      if (certificado_senha !== undefined && certificado_senha !== "") {
+        setClauses.push("certificado_senha = ?")
+        setValues.push(certificado_senha)
+      }
+      if (certificado_validade) {
+        setClauses.push("certificado_validade = ?")
+        setValues.push(certificado_validade)
+      }
+
+      setValues.push(existingConfigs[0].id)
+
       await pool.execute(
-        `UPDATE nfe_config SET
-          razao_social = ?, nome_fantasia = ?, cnpj = ?, inscricao_estadual = ?,
-          endereco = ?, numero_endereco = ?, complemento = ?, bairro = ?,
-          cidade = ?, uf = ?, cep = ?, codigo_municipio = ?, telefone = ?,
-          crt = ?, serie_nfe = ?, proximo_numero_nfe = ?, ambiente = ?,
-          info_complementar = ?, natureza_operacao = ?
-        WHERE id = ?`,
-        [
-          razao_social, nome_fantasia || null, (cnpj || "").replace(/\D/g, ""),
-          (inscricao_estadual || "").replace(/\D/g, ""),
-          endereco || null, numero_endereco || null, complemento || null,
-          bairro || null, cidade || "Sao Paulo", uf || "SP",
-          (cep || "").replace(/\D/g, "") || null, codigo_municipio || "3550308",
-          telefone || null, crt || 1, serie_nfe || 1,
-          proximo_numero_nfe || existingConfigs[0].proximo_numero_nfe || 1,
-          ambiente || 2, info_complementar || null, natureza_operacao || "Venda",
-          existingConfigs[0].id,
-        ]
+        `UPDATE nfe_config SET ${setClauses.join(", ")} WHERE id = ?`,
+        setValues
       )
     } else {
       // Insert
@@ -61,8 +80,9 @@ export async function POST(request: NextRequest) {
           endereco, numero_endereco, complemento, bairro,
           cidade, uf, cep, codigo_municipio, telefone,
           crt, serie_nfe, proximo_numero_nfe, ambiente,
-          info_complementar, natureza_operacao
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          info_complementar, natureza_operacao,
+          certificado_base64, certificado_senha, certificado_validade
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           razao_social, nome_fantasia || null, (cnpj || "").replace(/\D/g, ""),
           (inscricao_estadual || "").replace(/\D/g, ""),
@@ -72,6 +92,7 @@ export async function POST(request: NextRequest) {
           telefone || null, crt || 1, serie_nfe || 1,
           proximo_numero_nfe || 1, ambiente || 2,
           info_complementar || null, natureza_operacao || "Venda",
+          certificado_base64 || null, certificado_senha || null, certificado_validade || null,
         ]
       )
     }
