@@ -225,6 +225,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Debug: mostrar dados sanitizados que irao no XML
+    console.log("[v0] NF-e XML dados:", JSON.stringify({
+      razaoSocial: emitente.razaoSocial?.substring(0, 30) + "...",
+      nomeFantasia: emitente.nomeFantasia?.substring(0, 30),
+      logradouro: emitente.endereco.logradouro,
+      bairro: emitente.endereco.bairro,
+      tipoNota: dadosNFe.tipoNota,
+      consumidorFinal: dadosNFe.consumidorFinal,
+      meioPagamento: dadosNFe.meioPagamento,
+      tipoVenda: dadosNFe.tipoVenda,
+      qtdItens: dadosNFe.itens.length,
+      primeiroItem: dadosNFe.itens[0]?.descricao?.substring(0, 40),
+    }))
+
     // Gerar XML da NF-e
     const { xml: xmlNFe, chaveAcesso, cNF, cDV } = gerarXmlNFe(dadosNFe)
     console.log("[v0] NF-e: XML gerado. Chave de acesso:", chaveAcesso)
