@@ -126,6 +126,9 @@ export async function POST(request: NextRequest) {
     const cnpjEmitente = (config.cnpj || "").replace(/\D/g, "").padStart(14, "0")
     console.log("[v0] NF-e: CNPJ config.cnpj raw:", JSON.stringify(config.cnpj), "| formatado:", cnpjEmitente, "| length:", cnpjEmitente.length)
 
+    // Sanitizar campos de texto - remover virgulas/pontos/espacos finais que violam o XSD
+    const sanitizeField = (val: string) => val ? val.replace(/[,.\s]+$/g, "").trim() : ""
+
     // Montar emitente a partir da config
     const emitente: DadosEmitente = {
       cnpj: cnpjEmitente,
@@ -135,14 +138,14 @@ export async function POST(request: NextRequest) {
       crt: config.crt || 1,
       telefone: config.telefone || undefined,
       endereco: {
-        logradouro: config.endereco || "",
+        logradouro: sanitizeField(config.endereco || ""),
         numero: config.numero_endereco || "S/N",
         complemento: config.complemento || undefined,
-        bairro: config.bairro || "",
+        bairro: sanitizeField(config.bairro || ""),
         codigoMunicipio: config.codigo_municipio || "3550308",
         municipio: config.cidade || "Sao Paulo",
         uf: config.uf || "SP",
-        cep: config.cep || "",
+        cep: (config.cep || "").replace(/\D/g, ""),
       },
     }
 
@@ -161,10 +164,10 @@ export async function POST(request: NextRequest) {
       email: dest_email || undefined,
       telefone: dest_telefone || undefined,
       endereco: dest_endereco ? {
-        logradouro: dest_endereco,
+        logradouro: sanitizeField(dest_endereco),
         numero: dest_numero || "S/N",
         complemento: dest_complemento || undefined,
-        bairro: dest_bairro || "",
+        bairro: sanitizeField(dest_bairro || ""),
         codigoMunicipio: dest_codigo_municipio || "3550308",
         municipio: dest_cidade || "Sao Paulo",
         uf: dest_uf || "SP",
@@ -227,16 +230,17 @@ export async function POST(request: NextRequest) {
 
     // Debug: mostrar dados sanitizados que irao no XML
     console.log("[v0] NF-e XML dados:", JSON.stringify({
-      razaoSocial: emitente.razaoSocial?.substring(0, 30) + "...",
-      nomeFantasia: emitente.nomeFantasia?.substring(0, 30),
+      razaoSocial: emitente.razaoSocial?.substring(0, 40),
+      nomeFantasia: emitente.nomeFantasia?.substring(0, 40),
       logradouro: emitente.endereco.logradouro,
       bairro: emitente.endereco.bairro,
+      cep: emitente.endereco.cep,
       tipoNota: dadosNFe.tipoNota,
       consumidorFinal: dadosNFe.consumidorFinal,
       meioPagamento: dadosNFe.meioPagamento,
       tipoVenda: dadosNFe.tipoVenda,
       qtdItens: dadosNFe.itens.length,
-      primeiroItem: dadosNFe.itens[0]?.descricao?.substring(0, 40),
+      primeiroItem: dadosNFe.itens[0]?.descricao?.substring(0, 50),
     }))
 
     // Gerar XML da NF-e

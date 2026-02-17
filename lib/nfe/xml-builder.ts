@@ -349,6 +349,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `</prod>`
 
     // imposto - Simples Nacional CSOSN 102
+    // ORDEM OBRIGATORIA no XSD: ICMS > IPI > PIS > COFINS (erro 225 se fora de ordem!)
     xml += `<imposto>`
     xml += `<vTotTrib>${formatDecimal(vTotTribItem, 2)}</vTotTrib>`
     xml += `<ICMS>`
@@ -357,6 +358,13 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<CSOSN>102</CSOSN>` // 102=Tributada sem permissao de credito
     xml += `</ICMSSN102>`
     xml += `</ICMS>`
+    // IPI DEVE vir ANTES de PIS/COFINS (ordem obrigatoria no XSD nfe_v4.00)
+    xml += `<IPI>`
+    xml += `<cEnq>999</cEnq>` // 999=Tributacao normal (outros)
+    xml += `<IPINT>`
+    xml += `<CST>53</CST>` // 53=Saida nao tributada
+    xml += `</IPINT>`
+    xml += `</IPI>`
     xml += `<PIS>`
     xml += `<PISNT>`
     xml += `<CST>07</CST>` // 07=Operacao Isenta da Contribuicao (Simples Nacional)
@@ -367,13 +375,6 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<CST>07</CST>` // 07=Operacao Isenta da Contribuicao (Simples Nacional)
     xml += `</COFINSNT>`
     xml += `</COFINS>`
-    // IPI obrigatorio conforme XML autorizado (Contabilizei NF-e 155)
-    xml += `<IPI>`
-    xml += `<cEnq>999</cEnq>` // 999=Tributacao normal (outros)
-    xml += `<IPINT>`
-    xml += `<CST>53</CST>` // 53=Saida nao tributada
-    xml += `</IPINT>`
-    xml += `</IPI>`
     xml += `</imposto>`
 
     xml += `</det>`
@@ -542,20 +543,35 @@ function escapeXml(str: string, maxLength?: number): string {
   // 1. Remover acentos/diacriticos via decomposicao Unicode (NFD) + remocao de combining marks
   s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
   
-  // 2. Remover caracteres de controle (tabs, newlines, etc.) - schema nao permite
+  // 2. Substituir caracteres Unicode especiais por equivalentes ASCII
+  // Em-dash, en-dash -> hifen; smart quotes -> aspas simples/duplas; etc.
+  s = s.replace(/[\u2013\u2014]/g, "-") // en-dash, em-dash -> hifen
+  s = s.replace(/[\u2018\u2019\u201B]/g, "'") // smart single quotes
+  s = s.replace(/[\u201C\u201D\u201F]/g, '"') // smart double quotes
+  s = s.replace(/\u2026/g, "...") // ellipsis
+  s = s.replace(/\u00B0/g, "") // degree sign (remover)
+  s = s.replace(/\u00BA/g, "") // masculine ordinal (remover)
+  s = s.replace(/\u00AA/g, "") // feminine ordinal (remover)
+  s = s.replace(/\u00A0/g, " ") // non-breaking space -> space
+  
+  // 3. Remover caracteres de controle (tabs, newlines, etc.) - schema nao permite
   s = s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
   // Converter newlines e tabs para espaco
   s = s.replace(/[\r\n\t]/g, " ")
   
-  // 3. Remover espacos duplos e trim
+  // 4. Remover qualquer caracter nao-ASCII restante que possa violar o XSD
+  // Mantem apenas ASCII imprimivel (espaco a ~) 
+  s = s.replace(/[^\x20-\x7E]/g, "")
+  
+  // 5. Remover espacos duplos e trim
   s = s.replace(/\s+/g, " ").trim()
   
-  // 4. Truncar ANTES do escape (XSD maxLength conta texto, nao entidades)
+  // 6. Truncar ANTES do escape (XSD maxLength conta texto, nao entidades)
   if (maxLength && s.length > maxLength) {
     s = s.substring(0, maxLength)
   }
   
-  // 5. Escapar entidades XML
+  // 7. Escapar entidades XML
   s = s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
