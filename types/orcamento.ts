@@ -15,7 +15,7 @@ export interface Orcamento {
   valor_total: number
   data_orcamento: string
   validade?: number
-  situacao: "pendente" | "aprovado" | "rejeitado" | "cancelado"
+  situacao: "pendente" | "aprovado" | "rejeitado" | "cancelado" | "concluido"
   observacoes?: string
   created_at: string
   updated_at: string

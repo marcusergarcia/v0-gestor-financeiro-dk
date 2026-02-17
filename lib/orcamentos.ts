@@ -171,3 +171,54 @@ export async function getClientesForOrcamento(): Promise<Cliente[]> {
     return []
   }
 }
+
+/**
+ * Verifica se ambas as notas (NFS-e de servico e NF-e de material) ja foram emitidas
+ * para um orcamento especifico. Se sim, atualiza a situacao do orcamento para 'concluido'.
+ * 
+ * Chamada apos a emissao bem-sucedida de uma NFS-e ou NF-e vinculada a um orcamento.
+ */
+export async function verificarEConcluirOrcamento(
+  connection: any,
+  origemNumero: string | number
+): Promise<boolean> {
+  try {
+    if (!origemNumero) return false
+
+    // Verificar se existe NFS-e emitida para este orcamento
+    const [nfseRows] = await connection.execute(
+      `SELECT id FROM notas_fiscais 
+       WHERE origem = 'orcamento' AND origem_numero = ? AND status IN ('emitida', 'processando') 
+       LIMIT 1`,
+      [String(origemNumero)]
+    )
+    const temNfse = (nfseRows as any[]).length > 0
+
+    // Verificar se existe NF-e autorizada para este orcamento
+    const [nfeRows] = await connection.execute(
+      `SELECT id FROM nfe_emitidas 
+       WHERE origem = 'orcamento' AND origem_numero = ? AND status = 'autorizada' 
+       LIMIT 1`,
+      [String(origemNumero)]
+    )
+    const temNfe = (nfeRows as any[]).length > 0
+
+    console.log(`[v0] Orcamento #${origemNumero}: NFS-e emitida=${temNfse}, NF-e autorizada=${temNfe}`)
+
+    // Se ambas as notas foram emitidas, concluir o orcamento
+    if (temNfse && temNfe) {
+      await connection.execute(
+        `UPDATE orcamentos SET situacao = 'concluido', updated_at = NOW() WHERE numero = ?`,
+        [String(origemNumero)]
+      )
+      console.log(`[v0] Orcamento #${origemNumero} marcado como CONCLUIDO (ambas notas emitidas)`)
+      return true
+    }
+
+    return false
+  } catch (error: any) {
+    // Nao e critico - apenas log do erro, nao interrompe o fluxo de emissao
+    console.error(`[v0] Erro ao verificar conclusao do orcamento #${origemNumero}:`, error?.message)
+    return false
+  }
+}

@@ -10,6 +10,7 @@ import {
 } from "@/lib/nfe/xml-builder"
 import { assinarXmlNFe, extrairCertKeyDoPfx } from "@/lib/nfe/xml-signer"
 import { autorizarNFe } from "@/lib/nfe/soap-client"
+import { verificarEConcluirOrcamento } from "@/lib/orcamentos"
 
 export async function POST(request: NextRequest) {
   const connection = await pool.getConnection()
@@ -403,6 +404,11 @@ export async function POST(request: NextRequest) {
       )
 
       console.log("[v0] NF-e AUTORIZADA! Protocolo:", protocolo)
+
+      // Verificar se o orcamento pode ser concluido (ambas NFS-e e NF-e emitidas)
+      if (origem === "orcamento" && origem_numero) {
+        await verificarEConcluirOrcamento(connection, origem_numero)
+      }
 
       return NextResponse.json({
         success: true,
