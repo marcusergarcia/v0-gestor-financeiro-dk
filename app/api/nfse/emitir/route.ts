@@ -3,6 +3,7 @@ import { pool } from "@/lib/db"
 import { gerarXmlEnvioLoteRps, gerarXmlConsultaNfseRps, type DadosNfse } from "@/lib/nfse/xml-builder"
 import { enviarLoteRps, testeEnvioLoteRps, consultarNfse, extrairDadosNfseRetorno } from "@/lib/nfse/soap-client"
 import { assinarXmlNfse, extrairCertKeyDoPfx } from "@/lib/nfse/xml-signer"
+import { verificarEConcluirOrcamento } from "@/lib/orcamentos"
 
 export async function POST(request: NextRequest) {
   const connection = await pool.getConnection()
@@ -268,6 +269,11 @@ export async function POST(request: NextRequest) {
             `UPDATE nfse_config SET ultima_nfse_numero = GREATEST(COALESCE(ultima_nfse_numero, 0), ?) + 1 WHERE ativo = 1`,
             [Number(dadosRetorno.numeroNfse)]
           )
+
+          // Verificar se o orcamento pode ser concluido (ambas NFS-e e NF-e emitidas)
+          if (origem === "orcamento" && origem_numero) {
+            await verificarEConcluirOrcamento(connection, origem_numero)
+          }
         } else {
           // Lote aceito mas NFS-e em processamento assincrono (comum na prefeitura SP)
           await connection.execute(
@@ -317,6 +323,11 @@ export async function POST(request: NextRequest) {
                 dadosRetorno.numeroNfse = dadosConsulta.numeroNfse
                 dadosRetorno.codigoVerificacao = dadosConsulta.codigoVerificacao
                 console.log("[v0] NFS-e encontrada na consulta automatica:", dadosConsulta.numeroNfse)
+
+                // Verificar se o orcamento pode ser concluido
+                if (origem === "orcamento" && origem_numero) {
+                  await verificarEConcluirOrcamento(connection, origem_numero)
+                }
               }
             }
           } catch (consultaError: any) {
@@ -394,6 +405,11 @@ export async function POST(request: NextRequest) {
         await connection.execute(
           "UPDATE nfse_config SET proximo_numero_rps = proximo_numero_rps + 1 WHERE ativo = 1"
         )
+
+        // Verificar se o orcamento pode ser concluido
+        if (origem === "orcamento" && origem_numero) {
+          await verificarEConcluirOrcamento(connection, origem_numero)
+        }
 
         return NextResponse.json({
           success: true,
