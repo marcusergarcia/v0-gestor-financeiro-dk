@@ -92,6 +92,27 @@ export async function POST(request: NextRequest) {
     const ambiente = config.ambiente || 2
     console.log("[v0] NF-e: Numero:", numeroNFe, "Serie:", serie, "Ambiente:", ambiente)
 
+    // Gerar data de emissao no fuso horario de Sao Paulo (UTC-3)
+    // A Vercel roda em UTC, entao new Date().toISOString() pode retornar o dia seguinte
+    // quando em SP ainda e o dia anterior (ex: 22h SP = 01h UTC do dia seguinte).
+    // A SEFAZ pode rejeitar datas com fuso errado ou dia incorreto na chave de acesso.
+    const agora = new Date()
+    const spFormatter = new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    })
+    const spParts = spFormatter.formatToParts(agora)
+    const getPart = (type: string) => spParts.find((p) => p.type === type)?.value || ""
+    const dataEmissaoSP = `${getPart("year")}-${getPart("month")}-${getPart("day")}`
+    const dhEmiSP = `${dataEmissaoSP}T${getPart("hour")}:${getPart("minute")}:${getPart("second")}-03:00`
+    console.log("[v0] NF-e: Data emissao SP:", dataEmissaoSP, "dhEmi:", dhEmiSP, "| UTC:", agora.toISOString())
+
     // Montar emitente a partir da config
     const emitente: DadosEmitente = {
       cnpj: config.cnpj,
@@ -99,6 +120,7 @@ export async function POST(request: NextRequest) {
       nomeFantasia: config.nome_fantasia || undefined,
       inscricaoEstadual: config.inscricao_estadual,
       crt: config.crt || 1,
+      telefone: config.telefone || undefined,
       endereco: {
         logradouro: config.endereco || "",
         numero: config.numero_endereco || "S/N",
@@ -160,6 +182,8 @@ export async function POST(request: NextRequest) {
       numeroNF: numeroNFe,
       naturezaOperacao: natureza_operacao || config.natureza_operacao || "Venda",
       tipoAmbiente: ambiente,
+      dataEmissaoSP,
+      dhEmiSP,
     }
 
     // Extrair certificado PEM
