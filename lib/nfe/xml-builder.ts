@@ -345,8 +345,6 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<CSOSN>102</CSOSN>` // 102=Tributada sem permissao de credito
     xml += `</ICMSSN102>`
     xml += `</ICMS>`
-    // IPI omitido para Simples Nacional (CRT=1) com CSOSN 102
-    // A SEFAZ nao exige IPI para operacoes do Simples Nacional
     xml += `<PIS>`
     xml += `<PISNT>`
     xml += `<CST>07</CST>` // 07=Operacao Isenta da Contribuicao (Simples Nacional)
@@ -357,6 +355,13 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<CST>07</CST>` // 07=Operacao Isenta da Contribuicao (Simples Nacional)
     xml += `</COFINSNT>`
     xml += `</COFINS>`
+    // IPI obrigatorio conforme XML autorizado (Contabilizei NF-e 155)
+    xml += `<IPI>`
+    xml += `<cEnq>999</cEnq>` // 999=Tributacao normal (outros)
+    xml += `<IPINT>`
+    xml += `<CST>53</CST>` // 53=Saida nao tributada
+    xml += `</IPINT>`
+    xml += `</IPI>`
     xml += `</imposto>`
 
     xml += `</det>`
@@ -368,7 +373,9 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<vBC>0.00</vBC>`
   xml += `<vICMS>0.00</vICMS>`
   xml += `<vICMSDeson>0.00</vICMSDeson>`
-  // vFCPUFDest, vICMSUFDest, vICMSUFRemet omitidos (opcionais, operacao interna sem DIFAL)
+  xml += `<vFCPUFDest>0.00</vFCPUFDest>`
+  xml += `<vICMSUFDest>0.00</vICMSUFDest>`
+  xml += `<vICMSUFRemet>0.00</vICMSUFRemet>`
   xml += `<vFCP>0.00</vFCP>`
   xml += `<vBCST>0.00</vBCST>`
   xml += `<vST>0.00</vST>`
@@ -406,11 +413,14 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `</pag>`
 
   // === infAdic - Informacoes adicionais ===
-  if (dados.informacoesAdicionais) {
-    xml += `<infAdic>`
-    xml += `<infCpl>${escapeXml(dados.informacoesAdicionais, 5000)}</infCpl>`
-    xml += `</infAdic>`
-  }
+  // Mensagem padrao obrigatoria para Simples Nacional (conforme XML autorizado)
+  const msgSN = "Documento emitido por ME ou EPP optante pelo Simples Nacional."
+  const infCplTexto = dados.informacoesAdicionais
+    ? `${dados.informacoesAdicionais} | ${msgSN}`
+    : msgSN
+  xml += `<infAdic>`
+  xml += `<infCpl>${escapeXml(infCplTexto, 5000)}</infCpl>`
+  xml += `</infAdic>`
 
   xml += `</infNFe>`
   xml += `</NFe>`
