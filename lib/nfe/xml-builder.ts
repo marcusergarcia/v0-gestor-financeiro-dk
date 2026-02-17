@@ -254,7 +254,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
 
   // === emit - Emitente ===
   xml += `<emit>`
-  xml += `<CNPJ>${dados.emitente.cnpj.replace(/\D/g, "")}</CNPJ>`
+  xml += `<CNPJ>${dados.emitente.cnpj.replace(/\D/g, "").padStart(14, "0")}</CNPJ>`
   xml += `<xNome>${escapeXml(dados.emitente.razaoSocial)}</xNome>`
   if (dados.emitente.nomeFantasia) {
     xml += `<xFant>${escapeXml(dados.emitente.nomeFantasia)}</xFant>`
@@ -269,11 +269,14 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<cMun>${dados.emitente.endereco.codigoMunicipio}</cMun>`
   xml += `<xMun>${escapeXml(dados.emitente.endereco.municipio)}</xMun>`
   xml += `<UF>${dados.emitente.endereco.uf}</UF>`
-  xml += `<CEP>${dados.emitente.endereco.cep.replace(/\D/g, "")}</CEP>`
+  xml += `<CEP>${dados.emitente.endereco.cep.replace(/\D/g, "").padStart(8, "0")}</CEP>`
   xml += `<cPais>1058</cPais>`
   xml += `<xPais>BRASIL</xPais>`
   if (dados.emitente.telefone) {
-    xml += `<fone>${dados.emitente.telefone.replace(/\D/g, "")}</fone>`
+    const foneDigits = dados.emitente.telefone.replace(/\D/g, "")
+    if (foneDigits.length >= 6 && foneDigits.length <= 14) {
+      xml += `<fone>${foneDigits}</fone>`
+    }
   }
   xml += `</enderEmit>`
   xml += `<IE>${dados.emitente.inscricaoEstadual.replace(/\D/g, "")}</IE>`
@@ -283,9 +286,9 @@ export function gerarXmlNFe(dados: DadosNFe): {
   // === dest - Destinatario ===
   xml += `<dest>`
   if (dados.destinatario.tipo === "PJ") {
-    xml += `<CNPJ>${dados.destinatario.cpfCnpj.replace(/\D/g, "")}</CNPJ>`
+    xml += `<CNPJ>${dados.destinatario.cpfCnpj.replace(/\D/g, "").padStart(14, "0")}</CNPJ>`
   } else {
-    xml += `<CPF>${dados.destinatario.cpfCnpj.replace(/\D/g, "")}</CPF>`
+    xml += `<CPF>${dados.destinatario.cpfCnpj.replace(/\D/g, "").padStart(11, "0")}</CPF>`
   }
   xml += `<xNome>${escapeXml(dados.destinatario.razaoSocial)}</xNome>`
   if (dados.destinatario.endereco) {
@@ -299,11 +302,14 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<cMun>${dados.destinatario.endereco.codigoMunicipio}</cMun>`
     xml += `<xMun>${escapeXml(dados.destinatario.endereco.municipio)}</xMun>`
     xml += `<UF>${dados.destinatario.endereco.uf}</UF>`
-    xml += `<CEP>${dados.destinatario.endereco.cep.replace(/\D/g, "")}</CEP>`
+    xml += `<CEP>${dados.destinatario.endereco.cep.replace(/\D/g, "").padStart(8, "0")}</CEP>`
     xml += `<cPais>1058</cPais>`
     xml += `<xPais>BRASIL</xPais>`
     if (dados.destinatario.telefone) {
-      xml += `<fone>${dados.destinatario.telefone.replace(/\D/g, "")}</fone>`
+      const foneDigits = dados.destinatario.telefone.replace(/\D/g, "")
+      if (foneDigits.length >= 6 && foneDigits.length <= 14) {
+        xml += `<fone>${foneDigits}</fone>`
+      }
     }
     xml += `</enderDest>`
   }
@@ -325,7 +331,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<cProd>${escapeXml(item.codigoProduto)}</cProd>`
     xml += `<cEAN>${ean}</cEAN>`
     xml += `<xProd>${escapeXml(item.descricao)}</xProd>`
-    xml += `<NCM>${item.ncm.replace(/\D/g, "")}</NCM>`
+    xml += `<NCM>${item.ncm.replace(/\D/g, "").padStart(8, "0")}</NCM>`
     xml += `<CFOP>${item.cfop}</CFOP>`
     xml += `<uCom>${escapeXml(item.unidade)}</uCom>`
     xml += `<qCom>${Number(item.quantidade).toFixed(4)}</qCom>`
@@ -355,12 +361,12 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `</IPI>`
     xml += `<PIS>`
     xml += `<PISNT>`
-    xml += `<CST>49</CST>` // 49=Outras operacoes de saida (Simples Nacional)
+    xml += `<CST>07</CST>` // 07=Operacao Isenta da Contribuicao (Simples Nacional)
     xml += `</PISNT>`
     xml += `</PIS>`
     xml += `<COFINS>`
     xml += `<COFINSNT>`
-    xml += `<CST>49</CST>` // 49=Outras operacoes de saida (Simples Nacional)
+    xml += `<CST>07</CST>` // 07=Operacao Isenta da Contribuicao (Simples Nacional)
     xml += `</COFINSNT>`
     xml += `</COFINS>`
     xml += `</imposto>`
@@ -467,7 +473,7 @@ export function gerarXmlCancelamento(dados: {
   xml += `<infEvento Id="${idEvento}">`
   xml += `<cOrgao>35</cOrgao>`
   xml += `<tpAmb>${dados.tipoAmbiente}</tpAmb>`
-  xml += `<CNPJ>${dados.cnpj.replace(/\D/g, "")}</CNPJ>`
+  xml += `<CNPJ>${dados.cnpj.replace(/\D/g, "").padStart(14, "0")}</CNPJ>`
   xml += `<chNFe>${dados.chaveAcesso}</chNFe>`
   xml += `<dhEvento>${dhEvento}</dhEvento>`
   xml += `<tpEvento>110111</tpEvento>`
