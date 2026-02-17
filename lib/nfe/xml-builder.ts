@@ -270,14 +270,8 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<xMun>${escapeXml(dados.emitente.endereco.municipio, 60)}</xMun>`
   xml += `<UF>${dados.emitente.endereco.uf}</UF>`
   xml += `<CEP>${dados.emitente.endereco.cep.replace(/\D/g, "").padStart(8, "0")}</CEP>`
-  xml += `<cPais>1058</cPais>`
-  xml += `<xPais>BRASIL</xPais>`
-  if (dados.emitente.telefone) {
-    const foneDigits = dados.emitente.telefone.replace(/\D/g, "")
-    if (foneDigits.length >= 6 && foneDigits.length <= 14) {
-      xml += `<fone>${foneDigits}</fone>`
-    }
-  }
+  // cPais, xPais, fone REMOVIDOS: XML autorizado (Contabilizei) nao inclui esses campos
+  // A SEFAZ SP (PL_008i2) rejeita com erro 225 quando presentes
   xml += `</enderEmit>`
   xml += `<IE>${dados.emitente.inscricaoEstadual.replace(/\D/g, "")}</IE>`
   xml += `<CRT>${dados.emitente.crt}</CRT>`
@@ -303,14 +297,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<xMun>${escapeXml(dados.destinatario.endereco.municipio, 60)}</xMun>`
     xml += `<UF>${dados.destinatario.endereco.uf}</UF>`
     xml += `<CEP>${dados.destinatario.endereco.cep.replace(/\D/g, "").padStart(8, "0")}</CEP>`
-    xml += `<cPais>1058</cPais>`
-    xml += `<xPais>BRASIL</xPais>`
-    if (dados.destinatario.telefone) {
-      const foneDigits = dados.destinatario.telefone.replace(/\D/g, "")
-      if (foneDigits.length >= 6 && foneDigits.length <= 14) {
-        xml += `<fone>${foneDigits}</fone>`
-      }
-    }
+    // cPais, xPais, fone REMOVIDOS: XML autorizado nao inclui esses campos
     xml += `</enderDest>`
   }
   xml += `<indIEDest>${dados.destinatario.indicadorIE}</indIEDest>`
