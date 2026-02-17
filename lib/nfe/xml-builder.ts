@@ -189,14 +189,19 @@ export function gerarXmlNFe(dados: DadosNFe): {
 
   const idNFe = `NFe${chave}`
 
-  // Calcular totais
-  const vProd = dados.itens.reduce((acc, item) => acc + item.valorTotal, 0)
-  const vNF = vProd // Simples Nacional sem outros impostos
+  // Calcular totais - SEFAZ valida que vProd total = soma dos vProd de cada item
+  // Cada vProd de item deve ser arredondado para 2 casas antes de somar
+  const vProd = dados.itens.reduce((acc, item) => {
+    const vProdItem = Math.round(item.valorTotal * 100) / 100
+    return acc + vProdItem
+  }, 0)
+  const vNF = Math.round(vProd * 100) / 100 // Simples Nacional sem outros impostos
 
   // Calcular valor aproximado dos tributos (IBPT) - estimativa
   const vTotTrib = dados.itens.reduce((acc, item) => {
     // Estimativa de carga tributaria media para materiais: ~31.45%
-    return acc + item.valorTotal * 0.3145
+    const vProdItem = Math.round(item.valorTotal * 100) / 100
+    return acc + vProdItem * 0.3145
   }, 0)
 
   let xml = ""
@@ -246,6 +251,8 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<xMun>${escapeXml(dados.emitente.endereco.municipio)}</xMun>`
   xml += `<UF>${dados.emitente.endereco.uf}</UF>`
   xml += `<CEP>${dados.emitente.endereco.cep.replace(/\D/g, "")}</CEP>`
+  xml += `<cPais>1058</cPais>`
+  xml += `<xPais>BRASIL</xPais>`
   xml += `</enderEmit>`
   xml += `<IE>${dados.emitente.inscricaoEstadual.replace(/\D/g, "")}</IE>`
   xml += `<CRT>${dados.emitente.crt}</CRT>`
@@ -287,26 +294,30 @@ export function gerarXmlNFe(dados: DadosNFe): {
     xml += `<det nItem="${item.numero}">`
 
     // prod - Dados do produto
+    // SEFAZ exige formatacao numerica estrita:
+    // qCom/qTrib: ate 4 casas decimais
+    // vUnCom/vUnTrib: ate 10 casas decimais (min 2)
+    // vProd: exatamente 2 casas decimais
     xml += `<prod>`
     xml += `<cProd>${escapeXml(item.codigoProduto)}</cProd>`
     xml += `<cEAN>${ean}</cEAN>`
     xml += `<xProd>${escapeXml(item.descricao)}</xProd>`
-    xml += `<NCM>${item.ncm.replace(/\D/g, "")}</NCM>`
+    xml += `<NCM>${item.ncm.replace(/\D/g, "").padEnd(8, "0")}</NCM>`
     xml += `<CFOP>${item.cfop}</CFOP>`
     xml += `<uCom>${escapeXml(item.unidade)}</uCom>`
-    xml += `<qCom>${item.quantidade}</qCom>`
-    xml += `<vUnCom>${item.valorUnitario}</vUnCom>`
-    xml += `<vProd>${item.valorTotal.toFixed(2)}</vProd>`
+    xml += `<qCom>${fmtQtd(item.quantidade)}</qCom>`
+    xml += `<vUnCom>${fmtValUnit(item.valorUnitario)}</vUnCom>`
+    xml += `<vProd>${fmtVal(Math.round(item.valorTotal * 100) / 100)}</vProd>`
     xml += `<cEANTrib>${ean}</cEANTrib>`
     xml += `<uTrib>${escapeXml(item.unidade)}</uTrib>`
-    xml += `<qTrib>${item.quantidade}</qTrib>`
-    xml += `<vUnTrib>${item.valorUnitario}</vUnTrib>`
+    xml += `<qTrib>${fmtQtd(item.quantidade)}</qTrib>`
+    xml += `<vUnTrib>${fmtValUnit(item.valorUnitario)}</vUnTrib>`
     xml += `<indTot>1</indTot>` // 1=Compoe total
     xml += `</prod>`
 
     // imposto - Simples Nacional CSOSN 102
     xml += `<imposto>`
-    xml += `<vTotTrib>${vTotTribItem.toFixed(2)}</vTotTrib>`
+    xml += `<vTotTrib>${fmtVal(vTotTribItem)}</vTotTrib>`
     xml += `<ICMS>`
     xml += `<ICMSSN102>`
     xml += `<orig>0</orig>` // 0=Nacional
@@ -348,7 +359,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<vST>0.00</vST>`
   xml += `<vFCPST>0.00</vFCPST>`
   xml += `<vFCPSTRet>0.00</vFCPSTRet>`
-  xml += `<vProd>${vProd.toFixed(2)}</vProd>`
+  xml += `<vProd>${fmtVal(vProd)}</vProd>`
   xml += `<vFrete>0.00</vFrete>`
   xml += `<vSeg>0.00</vSeg>`
   xml += `<vDesc>0.00</vDesc>`
@@ -358,8 +369,8 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<vPIS>0.00</vPIS>`
   xml += `<vCOFINS>0.00</vCOFINS>`
   xml += `<vOutro>0.00</vOutro>`
-  xml += `<vNF>${vNF.toFixed(2)}</vNF>`
-  xml += `<vTotTrib>${vTotTrib.toFixed(2)}</vTotTrib>`
+  xml += `<vNF>${fmtVal(vNF)}</vNF>`
+  xml += `<vTotTrib>${fmtVal(vTotTrib)}</vTotTrib>`
   xml += `</ICMSTot>`
   xml += `</total>`
 
@@ -373,7 +384,7 @@ export function gerarXmlNFe(dados: DadosNFe): {
   xml += `<detPag>`
   xml += `<indPag>0</indPag>` // 0=A vista
   xml += `<tPag>99</tPag>` // 99=Outros
-  xml += `<vPag>${vNF.toFixed(2)}</vPag>`
+  xml += `<vPag>${fmtVal(vNF)}</vPag>`
   xml += `</detPag>`
   xml += `</pag>`
 
@@ -464,19 +475,51 @@ function escapeXml(str: string): string {
 
 function formatDateTimeISO(date: Date): string {
   // Formato: 2026-02-10T22:23:01-03:00
+  // Forcando timezone de Brasilia (-03:00) para consistencia
   const pad = (n: number) => n.toString().padStart(2, "0")
-  const year = date.getFullYear()
-  const month = pad(date.getMonth() + 1)
-  const day = pad(date.getDate())
-  const hours = pad(date.getHours())
-  const minutes = pad(date.getMinutes())
-  const seconds = pad(date.getSeconds())
 
-  // Timezone offset
-  const tzOffset = -date.getTimezoneOffset()
-  const tzSign = tzOffset >= 0 ? "+" : "-"
-  const tzHours = pad(Math.floor(Math.abs(tzOffset) / 60))
-  const tzMinutes = pad(Math.abs(tzOffset) % 60)
+  // Calcular horario de Brasilia (UTC-3)
+  const utcMs = date.getTime() + date.getTimezoneOffset() * 60000
+  const brasiliaMs = utcMs - 3 * 3600000
+  const brasilia = new Date(brasiliaMs)
 
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${tzSign}${tzHours}:${tzMinutes}`
+  const year = brasilia.getFullYear()
+  const month = pad(brasilia.getMonth() + 1)
+  const day = pad(brasilia.getDate())
+  const hours = pad(brasilia.getHours())
+  const minutes = pad(brasilia.getMinutes())
+  const seconds = pad(brasilia.getSeconds())
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}-03:00`
+}
+
+/**
+ * Formata valor monetario para NF-e (2 casas decimais)
+ * SEFAZ exige formato com ponto decimal e exatamente 2 casas
+ */
+function fmtVal(val: number): string {
+  return val.toFixed(2)
+}
+
+/**
+ * Formata quantidade (4 casas decimais)
+ * SEFAZ permite ate 4 casas para qCom/qTrib
+ */
+function fmtQtd(val: number): string {
+  return val.toFixed(4)
+}
+
+/**
+ * Formata valor unitario (ate 10 casas decimais)
+ * SEFAZ permite ate 10 casas para vUnCom/vUnTrib
+ * Remove zeros desnecessarios no final
+ */
+function fmtValUnit(val: number): string {
+  // Usar ate 10 casas, mas remover zeros no final (minimo 2 casas)
+  const str = val.toFixed(10)
+  // Remove trailing zeros but keep at least 2 decimal places
+  const parts = str.split(".")
+  let decimals = parts[1].replace(/0+$/, "")
+  if (decimals.length < 2) decimals = decimals.padEnd(2, "0")
+  return `${parts[0]}.${decimals}`
 }

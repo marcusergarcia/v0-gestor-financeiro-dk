@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2, Send, AlertCircle, User, Package, DollarSign, Trash2, Search, Plus, Check, ChevronsUpDown } from "lucide-react"
+import { Loader2, Send, AlertCircle, AlertTriangle, User, Package, DollarSign, Trash2, Search, Plus, Check, ChevronsUpDown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, cn } from "@/lib/utils"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
@@ -98,8 +98,21 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
   const [produtoSearchOpen, setProdutoSearchOpen] = useState(false)
   const [produtoSearchValue, setProdutoSearchValue] = useState("")
   const [loadingProdutos, setLoadingProdutos] = useState(false)
+  const [ambiente, setAmbiente] = useState<number>(2) // 1=Producao, 2=Homologacao
 
   const { toast } = useToast()
+
+  const fetchNfeConfig = async () => {
+    try {
+      const response = await fetch("/api/configuracoes/nfe")
+      const result = await response.json()
+      if (result.success && result.data) {
+        setAmbiente(result.data.ambiente || 2)
+      }
+    } catch (error) {
+      console.error("Erro ao carregar config NF-e:", error)
+    }
+  }
 
   const fetchProdutos = async () => {
     try {
@@ -120,6 +133,7 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
     if (open) {
       fetchClientes()
       fetchProdutos()
+      fetchNfeConfig()
       if (dadosOrigem) {
         preencherDadosOrigem()
       }
@@ -325,6 +339,16 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-5 w-5 text-blue-600" />
             Emitir NF-e Material (SEFAZ)
+            {ambiente === 2 && (
+              <Badge variant="outline" className="ml-2 text-amber-700 border-amber-400 bg-amber-50 text-xs font-normal">
+                HOMOLOGACAO
+              </Badge>
+            )}
+            {ambiente === 1 && (
+              <Badge variant="outline" className="ml-2 text-green-700 border-green-400 bg-green-50 text-xs font-normal">
+                PRODUCAO
+              </Badge>
+            )}
           </DialogTitle>
           <DialogDescription>
             {form.origem !== "avulsa" ? (
@@ -340,6 +364,20 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
             )}
           </DialogDescription>
         </DialogHeader>
+
+        {ambiente === 2 && (
+          <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-medium text-amber-800 text-sm">Ambiente de Homologacao (Teste)</p>
+              <p className="text-xs text-amber-700 mt-1">
+                A NF-e sera emitida em ambiente de teste. Notas de homologacao NAO aparecem no portal da SEFAZ
+                (www.nfe.fazenda.gov.br) e nao possuem validade fiscal. Para emitir notas reais, altere o ambiente
+                para Producao em Configuracoes {">"} NF-e Material.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-4">
           {/* Destinatario */}
