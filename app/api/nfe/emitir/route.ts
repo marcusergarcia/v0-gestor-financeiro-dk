@@ -290,9 +290,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Debug: Log do XML assinado e envelope para troubleshooting
-    console.log("[v0] NF-e: XML NFe assinado (primeiros 1000):", xmlAssinado.substring(0, 1000))
+    // Debug: Log do XML COMPLETO para troubleshooting de schema
+    // Dividir em pedacos de 2000 chars pois Vercel pode truncar logs longos
     console.log("[v0] NF-e: XML enviNFe tamanho:", xmlEnviNFe.length, "bytes")
+    const xmlParaLog = xmlEnviNFe
+    const chunkSize = 2000
+    for (let i = 0; i < xmlParaLog.length; i += chunkSize) {
+      const chunk = xmlParaLog.substring(i, i + chunkSize)
+      console.log(`[v0] NF-e XML[${i}-${Math.min(i + chunkSize, xmlParaLog.length)}]:`, chunk)
+    }
 
     // Enviar para a SEFAZ
     console.log("[v0] NF-e: Enviando para SEFAZ SP...")
