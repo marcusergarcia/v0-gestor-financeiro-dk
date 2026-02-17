@@ -166,6 +166,8 @@ export async function enviarSoapSefaz(
 
     console.log("[v0] NF-e SOAP Request para:", serviceUrl)
     console.log("[v0] NF-e SOAP Action:", soapAction)
+    console.log("[v0] NF-e SOAP Envelope tamanho:", soapEnvelope.length, "bytes")
+    console.log("[v0] NF-e SOAP Envelope (primeiros 500):", soapEnvelope.substring(0, 500))
 
     const result = await new Promise<{ body: string; statusCode: number }>((resolve, reject) => {
       const parsedUrl = new URL(serviceUrl)
@@ -197,6 +199,8 @@ export async function enviarSoapSefaz(
 
     const tempoMs = Date.now() - inicio
     console.log("[v0] NF-e SOAP Response status:", result.statusCode, "tempo:", tempoMs, "ms")
+    // Debug: log first 2000 chars of raw response for troubleshooting
+    console.log("[v0] NF-e SOAP Raw Response (truncated):", result.body.substring(0, 2000))
 
     if (result.statusCode < 200 || result.statusCode >= 300) {
       return {
@@ -211,22 +215,56 @@ export async function enviarSoapSefaz(
     // Extrair XML interno do envelope SOAP
     const xmlInterno = extrairXmlInternoSoap(result.body)
 
-    // Verificar status de retorno da SEFAZ
-    const cStatMatch = xmlInterno.match(/<cStat>(\d+)<\/cStat>/)
-    const xMotivoMatch = xmlInterno.match(/<xMotivo>([^<]+)<\/xMotivo>/)
-    const cStat = cStatMatch ? parseInt(cStatMatch[1]) : 0
-    const xMotivo = xMotivoMatch ? xMotivoMatch[1] : ""
+    // O retorno da SEFAZ para autorizacao sincrona (indSinc=1) tem DOIS niveis de cStat:
+    // 1) cStat do LOTE (retEnviNFe): ex 104 = "Lote processado"
+    // 2) cStat da NF-e (protNFe > infProt): ex 100 = "Autorizado" ou codigo de rejeicao
+    //
+    // Para autorizacao, o que importa e o cStat DENTRO de <protNFe><infProt>,
+    // nao o cStat do lote. O lote pode retornar 104 (processado) mas a NF-e pode
+    // ter sido rejeitada dentro do protNFe.
+
+    // Primeiro extrair o cStat do lote (primeiro match)
+    const cStatLoteMatch = xmlInterno.match(/<cStat>(\d+)<\/cStat>/)
+    const cStatLote = cStatLoteMatch ? parseInt(cStatLoteMatch[1]) : 0
+
+    // Tentar extrair o cStat de dentro de <protNFe><infProt> (status real da NF-e)
+    const protNFeMatch = xmlInterno.match(/<protNFe[^>]*>[\s\S]*?<infProt[^>]*>([\s\S]*?)<\/infProt>[\s\S]*?<\/protNFe>/)
+    let cStatNFe = 0
+    let xMotivoNFe = ""
+    let nProtNFe = ""
+    if (protNFeMatch) {
+      const infProtContent = protNFeMatch[1]
+      const cStatNFeMatch = infProtContent.match(/<cStat>(\d+)<\/cStat>/)
+      const xMotivoNFeMatch = infProtContent.match(/<xMotivo>([^<]+)<\/xMotivo>/)
+      const nProtMatch = infProtContent.match(/<nProt>([^<]+)<\/nProt>/)
+      cStatNFe = cStatNFeMatch ? parseInt(cStatNFeMatch[1]) : 0
+      xMotivoNFe = xMotivoNFeMatch ? xMotivoNFeMatch[1] : ""
+      nProtNFe = nProtMatch ? nProtMatch[1] : ""
+    }
+
+    // Se encontramos protNFe, usar o cStat da NF-e; caso contrario, usar o cStat do lote
+    const cStat = cStatNFe > 0 ? cStatNFe : cStatLote
+    const xMotivo = cStatNFe > 0 ? xMotivoNFe : (xmlInterno.match(/<xMotivo>([^<]+)<\/xMotivo>/)?.[1] || "")
 
     // Codigos de sucesso da SEFAZ:
     // 100 = Autorizado o uso da NF-e
-    // 104 = Lote processado (consultar retorno)
+    // 104 = Lote processado (quando sincrono E tem protNFe com 100, ok)
     // 128 = Lote de Evento processado
     // 135 = Evento registrado e vinculado a NF-e
     // 107 = Servico em operacao
-    const codigosSucesso = [100, 104, 107, 128, 135]
-    const temSucesso = codigosSucesso.includes(cStat)
+    const codigosSucessoNFe = [100, 107, 135]
+    const codigosSucessoLote = [104, 128]
 
-    console.log("[v0] NF-e cStat:", cStat, "xMotivo:", xMotivo, "sucesso:", temSucesso)
+    let temSucesso = false
+    if (cStatNFe > 0) {
+      // Temos protNFe: verificar o cStat da NF-e diretamente
+      temSucesso = codigosSucessoNFe.includes(cStatNFe)
+    } else {
+      // Sem protNFe: verificar cStat do lote (104 = processado, pode ser necessario consultar retorno)
+      temSucesso = codigosSucessoNFe.includes(cStatLote) || codigosSucessoLote.includes(cStatLote)
+    }
+
+    console.log("[v0] NF-e cStat LOTE:", cStatLote, "| cStat NF-e (protNFe):", cStatNFe, "xMotivo:", xMotivo, "nProt:", nProtNFe, "sucesso:", temSucesso)
 
     return {
       success: temSucesso,
@@ -289,14 +327,33 @@ export async function enviarSoapSefaz(
 
         if (retryResult.statusCode >= 200 && retryResult.statusCode < 300) {
           const xmlInterno = extrairXmlInternoSoap(retryResult.body)
-          const cStatMatch = xmlInterno.match(/<cStat>(\d+)<\/cStat>/)
-          const xMotivoMatch = xmlInterno.match(/<xMotivo>([^<]+)<\/xMotivo>/)
-          const cStat = cStatMatch ? parseInt(cStatMatch[1]) : 0
-          const xMotivo = xMotivoMatch ? xMotivoMatch[1] : ""
-          const codigosSucesso = [100, 104, 107, 128, 135]
-          const temSucesso = codigosSucesso.includes(cStat)
 
-          console.log("[v0] NF-e Retry cStat:", cStat, "xMotivo:", xMotivo, "sucesso:", temSucesso)
+          // Mesma logica de parsing: extrair cStat do protNFe se disponivel
+          const retryCStatLoteMatch = xmlInterno.match(/<cStat>(\d+)<\/cStat>/)
+          const retryCStatLote = retryCStatLoteMatch ? parseInt(retryCStatLoteMatch[1]) : 0
+
+          const retryProtNFeMatch = xmlInterno.match(/<protNFe[^>]*>[\s\S]*?<infProt[^>]*>([\s\S]*?)<\/infProt>[\s\S]*?<\/protNFe>/)
+          let retryCStatNFe = 0
+          let retryXMotivoNFe = ""
+          if (retryProtNFeMatch) {
+            const infProtContent = retryProtNFeMatch[1]
+            const cStatM = infProtContent.match(/<cStat>(\d+)<\/cStat>/)
+            const xMotivoM = infProtContent.match(/<xMotivo>([^<]+)<\/xMotivo>/)
+            retryCStatNFe = cStatM ? parseInt(cStatM[1]) : 0
+            retryXMotivoNFe = xMotivoM ? xMotivoM[1] : ""
+          }
+
+          const cStat = retryCStatNFe > 0 ? retryCStatNFe : retryCStatLote
+          const xMotivo = retryCStatNFe > 0 ? retryXMotivoNFe : (xmlInterno.match(/<xMotivo>([^<]+)<\/xMotivo>/)?.[1] || "")
+
+          let temSucesso = false
+          if (retryCStatNFe > 0) {
+            temSucesso = [100, 107, 135].includes(retryCStatNFe)
+          } else {
+            temSucesso = [100, 104, 107, 128, 135].includes(retryCStatLote)
+          }
+
+          console.log("[v0] NF-e Retry cStat LOTE:", retryCStatLote, "| cStat NF-e:", retryCStatNFe, "xMotivo:", xMotivo, "sucesso:", temSucesso)
           return {
             success: temSucesso,
             xml: xmlInterno,
