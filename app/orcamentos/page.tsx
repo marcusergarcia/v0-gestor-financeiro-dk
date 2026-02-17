@@ -22,11 +22,13 @@ import {
   Search,
   Filter,
   Wrench,
+  Package,
 } from "lucide-react"
 import Link from "next/link"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
+import { EmitirNfeDialog } from "@/components/nfe/emitir-nfe-dialog"
 
 interface Orcamento {
   id: string
@@ -72,6 +74,9 @@ export default function OrcamentosPage() {
   const [situacaoFilter, setSituacaoFilter] = useState("todos")
   const [nfseDialogOpen, setNfseDialogOpen] = useState(false)
   const [nfseOrcamento, setNfseOrcamento] = useState<Orcamento | null>(null)
+  const [nfeDialogOpen, setNfeDialogOpen] = useState(false)
+  const [nfeOrcamento, setNfeOrcamento] = useState<Orcamento | null>(null)
+  const [nfeItens, setNfeItens] = useState<any[]>([])
   const [valorPorKm, setValorPorKm] = useState(1.5)
   const { toast } = useToast()
 
@@ -223,6 +228,84 @@ export default function OrcamentosPage() {
         console.error("Erro ao atualizar situação:", error)
       }
       setNfseOrcamento(null)
+      fetchOrcamentos()
+    }
+  }
+
+  // Calcular Subtotal Material para um orçamento (valor da NF-e)
+  const calcularSubtotalMaterialOrcamento = (orc: Orcamento): number => {
+    const parcelamentoMaterial = safeNumber(orc.parcelamento_material) || 1
+    if (parcelamentoMaterial === 0) return 0
+
+    const valorMaterial = safeNumber(orc.valor_material)
+    const parcelamentoMdo = safeNumber(orc.parcelamento_mdo) || 1
+    const distancia = safeNumber(orc.distancia_km)
+    const prazo = safeNumber(orc.prazo_dias)
+    const valorBoleto = safeNumber(orc.valor_boleto)
+    const impostoMaterialPerc = safeNumber(orc.imposto_material)
+    const jurosAm = safeNumber(orc.juros_am)
+
+    const valorJuros = ((parcelamentoMdo + parcelamentoMaterial - 1) * jurosAm * valorMaterial) / 100
+    const taxaBoletoMaterial = parcelamentoMaterial * valorBoleto
+    const baseImposto = valorMaterial + valorJuros + taxaBoletoMaterial
+    const impostoMaterialValor = (baseImposto * impostoMaterialPerc) / 100
+    const custoDeslocamentoExtra = parcelamentoMdo === 0 ? (distancia * 2 * safeNumber(valorPorKm) * prazo) : 0
+
+    return valorMaterial + valorJuros + taxaBoletoMaterial + impostoMaterialValor + custoDeslocamentoExtra
+  }
+
+  const handleEmitirNfe = async (orcamento: Orcamento) => {
+    // Buscar itens do orçamento para popular o dialog de NF-e
+    try {
+      const response = await fetch(`/api/orcamentos/${orcamento.numero}`)
+      const result = await response.json()
+
+      if (result.success && result.data.itens) {
+        const valorMaterialBruto = result.data.itens.reduce(
+          (acc: number, item: any) => acc + safeNumber(item.quantidade) * safeNumber(item.valor_unitario),
+          0
+        )
+        const subtotalMaterial = calcularSubtotalMaterialOrcamento(orcamento)
+        const fatorAjuste = valorMaterialBruto > 0 ? subtotalMaterial / valorMaterialBruto : 1
+
+        const itensFormatados = result.data.itens
+          .filter((item: any) => safeNumber(item.valor_unitario) > 0)
+          .map((item: any) => {
+            const valorUnitarioAjustado = safeNumber(item.valor_unitario) * fatorAjuste
+            return {
+              produto_id: Number(item.produto_id),
+              codigo_produto: item.produto_codigo || "",
+              descricao: item.produto_descricao || "",
+              ncm: item.produto_ncm || "00000000",
+              unidade: item.produto_unidade || "UN",
+              quantidade: safeNumber(item.quantidade),
+              valor_unitario: valorUnitarioAjustado,
+              valor_total: safeNumber(item.quantidade) * valorUnitarioAjustado,
+            }
+          })
+
+        setNfeItens(itensFormatados)
+        setNfeOrcamento(orcamento)
+        setNfeDialogOpen(true)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar itens do orçamento:", error)
+      toast({
+        title: "Erro",
+        description: "Erro ao buscar dados do orçamento para NF-e",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleNfeSuccess = async () => {
+    if (nfeOrcamento) {
+      toast({
+        title: "Sucesso",
+        description: "NF-e de material emitida com sucesso!",
+      })
+      setNfeOrcamento(null)
+      setNfeItens([])
       fetchOrcamentos()
     }
   }
@@ -611,9 +694,20 @@ export default function OrcamentosPage() {
                                 variant="outline"
                                 onClick={() => handleEmitirNfse(orcamento)}
                                 className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-transparent h-8 w-8 p-0"
-                                title="Emitir NFS-e"
+                                title="Emitir NFS-e (Servico)"
                               >
                                 <FileCheck className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {orcamento.situacao === "aprovado" && safeNumber(orcamento.valor_material) > 0 && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEmitirNfe(orcamento)}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-8 w-8 p-0"
+                                title="Emitir NF-e (Material)"
+                              >
+                                <Package className="h-4 w-4" />
                               </Button>
                             )}
                             <Button
@@ -676,7 +770,7 @@ export default function OrcamentosPage() {
                       </div>
 
                       {/* Botões de Ação */}
-                      <div className={`grid gap-2 pt-3 border-t-2 border-slate-200 ${orcamento.situacao === "aprovado" ? "grid-cols-4" : "grid-cols-3"}`}>
+                      <div className={`grid gap-2 pt-3 border-t-2 border-slate-200 ${orcamento.situacao === "aprovado" ? "grid-cols-5" : "grid-cols-3"}`}>
                         <Link href={`/orcamentos/${orcamento.numero}`} className="w-full">
                           <Button
                             variant="outline"
@@ -701,8 +795,20 @@ export default function OrcamentosPage() {
                             size="sm"
                             className="w-full h-9 text-xs bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-300 text-emerald-700 font-medium"
                             onClick={() => handleEmitirNfse(orcamento)}
+                            title="NFS-e"
                           >
                             <FileCheck className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {orcamento.situacao === "aprovado" && safeNumber(orcamento.valor_material) > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full h-9 text-xs bg-blue-50 hover:bg-blue-100 border-2 border-blue-300 text-blue-700 font-medium"
+                            onClick={() => handleEmitirNfe(orcamento)}
+                            title="NF-e"
+                          >
+                            <Package className="h-4 w-4" />
                           </Button>
                         )}
                         <Button
@@ -749,6 +855,39 @@ export default function OrcamentosPage() {
             valor: calcularSubtotalMdoOrcamento(nfseOrcamento),
             valor_material: safeNumber(nfseOrcamento.valor_material),
             valor_total_orcamento: safeNumber(nfseOrcamento.valor_total),
+          }}
+        />
+      )}
+
+      {nfeOrcamento && (
+        <EmitirNfeDialog
+          open={nfeDialogOpen}
+          onOpenChange={(open) => {
+            setNfeDialogOpen(open)
+            if (!open) {
+              setNfeOrcamento(null)
+              setNfeItens([])
+            }
+          }}
+          onSuccess={handleNfeSuccess}
+          dadosOrigem={{
+            origem: "orcamento",
+            origem_numero: nfeOrcamento.numero,
+            cliente_id: Number(nfeOrcamento.cliente_id),
+            cliente_nome: nfeOrcamento.cliente_nome,
+            cliente_cnpj: nfeOrcamento.cliente_cnpj,
+            cliente_cpf: nfeOrcamento.cliente_cpf,
+            cliente_email: nfeOrcamento.cliente_email,
+            cliente_telefone: nfeOrcamento.cliente_telefone,
+            cliente_endereco: nfeOrcamento.cliente_endereco,
+            cliente_numero: "",
+            cliente_complemento: "",
+            cliente_bairro: nfeOrcamento.cliente_bairro,
+            cliente_cidade: nfeOrcamento.cliente_cidade,
+            cliente_uf: nfeOrcamento.cliente_estado,
+            cliente_cep: nfeOrcamento.cliente_cep,
+            itens: nfeItens,
+            valor_material: calcularSubtotalMaterialOrcamento(nfeOrcamento),
           }}
         />
       )}
