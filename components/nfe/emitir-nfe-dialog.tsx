@@ -17,9 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2, Send, AlertCircle, User, Package, DollarSign, Trash2 } from "lucide-react"
+import { Loader2, Send, AlertCircle, User, Package, DollarSign, Trash2, Search, Plus, Check, ChevronsUpDown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, cn } from "@/lib/utils"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 interface ItemNFe {
   produto_id?: number
@@ -91,11 +93,33 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
 
   const [itens, setItens] = useState<ItemNFe[]>(dadosOrigem?.itens || [])
 
+  // Produto search state
+  const [produtos, setProdutos] = useState<any[]>([])
+  const [produtoSearchOpen, setProdutoSearchOpen] = useState(false)
+  const [produtoSearchValue, setProdutoSearchValue] = useState("")
+  const [loadingProdutos, setLoadingProdutos] = useState(false)
+
   const { toast } = useToast()
+
+  const fetchProdutos = async () => {
+    try {
+      setLoadingProdutos(true)
+      const response = await fetch("/api/produtos?limit=1000")
+      const result = await response.json()
+      if (result.success) {
+        setProdutos(result.data || [])
+      }
+    } catch (error) {
+      console.error("Erro ao carregar produtos:", error)
+    } finally {
+      setLoadingProdutos(false)
+    }
+  }
 
   useEffect(() => {
     if (open) {
       fetchClientes()
+      fetchProdutos()
       if (dadosOrigem) {
         preencherDadosOrigem()
       }
@@ -161,7 +185,23 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
     }
   }
 
-  const adicionarItem = () => {
+  const adicionarProduto = (produto: any) => {
+    const valorUnit = Number(produto.valor_unitario) || 0
+    setItens((prev) => [...prev, {
+      produto_id: Number(produto.id),
+      codigo_produto: produto.codigo || "",
+      descricao: produto.descricao || "",
+      ncm: produto.ncm || "00000000",
+      unidade: produto.unidade || "UN",
+      quantidade: 1,
+      valor_unitario: valorUnit,
+      valor_total: valorUnit,
+    }])
+    setProdutoSearchOpen(false)
+    setProdutoSearchValue("")
+  }
+
+  const adicionarItemManual = () => {
     setItens((prev) => [...prev, {
       codigo_produto: "",
       descricao: "",
@@ -172,6 +212,12 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
       valor_total: 0,
     }])
   }
+
+  const filteredProdutos = produtos.filter(
+    (p) =>
+      p.descricao?.toLowerCase().includes(produtoSearchValue.toLowerCase()) ||
+      p.codigo?.toLowerCase().includes(produtoSearchValue.toLowerCase()),
+  )
 
   const atualizarItem = (index: number, field: keyof ItemNFe, value: any) => {
     setItens((prev) => {
@@ -207,7 +253,7 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
       return
     }
     if (itens.length === 0) {
-      const msg = "Adicione pelo menos um item/produto"
+      const msg = "Adicione pelo menos um produto usando a busca na tabela"
       setSubmitError(msg)
       toast({ title: "Campo obrigatorio", description: msg, variant: "destructive" })
       return
@@ -467,110 +513,173 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
                 <Package className="h-4 w-4 text-blue-600" />
                 Produtos / Itens ({itens.length})
               </h3>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={adicionarItem}
-                className="text-xs"
-              >
-                + Adicionar Item
-              </Button>
             </div>
 
-            {itens.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground text-sm border rounded-md">
-                Nenhum item adicionado. Clique em "Adicionar Item" ou os itens serao carregados do orcamento.
-              </div>
-            ) : (
-              <div className="border rounded-md overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[60px]">#</TableHead>
-                      <TableHead className="w-[100px]">Codigo</TableHead>
-                      <TableHead>Descricao</TableHead>
-                      <TableHead className="w-[100px]">NCM</TableHead>
-                      <TableHead className="w-[60px]">Unid.</TableHead>
-                      <TableHead className="w-[70px]">Qtd.</TableHead>
-                      <TableHead className="w-[110px]">Vl. Unit.</TableHead>
-                      <TableHead className="w-[110px]">Vl. Total</TableHead>
-                      <TableHead className="w-[40px]"></TableHead>
+            <div className="border rounded-md overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[60px]">#</TableHead>
+                    <TableHead className="w-[100px]">Codigo</TableHead>
+                    <TableHead>Descricao</TableHead>
+                    <TableHead className="w-[100px]">NCM</TableHead>
+                    <TableHead className="w-[60px]">Unid.</TableHead>
+                    <TableHead className="w-[70px]">Qtd.</TableHead>
+                    <TableHead className="w-[110px]">Vl. Unit.</TableHead>
+                    <TableHead className="w-[110px]">Vl. Total</TableHead>
+                    <TableHead className="w-[40px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {itens.map((item, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                      <TableCell>
+                        <Input
+                          value={item.codigo_produto}
+                          onChange={(e) => atualizarItem(index, "codigo_produto", e.target.value)}
+                          className="h-8 text-xs"
+                          placeholder="COD"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={item.descricao}
+                          onChange={(e) => atualizarItem(index, "descricao", e.target.value)}
+                          className="h-8 text-xs"
+                          placeholder="Descricao do produto"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={item.ncm}
+                          onChange={(e) => atualizarItem(index, "ncm", e.target.value)}
+                          className="h-8 text-xs"
+                          placeholder="NCM"
+                          maxLength={8}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={item.unidade}
+                          onChange={(e) => atualizarItem(index, "unidade", e.target.value)}
+                          className="h-8 text-xs w-14"
+                          placeholder="UN"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={item.quantidade}
+                          onChange={(e) => atualizarItem(index, "quantidade", Number(e.target.value))}
+                          className="h-8 text-xs w-16"
+                          min={1}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.valor_unitario}
+                          onChange={(e) => atualizarItem(index, "valor_unitario", Number(e.target.value))}
+                          className="h-8 text-xs"
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium text-xs">
+                        {formatCurrency(item.valor_total)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          onClick={() => removerItem(index)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {itens.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                        <TableCell>
-                          <Input
-                            value={item.codigo_produto}
-                            onChange={(e) => atualizarItem(index, "codigo_produto", e.target.value)}
-                            className="h-8 text-xs"
-                            placeholder="COD"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={item.descricao}
-                            onChange={(e) => atualizarItem(index, "descricao", e.target.value)}
-                            className="h-8 text-xs"
-                            placeholder="Descricao do produto"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={item.ncm}
-                            onChange={(e) => atualizarItem(index, "ncm", e.target.value)}
-                            className="h-8 text-xs"
-                            placeholder="NCM"
-                            maxLength={8}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={item.unidade}
-                            onChange={(e) => atualizarItem(index, "unidade", e.target.value)}
-                            className="h-8 text-xs w-14"
-                            placeholder="UN"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={item.quantidade}
-                            onChange={(e) => atualizarItem(index, "quantidade", Number(e.target.value))}
-                            className="h-8 text-xs w-16"
-                            min={1}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={item.valor_unitario}
-                            onChange={(e) => atualizarItem(index, "valor_unitario", Number(e.target.value))}
-                            className="h-8 text-xs"
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium text-xs">
-                          {formatCurrency(item.valor_total)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                            onClick={() => removerItem(index)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                  ))}
+
+                  {/* Linha de adicionar produto */}
+                  <TableRow className="bg-muted/30 hover:bg-muted/50">
+                    <TableCell colSpan={9} className="p-2">
+                      <div className="flex items-center gap-2">
+                        <Popover open={produtoSearchOpen} onOpenChange={(o) => { setProdutoSearchOpen(o); if (o && produtos.length === 0) fetchProdutos() }}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={produtoSearchOpen}
+                              className="flex-1 justify-start gap-2 h-9 bg-background text-sm font-normal text-muted-foreground hover:text-foreground"
+                            >
+                              <Search className="h-4 w-4 shrink-0" />
+                              Buscar e adicionar produto...
+                              <ChevronsUpDown className="ml-auto h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[500px] p-0" align="start">
+                            <Command>
+                              <CommandInput
+                                placeholder="Digite o nome ou codigo do produto..."
+                                value={produtoSearchValue}
+                                onValueChange={setProdutoSearchValue}
+                                className="h-10"
+                              />
+                              <CommandList className="max-h-[250px]">
+                                {loadingProdutos ? (
+                                  <div className="flex items-center justify-center p-4 text-sm text-muted-foreground gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Carregando produtos...
+                                  </div>
+                                ) : (
+                                  <>
+                                    <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                                    <CommandGroup heading="Produtos">
+                                      {filteredProdutos.slice(0, 50).map((produto) => (
+                                        <CommandItem
+                                          key={produto.id}
+                                          value={`${produto.codigo} ${produto.descricao}`}
+                                          onSelect={() => adicionarProduto(produto)}
+                                          className="flex items-center gap-3 p-2.5 cursor-pointer"
+                                        >
+                                          <Plus className="h-4 w-4 text-blue-600 shrink-0" />
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                              <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                                                {produto.codigo}
+                                              </Badge>
+                                              <span className="text-sm font-medium truncate">{produto.descricao}</span>
+                                            </div>
+                                            <div className="text-[11px] text-muted-foreground mt-0.5">
+                                              {produto.unidade} | NCM: {produto.ncm || "N/A"} | R$ {Number(produto.valor_unitario || 0).toFixed(2)}
+                                            </div>
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </>
+                                )}
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={adicionarItemManual}
+                          className="h-9 px-3 text-xs text-muted-foreground hover:text-foreground shrink-0"
+                          title="Adicionar item manualmente"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Manual
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
 
             {itens.length > 0 && (
               <div className="flex justify-end mt-2">
