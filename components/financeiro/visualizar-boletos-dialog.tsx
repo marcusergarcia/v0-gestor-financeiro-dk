@@ -19,7 +19,6 @@ import {
   Printer,
   Download,
   CreditCard,
-  ExternalLink,
 } from "lucide-react"
 
 interface Boleto {
@@ -194,7 +193,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
     window.open(url, "_blank")
   }
 
-  const imprimirTodosBoletos = () => {
+  const imprimirTodosBoletos = async () => {
     setPrintingAll(true)
 
     const boletosComPDF = boletos.filter((b) => b.asaas_bankslip_url || b.asaas_invoice_url)
@@ -205,291 +204,32 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
       return
     }
 
-    // Open a single window with all PDFs rendered in iframes
-    const printWindow = window.open("", "_blank")
-    if (!printWindow) {
-      alert("Popup bloqueado pelo navegador. Permita popups para este site.")
-      setPrintingAll(false)
-      return
-    }
+    try {
+      // Collect all PDF URLs
+      const urls = boletosComPDF.map((b) => b.asaas_bankslip_url || b.asaas_invoice_url)
 
-    // Helper to format date safely without timezone issues
-    const formatDateSafe = (dateStr: string | null | undefined): string => {
-      if (!dateStr) return "-"
-      try {
-        const dateOnly = dateStr.split("T")[0].trim()
-        const match = dateOnly.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-        if (match) {
-          return `${match[3]}/${match[2]}/${match[1]}`
-        }
-        return "-"
-      } catch {
-        return "-"
-      }
-    }
-
-    const totalBoletos = boletosComPDF.length
-
-    // Build data array for sequential loading
-    const boletosData = boletosComPDF.map((boleto) => ({
-      url: boleto.asaas_bankslip_url || boleto.asaas_invoice_url || "",
-      parcela: boleto.numero_parcela,
-      total: boleto.total_parcelas,
-      numero: boleto.numero,
-      vencimento: formatDateSafe(boleto.data_vencimento),
-    }))
-
-    const iframesHtml = boletosComPDF
-      .map((boleto, index) => {
-        const isLast = index === boletosComPDF.length - 1
-        return `
-          <div class="boleto-page" style="${!isLast ? "page-break-after: always;" : ""}">
-            <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-              <div style="background: #f1f5f9; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: 600; color: #334155;">
-                  Parcela ${boleto.numero_parcela}/${boleto.total_parcelas} - ${boleto.numero}
-                </span>
-                <span style="color: #64748b; font-size: 14px;">
-                  Vencimento: ${formatDateSafe(boleto.data_vencimento)}
-                </span>
-              </div>
-              <div class="iframe-container" id="container-${index}">
-                <div class="iframe-loading" id="loading-${index}">
-                  <div class="spinner"></div>
-                  <span>Carregando parcela ${boleto.numero_parcela}/${boleto.total_parcelas}...</span>
-                </div>
-                <iframe 
-                  id="iframe-${index}"
-                  style="width: 100%; height: calc(100vh - 160px); min-height: 800px; border: none; display: block;"
-                  title="Boleto ${boleto.numero}"
-                  class="boleto-iframe"
-                ></iframe>
-              </div>
-            </div>
-          </div>
-        `
+      // Call server-side API to merge all PDFs into one
+      const response = await fetch("/api/boletos/merge-pdfs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
       })
-      .join("")
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="pt-BR">
-      <head>
-        <meta charset="UTF-8">
-        <title>Boletos - Nota ${numeroBaseLimpo}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            background: #f8fafc; 
-            padding: 24px;
-            color: #1e293b;
-          }
-          .header { 
-            text-align: center; 
-            margin-bottom: 24px; 
-            padding: 20px;
-            background: linear-gradient(135deg, #2563eb, #7c3aed);
-            color: white;
-            border-radius: 12px;
-          }
-          .header h1 { font-size: 22px; margin-bottom: 4px; }
-          .header p { font-size: 14px; opacity: 0.9; }
-          .actions {
-            text-align: center;
-            margin-bottom: 24px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            background: #f8fafc;
-            padding: 16px 0;
-          }
-          .print-btn {
-            background: #94a3b8;
-            color: white;
-            border: none;
-            padding: 12px 32px;
-            font-size: 15px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: not-allowed;
-            transition: all 0.3s;
-          }
-          .print-btn.ready {
-            background: linear-gradient(135deg, #2563eb, #7c3aed);
-            cursor: pointer;
-          }
-          .print-btn.ready:hover { opacity: 0.9; }
-          .loading-info {
-            margin-top: 8px;
-            font-size: 13px;
-            color: #64748b;
-          }
-          .progress-bar-container {
-            width: 300px;
-            height: 6px;
-            background: #e2e8f0;
-            border-radius: 3px;
-            margin: 12px auto 0;
-            overflow: hidden;
-          }
-          .progress-bar-fill {
-            height: 100%;
-            background: linear-gradient(135deg, #2563eb, #7c3aed);
-            border-radius: 3px;
-            transition: width 0.4s ease;
-            width: 0%;
-          }
-          .iframe-container { position: relative; }
-          .iframe-loading {
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            padding: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            background: #f8fafc;
-            color: #64748b;
-            font-size: 14px;
-            z-index: 1;
-          }
-          .iframe-loading.hidden { display: none; }
-          .spinner {
-            width: 20px; height: 20px;
-            border: 3px solid #e2e8f0;
-            border-top-color: #2563eb;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-          }
-          @keyframes spin { to { transform: rotate(360deg); } }
-          .boleto-page { margin-bottom: 24px; }
-          @media print {
-            .actions { display: none; position: static; }
-            .header { display: none; }
-            .iframe-loading { display: none !important; }
-            body { padding: 0; background: white; }
-            .boleto-page { 
-              margin-bottom: 0; 
-              break-after: page;
-              page-break-after: always;
-            }
-            .boleto-page:last-child {
-              break-after: auto;
-              page-break-after: auto;
-            }
-            iframe {
-              height: 100vh !important;
-              min-height: 100vh !important;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>Boletos - Nota ${numeroBaseLimpo}</h1>
-          <p>${clienteNome ? `Cliente: ${clienteNome} | ` : ""}${totalBoletos} parcela${totalBoletos > 1 ? "s" : ""}</p>
-        </div>
-        <div class="actions">
-          <button id="printBtn" class="print-btn" disabled onclick="handlePrint()">
-            Carregando 0 de ${totalBoletos} boletos...
-          </button>
-          <div class="loading-info" id="loadingInfo">
-            Carregando parcelas sequencialmente para garantir que todas aparecam...
-          </div>
-          <div class="progress-bar-container" id="progressContainer">
-            <div class="progress-bar-fill" id="progressBar"></div>
-          </div>
-        </div>
-        ${iframesHtml}
-        <script>
-          var urls = ${JSON.stringify(boletosData.map((b) => b.url))};
-          var total = urls.length;
-          var loaded = 0;
-          var ready = false;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        throw new Error(errorData?.error || "Erro ao gerar PDF combinado")
+      }
 
-          function updateProgress() {
-            var pct = Math.round((loaded / total) * 100);
-            document.getElementById('progressBar').style.width = pct + '%';
-            document.getElementById('printBtn').textContent = 
-              'Carregando ' + loaded + ' de ' + total + ' boletos...';
-          }
-
-          function hideLoading(index) {
-            var loadingEl = document.getElementById('loading-' + index);
-            if (loadingEl) loadingEl.className = 'iframe-loading hidden';
-          }
-
-          // Load all iframes at once (set all src), then track via onload
-          // This is faster than sequential because the browser can parallelize requests
-          function loadAllIframes() {
-            for (var i = 0; i < total; i++) {
-              (function(index) {
-                var iframe = document.getElementById('iframe-' + index);
-                if (!iframe) { 
-                  loaded++;
-                  hideLoading(index);
-                  updateProgress();
-                  return; 
-                }
-
-                iframe.onload = function() {
-                  loaded++;
-                  hideLoading(index);
-                  updateProgress();
-                  checkAllDone();
-                };
-
-                // Set src to start loading
-                iframe.src = urls[index];
-              })(i);
-            }
-
-            // Safety fallback: enable print after a generous timeout
-            // regardless of onload events (cross-origin PDFs may not fire onload)
-            var fallbackMs = Math.max(total * 5000, 30000); // 5s per boleto, min 30s
-            setTimeout(function() {
-              if (!ready) {
-                // Force progress to show what actually loaded
-                document.getElementById('progressBar').style.width = '100%';
-                enablePrint();
-              }
-            }, fallbackMs);
-          }
-
-          function checkAllDone() {
-            if (loaded >= total && !ready) {
-              // Add a 2s buffer after all onload fires to ensure rendering is complete
-              setTimeout(function() { enablePrint(); }, 2000);
-            }
-          }
-
-          function enablePrint() {
-            if (ready) return;
-            ready = true;
-            var btn = document.getElementById('printBtn');
-            btn.disabled = false;
-            btn.className = 'print-btn ready';
-            btn.textContent = 'Imprimir Todos (' + total + ' parcelas)';
-            document.getElementById('loadingInfo').textContent = 'Todos os boletos carregados! Clique para imprimir.';
-            document.getElementById('loadingInfo').style.color = '#16a34a';
-            document.getElementById('progressBar').style.width = '100%';
-            document.getElementById('progressBar').style.background = '#16a34a';
-          }
-
-          function handlePrint() {
-            if (ready) { window.print(); }
-          }
-
-          // Start loading all iframes
-          loadAllIframes();
-        </script>
-      </body>
-      </html>
-    `)
-    printWindow.document.close()
-
-    setPrintingAll(false)
+      // Get the merged PDF as a blob and open in new tab
+      const blob = await response.blob()
+      const pdfUrl = URL.createObjectURL(blob)
+      window.open(pdfUrl, "_blank")
+    } catch (error) {
+      console.error("Erro ao combinar PDFs:", error)
+      alert("Erro ao combinar os boletos. Tente novamente.")
+    } finally {
+      setPrintingAll(false)
+    }
   }
 
   return (
@@ -585,8 +325,8 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                     </>
                   ) : (
                     <>
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Visualizar Todas as Parcelas
+                      <Printer className="h-4 w-4 mr-2" />
+                      Visualizar / Imprimir Todos
                     </>
                   )}
                 </Button>
