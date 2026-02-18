@@ -250,7 +250,6 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                 style="width: 100%; height: calc(100vh - 160px); min-height: 800px; border: none; display: block;"
                 title="Boleto ${boleto.numero}"
                 class="boleto-iframe"
-                onload="iframeLoaded()"
               ></iframe>
             </div>
           </div>
@@ -351,10 +350,10 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
         </div>
         <div class="actions">
           <button id="printBtn" class="print-btn" disabled onclick="handlePrint()">
-            Carregando boletos...
+            Carregando ${totalBoletos} boletos...
           </button>
           <div class="loading-info" id="loadingInfo">
-            Aguarde o carregamento de todas as parcelas: 0 de ${totalBoletos}
+            Aguarde o carregamento de todas as parcelas...
           </div>
           <div class="progress-bar-container" id="progressContainer">
             <div class="progress-bar-fill" id="progressBar"></div>
@@ -362,45 +361,42 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
         </div>
         ${iframesHtml}
         <script>
-          var totalIframes = ${totalBoletos};
-          var loadedIframes = 0;
+          var totalBoletos = ${totalBoletos};
+          // 3 seconds per boleto, minimum 5s, maximum 20s
+          var waitTime = Math.min(Math.max(totalBoletos * 3000, 5000), 20000);
+          var startTime = Date.now();
+          var ready = false;
 
-          function iframeLoaded() {
-            loadedIframes++;
-            var pct = Math.round((loadedIframes / totalIframes) * 100);
+          // Animate progress bar smoothly over the wait time
+          var progressInterval = setInterval(function() {
+            var elapsed = Date.now() - startTime;
+            var pct = Math.min(Math.round((elapsed / waitTime) * 100), 100);
             document.getElementById('progressBar').style.width = pct + '%';
-            document.getElementById('loadingInfo').textContent = 
-              'Aguarde o carregamento de todas as parcelas: ' + loadedIframes + ' de ' + totalIframes;
 
-            if (loadedIframes >= totalIframes) {
-              var btn = document.getElementById('printBtn');
-              btn.disabled = false;
-              btn.className = 'print-btn ready';
-              btn.textContent = 'Imprimir Todos (' + totalIframes + ' parcelas)';
-              document.getElementById('loadingInfo').textContent = 'Todos os boletos carregados!';
-              document.getElementById('loadingInfo').style.color = '#16a34a';
-              document.getElementById('progressBar').style.background = '#16a34a';
+            if (pct >= 100) {
+              clearInterval(progressInterval);
+              enablePrint();
             }
+          }, 100);
+
+          function enablePrint() {
+            if (ready) return;
+            ready = true;
+            var btn = document.getElementById('printBtn');
+            btn.disabled = false;
+            btn.className = 'print-btn ready';
+            btn.textContent = 'Imprimir Todos (' + totalBoletos + ' parcelas)';
+            document.getElementById('loadingInfo').textContent = 'Todos os boletos carregados!';
+            document.getElementById('loadingInfo').style.color = '#16a34a';
+            document.getElementById('progressBar').style.width = '100%';
+            document.getElementById('progressBar').style.background = '#16a34a';
           }
 
           function handlePrint() {
-            if (loadedIframes >= totalIframes) {
+            if (ready) {
               window.print();
             }
           }
-
-          // Fallback: after 30s, enable button regardless
-          setTimeout(function() {
-            if (loadedIframes < totalIframes) {
-              var btn = document.getElementById('printBtn');
-              btn.disabled = false;
-              btn.className = 'print-btn ready';
-              btn.textContent = 'Imprimir Todos (' + loadedIframes + '/' + totalIframes + ' carregados)';
-              document.getElementById('loadingInfo').textContent = 
-                'Alguns boletos podem nao ter carregado completamente.';
-              document.getElementById('loadingInfo').style.color = '#d97706';
-            }
-          }, 5000);
         </script>
       </body>
       </html>
