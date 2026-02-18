@@ -407,64 +407,61 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
           var total = urls.length;
           var loaded = 0;
           var ready = false;
-          var BATCH_SIZE = 2; // Load 2 at a time to speed up
 
           function updateProgress() {
             var pct = Math.round((loaded / total) * 100);
             document.getElementById('progressBar').style.width = pct + '%';
             document.getElementById('printBtn').textContent = 
               'Carregando ' + loaded + ' de ' + total + ' boletos...';
-            document.getElementById('loadingInfo').textContent = 
-              'Carregando parcelas sequencialmente para garantir que todas aparecam...';
           }
 
-          function onIframeReady(index) {
-            loaded++;
+          function hideLoading(index) {
             var loadingEl = document.getElementById('loading-' + index);
             if (loadingEl) loadingEl.className = 'iframe-loading hidden';
-            updateProgress();
-
-            if (loaded >= total) {
-              enablePrint();
-            }
           }
 
-          function loadBatch(startIndex) {
-            var endIndex = Math.min(startIndex + BATCH_SIZE, total);
-            var batchPromises = [];
+          // Load all iframes at once (set all src), then track via onload
+          // This is faster than sequential because the browser can parallelize requests
+          function loadAllIframes() {
+            for (var i = 0; i < total; i++) {
+              (function(index) {
+                var iframe = document.getElementById('iframe-' + index);
+                if (!iframe) { 
+                  loaded++;
+                  hideLoading(index);
+                  updateProgress();
+                  return; 
+                }
 
-            for (var i = startIndex; i < endIndex; i++) {
-              batchPromises.push(loadIframe(i));
+                iframe.onload = function() {
+                  loaded++;
+                  hideLoading(index);
+                  updateProgress();
+                  checkAllDone();
+                };
+
+                // Set src to start loading
+                iframe.src = urls[index];
+              })(i);
             }
 
-            Promise.all(batchPromises).then(function() {
-              if (endIndex < total) {
-                loadBatch(endIndex);
+            // Safety fallback: enable print after a generous timeout
+            // regardless of onload events (cross-origin PDFs may not fire onload)
+            var fallbackMs = Math.max(total * 5000, 30000); // 5s per boleto, min 30s
+            setTimeout(function() {
+              if (!ready) {
+                // Force progress to show what actually loaded
+                document.getElementById('progressBar').style.width = '100%';
+                enablePrint();
               }
-            });
+            }, fallbackMs);
           }
 
-          function loadIframe(index) {
-            return new Promise(function(resolve) {
-              var iframe = document.getElementById('iframe-' + index);
-              if (!iframe) { onIframeReady(index); resolve(); return; }
-
-              var resolved = false;
-              
-              iframe.onload = function() {
-                if (!resolved) { resolved = true; onIframeReady(index); resolve(); }
-              };
-              iframe.onerror = function() {
-                if (!resolved) { resolved = true; onIframeReady(index); resolve(); }
-              };
-
-              iframe.src = urls[index];
-
-              // Timeout per iframe: 8 seconds max
-              setTimeout(function() {
-                if (!resolved) { resolved = true; onIframeReady(index); resolve(); }
-              }, 8000);
-            });
+          function checkAllDone() {
+            if (loaded >= total && !ready) {
+              // Add a 2s buffer after all onload fires to ensure rendering is complete
+              setTimeout(function() { enablePrint(); }, 2000);
+            }
           }
 
           function enablePrint() {
@@ -474,7 +471,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
             btn.disabled = false;
             btn.className = 'print-btn ready';
             btn.textContent = 'Imprimir Todos (' + total + ' parcelas)';
-            document.getElementById('loadingInfo').textContent = 'Todos os boletos carregados!';
+            document.getElementById('loadingInfo').textContent = 'Todos os boletos carregados! Clique para imprimir.';
             document.getElementById('loadingInfo').style.color = '#16a34a';
             document.getElementById('progressBar').style.width = '100%';
             document.getElementById('progressBar').style.background = '#16a34a';
@@ -484,8 +481,8 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
             if (ready) { window.print(); }
           }
 
-          // Start sequential batch loading
-          loadBatch(0);
+          // Start loading all iframes
+          loadAllIframes();
         </script>
       </body>
       </html>
