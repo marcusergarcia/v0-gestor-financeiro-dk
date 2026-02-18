@@ -321,12 +321,12 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                   {printingAll ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Abrindo...
+                      Gerando PDF combinado... Aguarde
                     </>
                   ) : (
                     <>
                       <Printer className="h-4 w-4 mr-2" />
-                      Visualizar / Imprimir Todos
+                      Visualizar / Imprimir Todos ({boletos.filter((b) => b.asaas_bankslip_url || b.asaas_invoice_url).length} parcelas)
                     </>
                   )}
                 </Button>
