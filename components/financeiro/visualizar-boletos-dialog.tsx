@@ -19,6 +19,7 @@ import {
   Printer,
   Download,
   CreditCard,
+  ExternalLink,
 } from "lucide-react"
 
 interface Boleto {
@@ -199,55 +200,108 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
     const boletosComPDF = boletos.filter((b) => b.asaas_bankslip_url || b.asaas_invoice_url)
 
     if (boletosComPDF.length === 0) {
-      alert("Nenhum boleto disponível para impressão.")
+      alert("Nenhum boleto disponivel para impressao.")
       setPrintingAll(false)
       return
     }
 
-    boletosComPDF.forEach((boleto, index) => {
-      setTimeout(() => {
-        const url = boleto.asaas_bankslip_url || boleto.asaas_invoice_url
-        if (url) {
-          window.open(url, "_blank")
-        }
-      }, index * 500) // Delay de 500ms entre cada abertura
-    })
-
-    setTimeout(
-      () => {
-        setPrintingAll(false)
-      },
-      boletosComPDF.length * 500 + 1000,
-    )
-  }
-
-  const baixarTodosPDFs = async () => {
-    const boletosComPDF = boletos.filter((b) => b.asaas_bankslip_url)
-
-    if (boletosComPDF.length === 0) {
-      alert("Nenhum PDF disponível para download.")
+    // Open a single window with all PDFs rendered in iframes
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) {
+      alert("Popup bloqueado pelo navegador. Permita popups para este site.")
+      setPrintingAll(false)
       return
     }
 
-    for (const boleto of boletosComPDF) {
-      try {
-        const response = await fetch(boleto.asaas_bankslip_url!)
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = `boleto-${boleto.numero}.pdf`
-        document.body.appendChild(a)
-        a.click()
-        window.URL.revokeObjectURL(url)
-        document.body.removeChild(a)
+    const iframesHtml = boletosComPDF
+      .map((boleto, index) => {
+        const url = boleto.asaas_bankslip_url || boleto.asaas_invoice_url
+        return `
+          <div style="margin-bottom: 24px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+            <div style="background: #f1f5f9; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 600; color: #334155;">
+                Parcela ${boleto.numero_parcela}/${boleto.total_parcelas} - ${boleto.numero}
+              </span>
+              <span style="color: #64748b; font-size: 14px;">
+                Vencimento: ${boleto.data_vencimento ? new Date(boleto.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR") : "-"}
+              </span>
+            </div>
+            <iframe 
+              src="${url}" 
+              style="width: 100%; height: 800px; border: none; display: block;"
+              title="Boleto ${boleto.numero}"
+            ></iframe>
+          </div>
+        `
+      })
+      .join("")
 
-        // Delay entre downloads
-        await new Promise((resolve) => setTimeout(resolve, 500))
-      } catch (error) {
-        console.error(`Erro ao baixar boleto ${boleto.numero}:`, error)
-      }
-    }
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <title>Boletos - Nota ${numeroBaseLimpo}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #f8fafc; 
+            padding: 24px;
+            color: #1e293b;
+          }
+          .header { 
+            text-align: center; 
+            margin-bottom: 24px; 
+            padding: 20px;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            color: white;
+            border-radius: 12px;
+          }
+          .header h1 { font-size: 22px; margin-bottom: 4px; }
+          .header p { font-size: 14px; opacity: 0.9; }
+          .actions {
+            text-align: center;
+            margin-bottom: 24px;
+          }
+          .actions button {
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+          }
+          .actions button:hover { opacity: 0.9; }
+          @media print {
+            .actions { display: none; }
+            .header { 
+              background: #2563eb !important; 
+              -webkit-print-color-adjust: exact; 
+              print-color-adjust: exact; 
+            }
+            body { padding: 0; background: white; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Boletos - Nota ${numeroBaseLimpo}</h1>
+          <p>${clienteNome ? `Cliente: ${clienteNome} | ` : ""}${boletosComPDF.length} parcela${boletosComPDF.length > 1 ? "s" : ""}</p>
+        </div>
+        <div class="actions">
+          <button onclick="window.print()">Imprimir Todos</button>
+        </div>
+        ${iframesHtml}
+      </body>
+      </html>
+    `)
+    printWindow.document.close()
+
+    setPrintingAll(false)
   }
 
   return (
@@ -329,17 +383,8 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
               </Card>
             </div>
 
-            {boletos.some((b) => b.asaas_bankslip_url || b.asaas_invoice_url) && (
+            {boletos.some((b) => b.asaas_bankslip_url || b.asaas_invoice_url) && boletos.length > 1 && (
               <div className="flex gap-3 justify-end bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
-                <Button
-                  onClick={baixarTodosPDFs}
-                  disabled={!boletos.some((b) => b.asaas_bankslip_url)}
-                  variant="outline"
-                  className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-300 shadow-sm"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Baixar Todos PDFs
-                </Button>
                 <Button
                   onClick={imprimirTodosBoletos}
                   disabled={printingAll}
@@ -352,8 +397,8 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                     </>
                   ) : (
                     <>
-                      <Printer className="h-4 w-4 mr-2" />
-                      Imprimir Todos
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Visualizar Todas as Parcelas
                     </>
                   )}
                 </Button>
