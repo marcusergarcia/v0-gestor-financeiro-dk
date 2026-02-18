@@ -51,10 +51,21 @@ export async function POST(request: NextRequest) {
 
     console.log(`[merge-pdfs] Starting merge of ${urls.length} PDFs`)
 
-    // Fetch all PDFs in parallel for maximum speed
+    // Fetch PDFs in batches of 3 to avoid overwhelming the Asaas server
     const validUrls = urls.filter((u: string) => u && u.startsWith("http"))
-    const pdfPromises = validUrls.map((url: string) => fetchPdfWithRetry(url))
-    const pdfResults = await Promise.all(pdfPromises)
+    const BATCH_SIZE = 3
+    const pdfResults: (ArrayBuffer | null)[] = []
+    
+    for (let i = 0; i < validUrls.length; i += BATCH_SIZE) {
+      const batch = validUrls.slice(i, i + BATCH_SIZE)
+      console.log(`[merge-pdfs] Fetching batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} PDFs`)
+      const batchResults = await Promise.all(batch.map((url: string) => fetchPdfWithRetry(url)))
+      pdfResults.push(...batchResults)
+      // Small delay between batches to avoid rate limiting
+      if (i + BATCH_SIZE < validUrls.length) {
+        await new Promise((r) => setTimeout(r, 500))
+      }
+    }
 
     // Create merged PDF
     const mergedPdf = await PDFDocument.create()
