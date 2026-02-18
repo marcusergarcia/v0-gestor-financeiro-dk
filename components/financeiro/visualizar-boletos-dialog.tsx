@@ -230,9 +230,17 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
 
     const totalBoletos = boletosComPDF.length
 
+    // Build data array for sequential loading
+    const boletosData = boletosComPDF.map((boleto) => ({
+      url: boleto.asaas_bankslip_url || boleto.asaas_invoice_url || "",
+      parcela: boleto.numero_parcela,
+      total: boleto.total_parcelas,
+      numero: boleto.numero,
+      vencimento: formatDateSafe(boleto.data_vencimento),
+    }))
+
     const iframesHtml = boletosComPDF
       .map((boleto, index) => {
-        const url = boleto.asaas_bankslip_url || boleto.asaas_invoice_url
         const isLast = index === boletosComPDF.length - 1
         return `
           <div class="boleto-page" style="${!isLast ? "page-break-after: always;" : ""}">
@@ -245,12 +253,18 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                   Vencimento: ${formatDateSafe(boleto.data_vencimento)}
                 </span>
               </div>
-              <iframe 
-                src="${url}" 
-                style="width: 100%; height: calc(100vh - 160px); min-height: 800px; border: none; display: block;"
-                title="Boleto ${boleto.numero}"
-                class="boleto-iframe"
-              ></iframe>
+              <div class="iframe-container" id="container-${index}">
+                <div class="iframe-loading" id="loading-${index}">
+                  <div class="spinner"></div>
+                  <span>Carregando parcela ${boleto.numero_parcela}/${boleto.total_parcelas}...</span>
+                </div>
+                <iframe 
+                  id="iframe-${index}"
+                  style="width: 100%; height: calc(100vh - 160px); min-height: 800px; border: none; display: block;"
+                  title="Boleto ${boleto.numero}"
+                  class="boleto-iframe"
+                ></iframe>
+              </div>
             </div>
           </div>
         `
@@ -284,6 +298,11 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
           .actions {
             text-align: center;
             margin-bottom: 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: #f8fafc;
+            padding: 16px 0;
           }
           .print-btn {
             background: #94a3b8;
@@ -295,7 +314,6 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
             border-radius: 8px;
             cursor: not-allowed;
             transition: all 0.3s;
-            position: relative;
           }
           .print-btn.ready {
             background: linear-gradient(135deg, #2563eb, #7c3aed);
@@ -319,13 +337,37 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
             height: 100%;
             background: linear-gradient(135deg, #2563eb, #7c3aed);
             border-radius: 3px;
-            transition: width 0.3s ease;
+            transition: width 0.4s ease;
             width: 0%;
           }
+          .iframe-container { position: relative; }
+          .iframe-loading {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 14px;
+            z-index: 1;
+          }
+          .iframe-loading.hidden { display: none; }
+          .spinner {
+            width: 20px; height: 20px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+          }
+          @keyframes spin { to { transform: rotate(360deg); } }
           .boleto-page { margin-bottom: 24px; }
           @media print {
-            .actions { display: none; }
+            .actions { display: none; position: static; }
             .header { display: none; }
+            .iframe-loading { display: none !important; }
             body { padding: 0; background: white; }
             .boleto-page { 
               margin-bottom: 0; 
@@ -350,10 +392,10 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
         </div>
         <div class="actions">
           <button id="printBtn" class="print-btn" disabled onclick="handlePrint()">
-            Carregando ${totalBoletos} boletos...
+            Carregando 0 de ${totalBoletos} boletos...
           </button>
           <div class="loading-info" id="loadingInfo">
-            Aguarde o carregamento de todas as parcelas...
+            Carregando parcelas sequencialmente para garantir que todas aparecam...
           </div>
           <div class="progress-bar-container" id="progressContainer">
             <div class="progress-bar-fill" id="progressBar"></div>
@@ -361,23 +403,69 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
         </div>
         ${iframesHtml}
         <script>
-          var totalBoletos = ${totalBoletos};
-          // 3 seconds per boleto, minimum 5s, maximum 20s
-          var waitTime = Math.min(Math.max(totalBoletos * 3000, 5000), 20000);
-          var startTime = Date.now();
+          var urls = ${JSON.stringify(boletosData.map((b) => b.url))};
+          var total = urls.length;
+          var loaded = 0;
           var ready = false;
+          var BATCH_SIZE = 2; // Load 2 at a time to speed up
 
-          // Animate progress bar smoothly over the wait time
-          var progressInterval = setInterval(function() {
-            var elapsed = Date.now() - startTime;
-            var pct = Math.min(Math.round((elapsed / waitTime) * 100), 100);
+          function updateProgress() {
+            var pct = Math.round((loaded / total) * 100);
             document.getElementById('progressBar').style.width = pct + '%';
+            document.getElementById('printBtn').textContent = 
+              'Carregando ' + loaded + ' de ' + total + ' boletos...';
+            document.getElementById('loadingInfo').textContent = 
+              'Carregando parcelas sequencialmente para garantir que todas aparecam...';
+          }
 
-            if (pct >= 100) {
-              clearInterval(progressInterval);
+          function onIframeReady(index) {
+            loaded++;
+            var loadingEl = document.getElementById('loading-' + index);
+            if (loadingEl) loadingEl.className = 'iframe-loading hidden';
+            updateProgress();
+
+            if (loaded >= total) {
               enablePrint();
             }
-          }, 100);
+          }
+
+          function loadBatch(startIndex) {
+            var endIndex = Math.min(startIndex + BATCH_SIZE, total);
+            var batchPromises = [];
+
+            for (var i = startIndex; i < endIndex; i++) {
+              batchPromises.push(loadIframe(i));
+            }
+
+            Promise.all(batchPromises).then(function() {
+              if (endIndex < total) {
+                loadBatch(endIndex);
+              }
+            });
+          }
+
+          function loadIframe(index) {
+            return new Promise(function(resolve) {
+              var iframe = document.getElementById('iframe-' + index);
+              if (!iframe) { onIframeReady(index); resolve(); return; }
+
+              var resolved = false;
+              
+              iframe.onload = function() {
+                if (!resolved) { resolved = true; onIframeReady(index); resolve(); }
+              };
+              iframe.onerror = function() {
+                if (!resolved) { resolved = true; onIframeReady(index); resolve(); }
+              };
+
+              iframe.src = urls[index];
+
+              // Timeout per iframe: 8 seconds max
+              setTimeout(function() {
+                if (!resolved) { resolved = true; onIframeReady(index); resolve(); }
+              }, 8000);
+            });
+          }
 
           function enablePrint() {
             if (ready) return;
@@ -385,7 +473,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
             var btn = document.getElementById('printBtn');
             btn.disabled = false;
             btn.className = 'print-btn ready';
-            btn.textContent = 'Imprimir Todos (' + totalBoletos + ' parcelas)';
+            btn.textContent = 'Imprimir Todos (' + total + ' parcelas)';
             document.getElementById('loadingInfo').textContent = 'Todos os boletos carregados!';
             document.getElementById('loadingInfo').style.color = '#16a34a';
             document.getElementById('progressBar').style.width = '100%';
@@ -393,10 +481,11 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
           }
 
           function handlePrint() {
-            if (ready) {
-              window.print();
-            }
+            if (ready) { window.print(); }
           }
+
+          // Start sequential batch loading
+          loadBatch(0);
         </script>
       </body>
       </html>
