@@ -213,24 +213,42 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
       return
     }
 
+    // Helper to format date safely without timezone issues
+    const formatDateSafe = (dateStr: string | null | undefined): string => {
+      if (!dateStr) return "-"
+      try {
+        const dateOnly = dateStr.split("T")[0].trim()
+        const match = dateOnly.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+        if (match) {
+          return `${match[3]}/${match[2]}/${match[1]}`
+        }
+        return "-"
+      } catch {
+        return "-"
+      }
+    }
+
     const iframesHtml = boletosComPDF
       .map((boleto, index) => {
         const url = boleto.asaas_bankslip_url || boleto.asaas_invoice_url
+        const isLast = index === boletosComPDF.length - 1
         return `
-          <div style="margin-bottom: 24px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-            <div style="background: #f1f5f9; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-weight: 600; color: #334155;">
-                Parcela ${boleto.numero_parcela}/${boleto.total_parcelas} - ${boleto.numero}
-              </span>
-              <span style="color: #64748b; font-size: 14px;">
-                Vencimento: ${boleto.data_vencimento ? new Date(boleto.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR") : "-"}
-              </span>
+          <div class="boleto-page" style="${!isLast ? "page-break-after: always;" : ""}">
+            <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+              <div style="background: #f1f5f9; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 600; color: #334155;">
+                  Parcela ${boleto.numero_parcela}/${boleto.total_parcelas} - ${boleto.numero}
+                </span>
+                <span style="color: #64748b; font-size: 14px;">
+                  Vencimento: ${formatDateSafe(boleto.data_vencimento)}
+                </span>
+              </div>
+              <iframe 
+                src="${url}" 
+                style="width: 100%; height: calc(100vh - 160px); min-height: 800px; border: none; display: block;"
+                title="Boleto ${boleto.numero}"
+              ></iframe>
             </div>
-            <iframe 
-              src="${url}" 
-              style="width: 100%; height: 800px; border: none; display: block;"
-              title="Boleto ${boleto.numero}"
-            ></iframe>
           </div>
         `
       })
@@ -276,14 +294,26 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
             transition: opacity 0.2s;
           }
           .actions button:hover { opacity: 0.9; }
+          .boleto-page { margin-bottom: 24px; }
           @media print {
             .actions { display: none; }
             .header { 
-              background: #2563eb !important; 
-              -webkit-print-color-adjust: exact; 
-              print-color-adjust: exact; 
+              display: none;
             }
             body { padding: 0; background: white; }
+            .boleto-page { 
+              margin-bottom: 0; 
+              break-after: page;
+              page-break-after: always;
+            }
+            .boleto-page:last-child {
+              break-after: auto;
+              page-break-after: auto;
+            }
+            iframe {
+              height: 100vh !important;
+              min-height: 100vh !important;
+            }
           }
         </style>
       </head>
