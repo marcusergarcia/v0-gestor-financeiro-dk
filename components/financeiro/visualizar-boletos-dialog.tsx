@@ -206,7 +206,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
 
     try {
       // Collect all PDF URLs
-      const urls = boletosComPDF.map((b) => b.asaas_bankslip_url || b.asaas_invoice_url)
+      const urls = boletosComPDF.map((b) => b.asaas_bankslip_url || b.asaas_invoice_url).filter(Boolean)
 
       // Call server-side API to merge all PDFs into one
       const response = await fetch("/api/boletos/merge-pdfs", {
@@ -220,13 +220,42 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
         throw new Error(errorData?.error || "Erro ao gerar PDF combinado")
       }
 
-      // Get the merged PDF as a blob and open in new tab
+      const contentType = response.headers.get("Content-Type")
+      if (!contentType || !contentType.includes("application/pdf")) {
+        throw new Error("Resposta invalida da API")
+      }
+
+      // Get the merged PDF as a blob and open in new tab for viewing/printing
       const blob = await response.blob()
+      if (blob.size < 100) {
+        throw new Error("PDF gerado esta vazio")
+      }
+
       const pdfUrl = URL.createObjectURL(blob)
-      window.open(pdfUrl, "_blank")
+      const newTab = window.open(pdfUrl, "_blank")
+      if (!newTab) {
+        // If popup blocked, download instead
+        const a = document.createElement("a")
+        a.href = pdfUrl
+        a.download = `boletos-nota-${numeroBaseLimpo}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+      }
     } catch (error) {
       console.error("Erro ao combinar PDFs:", error)
-      alert("Erro ao combinar os boletos. Tente novamente.")
+      // Fallback: open each PDF in a separate tab
+      const fallback = confirm(
+        "Nao foi possivel gerar o PDF combinado. Deseja abrir cada boleto em uma aba separada?"
+      )
+      if (fallback) {
+        boletosComPDF.forEach((boleto, index) => {
+          setTimeout(() => {
+            const url = boleto.asaas_bankslip_url || boleto.asaas_invoice_url
+            if (url) window.open(url, "_blank")
+          }, index * 500)
+        })
+      }
     } finally {
       setPrintingAll(false)
     }
