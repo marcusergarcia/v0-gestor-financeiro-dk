@@ -400,7 +400,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                 'Alguns boletos podem nao ter carregado completamente.';
               document.getElementById('loadingInfo').style.color = '#d97706';
             }
-          }, 30000);
+          }, 5000);
         </script>
       </body>
       </html>
