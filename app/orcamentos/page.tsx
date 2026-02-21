@@ -78,6 +78,8 @@ export default function OrcamentosPage() {
   const [nfeOrcamento, setNfeOrcamento] = useState<Orcamento | null>(null)
   const [nfeItens, setNfeItens] = useState<any[]>([])
   const [valorPorKm, setValorPorKm] = useState(1.5)
+  // Mapa de orcamento numero -> { temNfse, temNfe } para controlar icones
+  const [notasEmitidas, setNotasEmitidas] = useState<Record<string, { temNfse: boolean; temNfe: boolean }>>({})
   const { toast } = useToast()
 
   useEffect(() => {
@@ -139,6 +141,47 @@ export default function OrcamentosPage() {
     return valorMaoObra - descontoMdoValor + custoDeslocamento + taxaBoletoMdo + impostoServicoValor
   }
 
+  const fetchNotasEmitidasPorOrcamento = async () => {
+    try {
+      const [nfseRes, nfeRes] = await Promise.all([
+        fetch("/api/nfse").catch(() => null),
+        fetch("/api/nfe").catch(() => null),
+      ])
+
+      const mapa: Record<string, { temNfse: boolean; temNfe: boolean }> = {}
+
+      if (nfseRes?.ok) {
+        const nfseData = await nfseRes.json()
+        if (nfseData.success && nfseData.data) {
+          for (const nf of nfseData.data) {
+            if (nf.origem === "orcamento" && nf.origem_numero && (nf.status === "emitida" || nf.status === "processando")) {
+              const num = String(nf.origem_numero)
+              if (!mapa[num]) mapa[num] = { temNfse: false, temNfe: false }
+              mapa[num].temNfse = true
+            }
+          }
+        }
+      }
+
+      if (nfeRes?.ok) {
+        const nfeData = await nfeRes.json()
+        if (nfeData.success && nfeData.data) {
+          for (const nf of nfeData.data) {
+            if (nf.origem === "orcamento" && nf.origem_numero && (nf.status === "autorizada" || nf.status === "processando")) {
+              const num = String(nf.origem_numero)
+              if (!mapa[num]) mapa[num] = { temNfse: false, temNfe: false }
+              mapa[num].temNfe = true
+            }
+          }
+        }
+      }
+
+      setNotasEmitidas(mapa)
+    } catch (error) {
+      console.error("Erro ao buscar notas emitidas:", error)
+    }
+  }
+
   const fetchOrcamentos = async () => {
     try {
       const response = await fetch("/api/orcamentos")
@@ -165,6 +208,8 @@ export default function OrcamentosPage() {
 
         setOrcamentos(orcamentosOrdenados)
       }
+      // Buscar notas emitidas para controlar icones
+      await fetchNotasEmitidasPorOrcamento()
     } catch (error) {
       console.error("Erro ao buscar orçamentos:", error)
     } finally {
@@ -215,14 +260,23 @@ export default function OrcamentosPage() {
   const handleNfseSuccess = async () => {
     if (nfseOrcamento) {
       try {
-        await fetch(`/api/orcamentos/${nfseOrcamento.numero}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ situacao: "nota fiscal emitida" }),
-        })
+        // O backend (verificarEConcluirOrcamento) ja cuida de marcar como "concluido"
+        // quando ambas as notas existem. Aqui so marcamos como "nota fiscal emitida"
+        // se o orcamento ainda nao estiver concluido.
+        const checkRes = await fetch(`/api/orcamentos/${nfseOrcamento.numero}`)
+        const checkData = await checkRes.json()
+        const situacaoAtual = checkData?.data?.situacao
+
+        if (situacaoAtual !== "concluido") {
+          await fetch(`/api/orcamentos/${nfseOrcamento.numero}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ situacao: "nota fiscal emitida" }),
+          })
+        }
         toast({
           title: "Sucesso",
-          description: "NFS-e emitida e situação atualizada para 'NF Emitida'",
+          description: "NFS-e emitida com sucesso!",
         })
       } catch (error) {
         console.error("Erro ao atualizar situação:", error)
@@ -300,6 +354,24 @@ export default function OrcamentosPage() {
 
   const handleNfeSuccess = async () => {
     if (nfeOrcamento) {
+      try {
+        // O backend (verificarEConcluirOrcamento) ja cuida de marcar como "concluido"
+        // quando ambas as notas existem. Aqui so marcamos como "nota fiscal emitida"
+        // se o orcamento ainda nao estiver concluido.
+        const checkRes = await fetch(`/api/orcamentos/${nfeOrcamento.numero}`)
+        const checkData = await checkRes.json()
+        const situacaoAtual = checkData?.data?.situacao
+
+        if (situacaoAtual !== "concluido") {
+          await fetch(`/api/orcamentos/${nfeOrcamento.numero}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ situacao: "nota fiscal emitida" }),
+          })
+        }
+      } catch (error) {
+        console.error("Erro ao atualizar situação:", error)
+      }
       toast({
         title: "Sucesso",
         description: "NF-e de material emitida com sucesso!",
@@ -688,28 +760,44 @@ export default function OrcamentosPage() {
                                 <Edit className="h-4 w-4" />
                               </Button>
                             </Link>
-                            {orcamento.situacao === "aprovado" && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEmitirNfse(orcamento)}
-                                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-transparent h-8 w-8 p-0"
-                                title="Emitir NFS-e (Servico)"
-                              >
-                                <FileCheck className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {orcamento.situacao === "aprovado" && safeNumber(orcamento.valor_material) > 0 && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEmitirNfe(orcamento)}
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-8 w-8 p-0"
-                                title="Emitir NF-e (Material)"
-                              >
-                                <Package className="h-4 w-4" />
-                              </Button>
-                            )}
+                            {(orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida") && (() => {
+                              const notaInfo = notasEmitidas[orcamento.numero]
+                              const nfseJaEmitida = notaInfo?.temNfse || false
+                              return (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEmitirNfse(orcamento)}
+                                  disabled={nfseJaEmitida}
+                                  className={`h-8 w-8 p-0 ${nfseJaEmitida
+                                    ? "text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed opacity-50"
+                                    : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-transparent"
+                                  }`}
+                                  title={nfseJaEmitida ? "NFS-e ja emitida" : "Emitir NFS-e (Servico)"}
+                                >
+                                  <FileCheck className="h-4 w-4" />
+                                </Button>
+                              )
+                            })()}
+                            {(orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida") && safeNumber(orcamento.valor_material) > 0 && (() => {
+                              const notaInfo = notasEmitidas[orcamento.numero]
+                              const nfeJaEmitida = notaInfo?.temNfe || false
+                              return (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEmitirNfe(orcamento)}
+                                  disabled={nfeJaEmitida}
+                                  className={`h-8 w-8 p-0 ${nfeJaEmitida
+                                    ? "text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed opacity-50"
+                                    : "text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent"
+                                  }`}
+                                  title={nfeJaEmitida ? "NF-e ja emitida" : "Emitir NF-e (Material)"}
+                                >
+                                  <Package className="h-4 w-4" />
+                                </Button>
+                              )
+                            })()}
                             <Button
                               size="sm"
                               variant="outline"
@@ -770,56 +858,75 @@ export default function OrcamentosPage() {
                       </div>
 
                       {/* Botões de Ação */}
-                      <div className={`grid gap-2 pt-3 border-t-2 border-slate-200 ${orcamento.situacao === "aprovado" ? "grid-cols-5" : "grid-cols-3"}`}>
-                        <Link href={`/orcamentos/${orcamento.numero}`} className="w-full">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-9 text-xs bg-blue-50 hover:bg-blue-100 border-2 border-blue-300 text-blue-700 font-medium"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        <Link href={`/orcamentos/${orcamento.numero}/editar`} className="w-full">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-9 text-xs bg-green-50 hover:bg-green-100 border-2 border-green-300 text-green-700 font-medium"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        {orcamento.situacao === "aprovado" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-9 text-xs bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-300 text-emerald-700 font-medium"
-                            onClick={() => handleEmitirNfse(orcamento)}
-                            title="NFS-e"
-                          >
-                            <FileCheck className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {orcamento.situacao === "aprovado" && safeNumber(orcamento.valor_material) > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-9 text-xs bg-blue-50 hover:bg-blue-100 border-2 border-blue-300 text-blue-700 font-medium"
-                            onClick={() => handleEmitirNfe(orcamento)}
-                            title="NF-e"
-                          >
-                            <Package className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-9 text-xs bg-red-50 hover:bg-red-100 border-2 border-red-300 text-red-600 font-medium"
-                          onClick={() => handleDelete(orcamento.numero)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {(() => {
+                        const mostraNfBtns = orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida"
+                        const notaInfo = notasEmitidas[orcamento.numero]
+                        const nfseJaEmitida = notaInfo?.temNfse || false
+                        const nfeJaEmitida = notaInfo?.temNfe || false
+                        const temMaterial = safeNumber(orcamento.valor_material) > 0
+                        const totalCols = 2 + (mostraNfBtns ? 1 : 0) + (mostraNfBtns && temMaterial ? 1 : 0) + 1
+                        const gridColsClass = totalCols === 3 ? "grid-cols-3" : totalCols === 4 ? "grid-cols-4" : "grid-cols-5"
+                        return (
+                          <div className={`grid gap-2 pt-3 border-t-2 border-slate-200 ${gridColsClass}`}>
+                            <Link href={`/orcamentos/${orcamento.numero}`} className="w-full">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full h-9 text-xs bg-blue-50 hover:bg-blue-100 border-2 border-blue-300 text-blue-700 font-medium"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            <Link href={`/orcamentos/${orcamento.numero}/editar`} className="w-full">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full h-9 text-xs bg-green-50 hover:bg-green-100 border-2 border-green-300 text-green-700 font-medium"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            {mostraNfBtns && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={nfseJaEmitida}
+                                className={`w-full h-9 text-xs font-medium border-2 ${nfseJaEmitida
+                                  ? "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
+                                  : "bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-700"
+                                }`}
+                                onClick={() => !nfseJaEmitida && handleEmitirNfse(orcamento)}
+                                title={nfseJaEmitida ? "NFS-e ja emitida" : "NFS-e"}
+                              >
+                                <FileCheck className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {mostraNfBtns && temMaterial && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={nfeJaEmitida}
+                                className={`w-full h-9 text-xs font-medium border-2 ${nfeJaEmitida
+                                  ? "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
+                                  : "bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-700"
+                                }`}
+                                onClick={() => !nfeJaEmitida && handleEmitirNfe(orcamento)}
+                                title={nfeJaEmitida ? "NF-e ja emitida" : "NF-e"}
+                              >
+                                <Package className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full h-9 text-xs bg-red-50 hover:bg-red-100 border-2 border-red-300 text-red-600 font-medium"
+                              onClick={() => handleDelete(orcamento.numero)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )
+                      })()}
                     </CardContent>
                   </Card>
                 ))}
