@@ -252,6 +252,8 @@ export default function NotaFiscalPage() {
       })
 
       setNotas(notasUnificadas)
+      // Fetch boleto status para todas as notas emitidas/autorizadas
+      fetchBoletoStatusAll(notasUnificadas)
     } catch {
       setNotas([])
     } finally {
@@ -263,6 +265,23 @@ export default function NotaFiscalPage() {
     try {
       const emitidas = notasList.filter((n: any) => n.status === "emitida" && n.numero_nfse)
       if (emitidas.length === 0) return
+
+      const response = await fetch("/api/boletos/status-por-nota")
+      const result = await response.json()
+      if (result.success && result.data) {
+        setBoletoStatusMap(result.data)
+      }
+    } catch (error) {
+      console.error("Erro ao buscar status dos boletos:", error)
+    }
+  }
+
+  const fetchBoletoStatusAll = async (notasUnificadas: NotaUnificada[]) => {
+    try {
+      const temNotasEmitidas = notasUnificadas.some(
+        (n) => (n.status === "emitida" || n.status === "autorizada") && (n.numero_nfse || n.numero_nfe)
+      )
+      if (!temNotasEmitidas) return
 
       const response = await fetch("/api/boletos/status-por-nota")
       const result = await response.json()

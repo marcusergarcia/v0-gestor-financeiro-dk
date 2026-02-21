@@ -96,9 +96,13 @@ export function NovoBoletoDialog({ open, onOpenChange, notaFiscal, onSuccess }: 
         if (notaFiscal.valor_total || notaFiscal.valor_servicos) {
           setValorTotal(String(notaFiscal.valor_total || notaFiscal.valor_servicos))
         }
-        // Numero da nota
+        // Numero da nota - NFS-e ou NF-e
         if (notaFiscal.numero_nfse) {
           setNumeroNota(String(notaFiscal.numero_nfse))
+        } else if (notaFiscal.numero_nfe) {
+          setNumeroNota(String(notaFiscal.numero_nfe))
+        } else if (notaFiscal.numero) {
+          setNumeroNota(String(notaFiscal.numero))
         }
         // Data da nota - usar data_emissao, ou created_at como fallback
         const dataOrigem = notaFiscal.data_emissao || notaFiscal.created_at
