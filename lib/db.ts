@@ -61,7 +61,7 @@ export async function createConnection() {
 export const getConnection = createConnection
 
 export async function query(sql: string, params?: any[]) {
-  const maxRetries = 2
+  const maxRetries = 3
   let lastError: any
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -74,15 +74,54 @@ export async function query(sql: string, params?: any[]) {
       lastError = error
       console.error(`Database query error (attempt ${attempt + 1}/${maxRetries + 1}):`, error?.code || error?.message)
       
-      // Retry only on connection errors
-      if (attempt < maxRetries && (error?.code === 'ETIMEDOUT' || error?.code === 'ECONNREFUSED' || error?.code === 'PROTOCOL_CONNECTION_LOST')) {
+      // Retry on connection errors
+      const retryableCodes = ['ETIMEDOUT', 'ECONNREFUSED', 'PROTOCOL_CONNECTION_LOST', 'ECONNRESET', 'EPIPE', 'ER_CON_COUNT_ERROR']
+      if (attempt < maxRetries && retryableCodes.includes(error?.code)) {
         await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)))
         continue
       }
       throw error
     } finally {
       if (connection) {
-        connection.release()
+        try {
+          connection.release()
+        } catch {
+          // Ignore release errors
+        }
+      }
+    }
+  }
+
+  throw lastError
+}
+
+export async function execute(sql: string, params?: any[]): Promise<any> {
+  const maxRetries = 3
+  let lastError: any
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    let connection
+    try {
+      connection = await pool.getConnection()
+      const result = await connection.execute(sql, params)
+      return result
+    } catch (error: any) {
+      lastError = error
+      console.error(`Database execute error (attempt ${attempt + 1}/${maxRetries + 1}):`, error?.code || error?.message)
+      
+      const retryableCodes = ['ETIMEDOUT', 'ECONNREFUSED', 'PROTOCOL_CONNECTION_LOST', 'ECONNRESET', 'EPIPE', 'ER_CON_COUNT_ERROR']
+      if (attempt < maxRetries && retryableCodes.includes(error?.code)) {
+        await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)))
+        continue
+      }
+      throw error
+    } finally {
+      if (connection) {
+        try {
+          connection.release()
+        } catch {
+          // Ignore release errors
+        }
       }
     }
   }

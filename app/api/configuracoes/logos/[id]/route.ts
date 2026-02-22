@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { pool } from "@/lib/db"
+import { query, execute } from "@/lib/db"
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -16,7 +16,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     // Verificar se o logo existe
-    const [existingLogo] = await pool.execute(`SELECT id, tipo FROM logos_sistema WHERE id = ?`, [id])
+    const existingLogo = await query(`SELECT id, tipo FROM logos_sistema WHERE id = ?`, [id])
 
     if (!Array.isArray(existingLogo) || existingLogo.length === 0) {
       return NextResponse.json(
@@ -29,7 +29,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     // Excluir o logo
-    await pool.execute(`DELETE FROM logos_sistema WHERE id = ?`, [id])
+    await query(`DELETE FROM logos_sistema WHERE id = ?`, [id])
 
     return NextResponse.json({
       success: true,
@@ -62,7 +62,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
 
-    const [result] = await pool.execute(
+    const [result] = await execute(
       `
       UPDATE logos_sistema 
       SET nome = ?, ativo = ?, updated_at = NOW()
@@ -82,7 +82,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Buscar o logo atualizado
-    const [updatedLogo] = await pool.execute(
+    const updatedLogo = await query(
       `
       SELECT id, tipo, nome, dados, formato, tamanho, dimensoes, ativo, created_at
       FROM logos_sistema WHERE id = ?
