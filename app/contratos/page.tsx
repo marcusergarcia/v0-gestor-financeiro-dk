@@ -74,6 +74,7 @@ interface Contrato {
   data_inicio: string
   data_fim: string
   data_assinatura: string
+  dia_vencimento?: number
   equipamentos_inclusos?: string
   equipamentos_consignacao?: string
   servicos_inclusos?: string
@@ -743,6 +744,7 @@ export default function ContratosPage() {
                           <TableHead className="w-[100px]">Numero</TableHead>
                           <TableHead className="min-w-[200px]">Cliente / Equipamentos</TableHead>
                           <TableHead className="w-[120px]">Valor Mensal</TableHead>
+                          <TableHead className="w-[50px] text-center">Dia</TableHead>
                           <TableHead className="w-[80px]">Status</TableHead>
                           <TableHead className="hidden sm:table-cell w-[90px]">Inicio</TableHead>
                           <TableHead className="hidden lg:table-cell w-[100px]">Prazo</TableHead>
@@ -787,6 +789,11 @@ export default function ContratosPage() {
                             </TableCell>
                             <TableCell className="font-medium text-green-600 text-sm">
                               {formatCurrency(contrato.valor_mensal)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className="font-mono text-xs">
+                                {contrato.dia_vencimento || "-"}
+                              </Badge>
                             </TableCell>
                             <TableCell>{getContratoStatusBadge(contrato.status)}</TableCell>
                             <TableCell className="text-sm hidden sm:table-cell">
