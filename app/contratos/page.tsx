@@ -293,21 +293,23 @@ export default function ContratosPage() {
   }
 
   const buildDescricaoContrato = (contrato: Contrato, mesReferencia: string): string => {
-    const mesLabel = MESES.find(m => m.value === mesReferencia.split("/")[0])?.label || ""
-    const ano = mesReferencia.split("/")[1] || ""
     let descricao = `Ref. ${mesReferencia} - Contrato ${contrato.numero}`
-    descricao += `\nServico de conservacao e manutencao de elevadores`
 
     const equipamentos = parseEquipamentos(contrato)
     if (equipamentos.length > 0) {
       descricao += `\n\nEquipamentos:`
       equipamentos.forEach((eq) => {
-        descricao += `\n- ${eq.nome} (Qtd: ${eq.quantidade})`
+        descricao += `\n- ${eq.quantidade} ${eq.nome}`
       })
     }
 
     if (contrato.equipamentos_consignacao) {
-      descricao += `\n\nEquipamentos em consignacao: ${contrato.equipamentos_consignacao}`
+      descricao += `\n\nEquipamentos em consignacao:`
+      // Split by newlines to list each item on its own line
+      const linhas = contrato.equipamentos_consignacao.split(/[\n\r]+/).filter(l => l.trim())
+      linhas.forEach((linha) => {
+        descricao += `\n- ${linha.trim()}`
+      })
     }
 
     return descricao
