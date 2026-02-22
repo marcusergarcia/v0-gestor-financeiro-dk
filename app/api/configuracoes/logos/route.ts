@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { pool } from "@/lib/db"
+import { query, execute } from "@/lib/db"
 
 export async function GET() {
   try {
-    const [rows] = await pool.execute(`
+    const rows = await query(`
       SELECT id, tipo, nome, dados, formato, tamanho, dimensoes, ativo, created_at
       FROM logos_sistema 
       WHERE ativo = 1
@@ -11,7 +11,7 @@ export async function GET() {
     `)
 
     // Processar os dados para garantir compatibilidade com navegadores
-    const processedRows = (rows as any[]).map((row) => {
+    const processedRows = ((rows || []) as any[]).map((row) => {
       if (row.dados && !row.dados.startsWith("data:")) {
         // Se os dados não têm o prefixo data:, adicionar
         const mimeType = getMimeType(row.formato || "png")
@@ -98,10 +98,10 @@ export async function POST(request: NextRequest) {
     })
 
     // Desativar logo anterior do mesmo tipo
-    await pool.execute(`UPDATE logos_sistema SET ativo = 0 WHERE tipo = ? AND ativo = 1`, [tipo])
+    await query(`UPDATE logos_sistema SET ativo = 0 WHERE tipo = ? AND ativo = 1`, [tipo])
 
     // Inserir novo logo
-    const [result] = await pool.execute(
+    const [result] = await execute(
       `
       INSERT INTO logos_sistema (tipo, nome, dados, formato, tamanho, dimensoes, ativo, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     const insertId = (result as any).insertId
 
     // Buscar o logo criado e retornar com prefixo data:
-    const [newLogo] = await pool.execute(
+    const newLogo = await query(
       `
       SELECT id, tipo, nome, dados, formato, tamanho, dimensoes, ativo, created_at
       FROM logos_sistema WHERE id = ?
