@@ -11,6 +11,12 @@ export async function GET() {
         cl.email as cliente_email,
         cl.telefone as cliente_telefone,
         cl.endereco as cliente_endereco,
+        cl.cnpj as cliente_cnpj,
+        cl.cpf as cliente_cpf,
+        cl.bairro as cliente_bairro,
+        cl.cidade as cliente_cidade,
+        cl.estado as cliente_estado,
+        cl.cep as cliente_cep,
         DATE_FORMAT(cc.data_inicio, '%Y-%m-%d') as data_inicio,
         DATE_FORMAT(cc.data_fim, '%Y-%m-%d') as data_fim,
         DATE_FORMAT(cc.data_proposta, '%Y-%m-%d') as data_proposta

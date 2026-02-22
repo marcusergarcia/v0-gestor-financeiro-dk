@@ -7,6 +7,16 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import {
   Plus,
   FileText,
   Edit,
@@ -17,11 +27,14 @@ import {
   TrendingUp,
   CheckCircle,
   MoreHorizontal,
+  FileCheck,
+  Package,
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency } from "@/lib/utils"
+import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
 
 interface PropostaContrato {
   id: string
@@ -41,7 +54,17 @@ interface Contrato {
   id: string
   numero: string
   proposta_id: string
+  cliente_id: string
   cliente_nome: string
+  cliente_cnpj?: string
+  cliente_cpf?: string
+  cliente_email?: string
+  cliente_telefone?: string
+  cliente_endereco?: string
+  cliente_bairro?: string
+  cliente_cidade?: string
+  cliente_estado?: string
+  cliente_cep?: string
   tipo: string
   frequencia: string
   valor_mensal: number
@@ -51,6 +74,9 @@ interface Contrato {
   data_inicio: string
   data_fim: string
   data_assinatura: string
+  equipamentos_inclusos?: string
+  equipamentos_consignacao?: string
+  servicos_inclusos?: string
   created_at: string
 }
 
@@ -108,7 +134,35 @@ export default function ContratosPage() {
   const [loading, setLoading] = useState(true)
   const [propostaStatusFilter, setPropostaStatusFilter] = useState("all")
   const [contratoStatusFilter, setContratoStatusFilter] = useState("all")
+  // NFS-e state
+  const [nfseDialogOpen, setNfseDialogOpen] = useState(false)
+  const [nfseContrato, setNfseContrato] = useState<Contrato | null>(null)
+  const [nfseMesReferencia, setNfseMesReferencia] = useState("")
+  const [notasEmitidasContrato, setNotasEmitidasContrato] = useState<Record<string, { temNfse: boolean }>>({})
+  // Month reference dialog
+  const [mesRefDialogOpen, setMesRefDialogOpen] = useState(false)
+  const [mesRefContrato, setMesRefContrato] = useState<Contrato | null>(null)
+  const [mesRefSelecionado, setMesRefSelecionado] = useState("")
+  const [anoRefSelecionado, setAnoRefSelecionado] = useState("")
   const { toast } = useToast()
+
+  const MESES = [
+    { value: "01", label: "Janeiro" },
+    { value: "02", label: "Fevereiro" },
+    { value: "03", label: "Marco" },
+    { value: "04", label: "Abril" },
+    { value: "05", label: "Maio" },
+    { value: "06", label: "Junho" },
+    { value: "07", label: "Julho" },
+    { value: "08", label: "Agosto" },
+    { value: "09", label: "Setembro" },
+    { value: "10", label: "Outubro" },
+    { value: "11", label: "Novembro" },
+    { value: "12", label: "Dezembro" },
+  ]
+
+  const currentYear = new Date().getFullYear()
+  const ANOS = Array.from({ length: 5 }, (_, i) => String(currentYear - 1 + i))
 
   useEffect(() => {
     loadPropostas()
@@ -156,6 +210,8 @@ export default function ContratosPage() {
           variant: "destructive",
         })
       }
+      // Buscar notas emitidas para controlar icones
+      await fetchNotasEmitidasPorContrato()
     } catch (error) {
       console.error("Erro ao carregar contratos:", error)
       toast({
@@ -166,6 +222,105 @@ export default function ContratosPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchNotasEmitidasPorContrato = async () => {
+    try {
+      const nfseRes = await fetch("/api/nfse").catch(() => null)
+      const mapa: Record<string, { temNfse: boolean }> = {}
+
+      if (nfseRes?.ok) {
+        const nfseData = await nfseRes.json()
+        if (nfseData.success && nfseData.data) {
+          for (const nf of nfseData.data) {
+            if (nf.origem === "contrato" && nf.origem_numero && (nf.status === "emitida" || nf.status === "processando")) {
+              const num = String(nf.origem_numero)
+              // Track per month: key = "contrato_numero|mes_referencia"
+              const mesRef = nf.descricao_servico?.match(/Ref\.\s*(\d{2}\/\d{4})/)?.[1] || ""
+              const chave = mesRef ? `${num}|${mesRef}` : num
+              if (!mapa[chave]) mapa[chave] = { temNfse: false }
+              mapa[chave].temNfse = true
+              // Also mark general
+              if (!mapa[num]) mapa[num] = { temNfse: false }
+              mapa[num].temNfse = true
+            }
+          }
+        }
+      }
+
+      setNotasEmitidasContrato(mapa)
+    } catch (error) {
+      console.error("Erro ao buscar notas emitidas:", error)
+    }
+  }
+
+  const parseEquipamentos = (contrato: Contrato): Array<{ nome: string; quantidade: number }> => {
+    try {
+      if (!contrato.equipamentos_inclusos) return []
+      const parsed = JSON.parse(contrato.equipamentos_inclusos)
+      if (Array.isArray(parsed)) {
+        return parsed.map((item: any) => ({
+          nome: item.nome || item.descricao || "Equipamento",
+          quantidade: Number(item.quantidade) || 1,
+        }))
+      }
+      return []
+    } catch {
+      return []
+    }
+  }
+
+  const handleIniciarEmitirNfse = (contrato: Contrato) => {
+    setMesRefContrato(contrato)
+    // Default to current month
+    const now = new Date()
+    setMesRefSelecionado(String(now.getMonth() + 1).padStart(2, "0"))
+    setAnoRefSelecionado(String(now.getFullYear()))
+    setMesRefDialogOpen(true)
+  }
+
+  const handleConfirmarMesRef = () => {
+    if (!mesRefContrato || !mesRefSelecionado || !anoRefSelecionado) return
+
+    const mesLabel = MESES.find(m => m.value === mesRefSelecionado)?.label || mesRefSelecionado
+    const mesReferencia = `${mesRefSelecionado}/${anoRefSelecionado}`
+
+    setNfseMesReferencia(mesReferencia)
+    setNfseContrato(mesRefContrato)
+    setMesRefDialogOpen(false)
+    setMesRefContrato(null)
+    setNfseDialogOpen(true)
+  }
+
+  const buildDescricaoContrato = (contrato: Contrato, mesReferencia: string): string => {
+    const mesLabel = MESES.find(m => m.value === mesReferencia.split("/")[0])?.label || ""
+    const ano = mesReferencia.split("/")[1] || ""
+    let descricao = `Ref. ${mesReferencia} - Contrato ${contrato.numero}`
+    descricao += `\nServico de conservacao e manutencao de elevadores`
+
+    const equipamentos = parseEquipamentos(contrato)
+    if (equipamentos.length > 0) {
+      descricao += `\n\nEquipamentos:`
+      equipamentos.forEach((eq) => {
+        descricao += `\n- ${eq.nome} (Qtd: ${eq.quantidade})`
+      })
+    }
+
+    if (contrato.equipamentos_consignacao) {
+      descricao += `\n\nEquipamentos em consignacao: ${contrato.equipamentos_consignacao}`
+    }
+
+    return descricao
+  }
+
+  const handleNfseSuccess = async () => {
+    toast({
+      title: "Sucesso!",
+      description: "NFS-e emitida com sucesso!",
+    })
+    setNfseContrato(null)
+    setNfseMesReferencia("")
+    loadContratos()
   }
 
   const excluirProposta = async (numero: string) => {
@@ -583,18 +738,20 @@ export default function ContratosPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[100px]">Número</TableHead>
-                          <TableHead className="min-w-[150px]">Cliente</TableHead>
-                          <TableHead className="hidden md:table-cell w-[80px]">Tipo</TableHead>
+                          <TableHead className="w-[100px]">Numero</TableHead>
+                          <TableHead className="min-w-[200px]">Cliente / Equipamentos</TableHead>
                           <TableHead className="w-[120px]">Valor Mensal</TableHead>
                           <TableHead className="w-[80px]">Status</TableHead>
-                          <TableHead className="hidden sm:table-cell w-[90px]">Início</TableHead>
+                          <TableHead className="hidden sm:table-cell w-[90px]">Inicio</TableHead>
                           <TableHead className="hidden lg:table-cell w-[100px]">Prazo</TableHead>
-                          <TableHead className="w-[60px]">Ações</TableHead>
+                          <TableHead className="w-[100px]">Acoes</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredContratos.map((contrato) => (
+                        {filteredContratos.map((contrato) => {
+                          const equipamentos = parseEquipamentos(contrato)
+                          const nfseJaEmitida = notasEmitidasContrato[contrato.numero]?.temNfse || false
+                          return (
                           <TableRow key={contrato.id}>
                             <TableCell className="font-medium">
                               <Badge variant="outline" className="font-mono text-xs">
@@ -602,12 +759,29 @@ export default function ContratosPage() {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <div className="font-medium text-sm">{contrato.cliente_nome}</div>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              <Badge variant="outline" className="capitalize text-xs">
-                                {contrato.tipo || "Conservação"}
-                              </Badge>
+                              <div>
+                                <div className="font-medium text-sm">{contrato.cliente_nome}</div>
+                                {equipamentos.length > 0 && (
+                                  <div className="mt-1">
+                                    {equipamentos.map((eq, idx) => (
+                                      <div key={idx} className="flex items-center gap-1 text-xs text-gray-500">
+                                        <Package className="h-3 w-3 flex-shrink-0" />
+                                        <span>{eq.nome}</span>
+                                        {eq.quantidade > 1 && (
+                                          <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                                            x{eq.quantidade}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {contrato.equipamentos_consignacao && (
+                                  <div className="mt-1 text-xs text-amber-600">
+                                    Consig.: {contrato.equipamentos_consignacao}
+                                  </div>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="font-medium text-green-600 text-sm">
                               {formatCurrency(contrato.valor_mensal)}
@@ -622,7 +796,21 @@ export default function ContratosPage() {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <div className="flex items-center justify-end">
+                              <div className="flex items-center gap-1 justify-end">
+                                {contrato.status === "ativo" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleIniciarEmitirNfse(contrato)}
+                                    className={`h-8 w-8 p-0 ${nfseJaEmitida
+                                      ? "text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed opacity-50"
+                                      : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-transparent"
+                                    }`}
+                                    title={nfseJaEmitida ? "NFS-e ja emitida" : "Emitir NFS-e (Servico)"}
+                                  >
+                                    <FileCheck className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
@@ -654,7 +842,8 @@ export default function ContratosPage() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                          )
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -664,6 +853,122 @@ export default function ContratosPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Dialog de Mes de Referencia */}
+      <Dialog open={mesRefDialogOpen} onOpenChange={(open) => {
+        setMesRefDialogOpen(open)
+        if (!open) setMesRefContrato(null)
+      }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-emerald-600" />
+              Mes de Referencia
+            </DialogTitle>
+            <DialogDescription>
+              Selecione o mes e ano de referencia para a NFS-e do contrato{" "}
+              <span className="font-semibold">{mesRefContrato?.numero}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="mes-ref">Mes</Label>
+              <Select value={mesRefSelecionado} onValueChange={setMesRefSelecionado}>
+                <SelectTrigger id="mes-ref">
+                  <SelectValue placeholder="Selecione o mes" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MESES.map((mes) => (
+                    <SelectItem key={mes.value} value={mes.value}>
+                      {mes.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ano-ref">Ano</Label>
+              <Select value={anoRefSelecionado} onValueChange={setAnoRefSelecionado}>
+                <SelectTrigger id="ano-ref">
+                  <SelectValue placeholder="Selecione o ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ANOS.map((ano) => (
+                    <SelectItem key={ano} value={ano}>
+                      {ano}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {mesRefContrato && (() => {
+              const equipamentos = parseEquipamentos(mesRefContrato)
+              return equipamentos.length > 0 ? (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
+                    <Package className="h-3.5 w-3.5" />
+                    Equipamentos do Contrato
+                  </p>
+                  {equipamentos.map((eq, idx) => (
+                    <div key={idx} className="text-xs text-gray-600 flex items-center gap-1">
+                      <span>- {eq.nome}</span>
+                      {eq.quantidade > 1 && <span className="text-gray-400">(Qtd: {eq.quantidade})</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : null
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setMesRefDialogOpen(false)
+              setMesRefContrato(null)
+            }}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmarMesRef}
+              disabled={!mesRefSelecionado || !anoRefSelecionado}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <FileCheck className="h-4 w-4 mr-2" />
+              Continuar para NFS-e
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Emissao NFS-e */}
+      {nfseContrato && (
+        <EmitirNfseDialog
+          open={nfseDialogOpen}
+          onOpenChange={(open) => {
+            setNfseDialogOpen(open)
+            if (!open) {
+              setNfseContrato(null)
+              setNfseMesReferencia("")
+            }
+          }}
+          onSuccess={handleNfseSuccess}
+          dadosOrigem={{
+            origem: "contrato",
+            origem_numero: nfseContrato.numero,
+            cliente_id: Number(nfseContrato.cliente_id),
+            cliente_nome: nfseContrato.cliente_nome,
+            cliente_cnpj: nfseContrato.cliente_cnpj,
+            cliente_cpf: nfseContrato.cliente_cpf,
+            cliente_email: nfseContrato.cliente_email,
+            cliente_telefone: nfseContrato.cliente_telefone,
+            cliente_endereco: nfseContrato.cliente_endereco,
+            cliente_bairro: nfseContrato.cliente_bairro,
+            cliente_cidade: nfseContrato.cliente_cidade,
+            cliente_uf: nfseContrato.cliente_estado,
+            cliente_cep: nfseContrato.cliente_cep,
+            descricao: buildDescricaoContrato(nfseContrato, nfseMesReferencia),
+            valor: Number(nfseContrato.valor_mensal) || 0,
+          }}
+        />
+      )}
     </div>
   )
 }
