@@ -190,9 +190,9 @@ export default function OrcamentosPage() {
         const orcamentosOrdenados = (data.data || []).sort((a: Orcamento, b: Orcamento) => {
           const ordemPrioridade = {
             pendente: 1,
-            aprovado: 2,
-            "enviado por email": 3,
-            "nota fiscal emitida": 4,
+            "nota fiscal emitida": 2,
+            aprovado: 3,
+            "enviado por email": 4,
             concluido: 5,
           }
 
