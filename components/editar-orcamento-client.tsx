@@ -577,7 +577,8 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
       return
     }
 
-    if (itens.length === 0) {
+    // Só exige itens se parcelamento material > 0 (com cobrança de material)
+    if (itens.length === 0 && parcelamentoMaterial > 0) {
       toast({
         title: "Erro",
         description: "Adicione pelo menos um item ao orçamento",
@@ -749,7 +750,7 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
             </Button>
             <Button
               onClick={salvarOrcamento}
-              disabled={saving || isLoading || !cliente || itens.length === 0 || !tipoServico.trim()} // Also disable if duplicating
+              disabled={saving || isLoading || !cliente || (itens.length === 0 && parcelamentoMaterial > 0) || !tipoServico.trim()} // Also disable if duplicating
               className="bg-white text-purple-600 hover:bg-purple-50"
             >
               <Save className="h-4 w-4 mr-2" />
