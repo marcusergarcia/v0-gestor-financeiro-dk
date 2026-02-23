@@ -576,7 +576,8 @@ export default function NovoOrcamentoPage() {
       return
     }
 
-    if (itens.length === 0) {
+    // Só exige itens se parcelamento material > 0 (com cobrança de material)
+    if (itens.length === 0 && parcelamentoMaterial > 0) {
       toast({
         title: "Erro",
         description: "Adicione pelo menos um item ao orçamento",
@@ -707,7 +708,7 @@ export default function NovoOrcamentoPage() {
             </Link>
             <Button
               onClick={salvarOrcamento}
-              disabled={saving || !cliente || itens.length === 0 || !tipoServico.trim()}
+              disabled={saving || !cliente || (itens.length === 0 && parcelamentoMaterial > 0) || !tipoServico.trim()}
               className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg"
             >
               <Save className="h-4 w-4 mr-2" />
@@ -1447,7 +1448,7 @@ export default function NovoOrcamentoPage() {
 
                   <Button
                     onClick={salvarOrcamento}
-                    disabled={saving || !cliente || itens.length === 0 || !tipoServico.trim()}
+                    disabled={saving || !cliente || (itens.length === 0 && parcelamentoMaterial > 0) || !tipoServico.trim()}
                     className="w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg"
                   >
                     <Save className="h-4 w-4 mr-2" />
