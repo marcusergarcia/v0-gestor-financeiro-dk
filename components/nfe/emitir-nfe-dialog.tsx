@@ -133,8 +133,28 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
     }
   }, [open, dadosOrigem])
 
-  const preencherDadosOrigem = () => {
+  const preencherDadosOrigem = async () => {
     if (!dadosOrigem) return
+
+    // Buscar dados de contribuinte do cliente se tivermos cliente_id
+    let contribuinte = 0
+    let inscricaoEstadual = ""
+    if (dadosOrigem.cliente_id) {
+      try {
+        const res = await fetch(`/api/clientes/${dadosOrigem.cliente_id}`)
+        const result = await res.json()
+        if (result.success && result.data) {
+          contribuinte = Number(result.data.contribuinte_icms ?? 0)
+          inscricaoEstadual = result.data.inscricao_estadual || ""
+        }
+      } catch (err) {
+        console.error("Erro ao buscar dados contribuinte do cliente:", err)
+      }
+    }
+
+    const contribuinteMap: Record<number, number> = { 0: 9, 1: 1, 2: 2 }
+    const indIeDest = contribuinteMap[contribuinte] ?? 9
+
     setForm((prev) => ({
       ...prev,
       origem: dadosOrigem.origem || "avulsa",
@@ -154,6 +174,9 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
       dest_uf: dadosOrigem.cliente_uf || "",
       dest_cep: dadosOrigem.cliente_cep || "",
       dest_codigo_municipio: dadosOrigem.cliente_codigo_municipio || "3550308",
+      // IE do destinatario: preencher automaticamente do cadastro do cliente
+      dest_inscricao_estadual: contribuinte === 1 ? inscricaoEstadual : "",
+      dest_ind_ie_dest: indIeDest,
     }))
     if (dadosOrigem.itens && dadosOrigem.itens.length > 0) {
       setItens(dadosOrigem.itens)
@@ -180,7 +203,7 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
       // 1 = Contribuinte ICMS -> ind_ie_dest = 1 (exige IE)
       // 2 = Contribuinte Isento -> ind_ie_dest = 2
       const contribuinteMap: Record<number, number> = { 0: 9, 1: 1, 2: 2 }
-      const contribuinte = cliente.contribuinte_icms ?? 0
+      const contribuinte = Number(cliente.contribuinte_icms ?? 0)
       const indIeDest = contribuinteMap[contribuinte] ?? 9
 
       setForm((prev) => ({
