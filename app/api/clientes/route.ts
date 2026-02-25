@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
         nome_adm,
         contato_adm,
         telefone_adm,
-        email_adm
+        email_adm,
+        contribuinte_icms,
+        inscricao_estadual
       FROM clientes
       WHERE (status IS NULL OR status != 'inativo')
     `
@@ -143,8 +145,9 @@ export async function POST(request: NextRequest) {
         codigo, nome, cnpj, cpf, email, telefone, endereco, bairro,
         cidade, estado, cep, contato, distancia_km, sindico, rg_sindico,
         cpf_sindico, zelador, tem_contrato, dia_contrato, observacoes,
-        nome_adm, contato_adm, telefone_adm, email_adm, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        nome_adm, contato_adm, telefone_adm, email_adm,
+        contribuinte_icms, inscricao_estadual, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `
 
     const params = [
@@ -172,6 +175,8 @@ export async function POST(request: NextRequest) {
       data.contato_adm?.toUpperCase() || null,
       data.telefone_adm || null,
       data.email_adm?.toLowerCase() || null,
+      data.contribuinte_icms !== undefined ? Number(data.contribuinte_icms) : 0,
+      data.inscricao_estadual?.replace(/[^\d]/g, "") || null,
     ]
 
     const result = await query(insertQuery, params)

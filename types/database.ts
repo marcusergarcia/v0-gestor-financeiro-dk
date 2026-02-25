@@ -28,6 +28,9 @@ export interface Cliente {
   contato_adm?: string
   telefone_adm?: string
   email_adm?: string
+  // Contribuinte ICMS
+  contribuinte_icms?: number // 0 = Não contribuinte (padrão), 1 = Contribuinte ICMS, 2 = Contribuinte Isento
+  inscricao_estadual?: string
 }
 
 export interface Boleto {

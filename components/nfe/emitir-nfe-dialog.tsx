@@ -175,6 +175,14 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
   const selecionarCliente = (clienteId: string) => {
     const cliente = clientes.find((c) => String(c.id) === clienteId)
     if (cliente) {
+      // Mapear contribuinte_icms do cadastro para ind_ie_dest da NF-e
+      // 0 = Nao Contribuinte -> ind_ie_dest = 9
+      // 1 = Contribuinte ICMS -> ind_ie_dest = 1 (exige IE)
+      // 2 = Contribuinte Isento -> ind_ie_dest = 2
+      const contribuinteMap: Record<number, number> = { 0: 9, 1: 1, 2: 2 }
+      const contribuinte = cliente.contribuinte_icms ?? 0
+      const indIeDest = contribuinteMap[contribuinte] ?? 9
+
       setForm((prev) => ({
         ...prev,
         cliente_id: cliente.id,
@@ -191,9 +199,9 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
         dest_uf: cliente.estado || "",
         dest_cep: cliente.cep || "",
         dest_codigo_municipio: cliente.codigo_municipio || prev.dest_codigo_municipio,
-        // IE do destinatario: preencher se o cliente tiver
-        dest_inscricao_estadual: cliente.inscricao_estadual || "",
-        dest_ind_ie_dest: cliente.inscricao_estadual ? 1 : 9,
+        // IE do destinatario: preencher automaticamente do cadastro do cliente
+        dest_inscricao_estadual: contribuinte === 1 ? (cliente.inscricao_estadual || "") : "",
+        dest_ind_ie_dest: indIeDest,
       }))
     }
   }
@@ -572,6 +580,12 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
                         )}
                         {cliente.cpf && (
                           <span className="text-muted-foreground ml-2">CPF: {cliente.cpf}</span>
+                        )}
+                        {cliente.contribuinte_icms === 1 && (
+                          <Badge variant="outline" className="ml-2 text-xs">Contribuinte ICMS</Badge>
+                        )}
+                        {cliente.contribuinte_icms === 2 && (
+                          <Badge variant="outline" className="ml-2 text-xs">Isento</Badge>
                         )}
                       </button>
                     ))}

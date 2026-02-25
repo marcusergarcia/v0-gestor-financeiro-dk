@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Save, User, Phone, MapPin, Lock, Building2, Search, MapPinned } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ArrowLeft, Save, User, Phone, MapPin, Lock, Building2, Search, MapPinned, FileText } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useCep } from "@/hooks/use-cep"
@@ -49,6 +50,8 @@ export default function NovoClientePage() {
     contato_adm: "",
     telefone_adm: "",
     email_adm: "",
+    contribuinte_icms: 0,
+    inscricao_estadual: "",
   })
 
   useEffect(() => {
@@ -160,6 +163,18 @@ export default function NovoClientePage() {
 
     if (!formData.cnpj && !formData.cpf) {
       const msg = "CNPJ ou CPF e obrigatorio para gerar o codigo"
+      setSubmitError(msg)
+      toast({
+        title: "Erro de validacao",
+        description: msg,
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validar inscricao estadual quando contribuinte ICMS
+    if (formData.contribuinte_icms === 1 && !formData.inscricao_estadual.trim()) {
+      const msg = "Inscricao Estadual e obrigatoria para Contribuinte ICMS"
       setSubmitError(msg)
       toast({
         title: "Erro de validacao",
@@ -534,6 +549,60 @@ export default function NovoClientePage() {
                   placeholder="Observações adicionais sobre o cliente"
                   rows={3}
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Informacoes Fiscais */}
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-50 to-green-50">
+            <CardHeader className="bg-gradient-to-r from-emerald-500 to-green-600 text-white rounded-t-lg p-4 lg:p-6">
+              <CardTitle className="flex items-center gap-2 text-white">
+                <FileText className="h-5 w-5" />
+                Informacoes Fiscais
+              </CardTitle>
+              <CardDescription className="text-emerald-100">Contribuinte ICMS e Inscricao Estadual para emissao de NF-e</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="contribuinte_icms">Contribuinte ICMS</Label>
+                  <Select
+                    value={String(formData.contribuinte_icms)}
+                    onValueChange={(value) => {
+                      const numValue = Number(value)
+                      handleInputChange("contribuinte_icms", numValue)
+                      // Limpar inscricao estadual quando nao e contribuinte ICMS
+                      if (numValue !== 1) {
+                        handleInputChange("inscricao_estadual", "")
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Nao Contribuinte</SelectItem>
+                      <SelectItem value="1">Contribuinte ICMS</SelectItem>
+                      <SelectItem value="2">Contribuinte Isento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">A maioria dos clientes e Nao Contribuinte</p>
+                </div>
+                {formData.contribuinte_icms === 1 && (
+                  <div className="space-y-1">
+                    <Label htmlFor="inscricao_estadual">Inscricao Estadual *</Label>
+                    <Input
+                      id="inscricao_estadual"
+                      value={formData.inscricao_estadual}
+                      onChange={(e) => handleInputChange("inscricao_estadual", e.target.value.replace(/[^\d]/g, ""))}
+                      placeholder="Ex: 123456789"
+                      className="h-9"
+                      maxLength={14}
+                      required
+                    />
+                    <p className="text-xs text-amber-600">Obrigatorio para Contribuinte ICMS</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
