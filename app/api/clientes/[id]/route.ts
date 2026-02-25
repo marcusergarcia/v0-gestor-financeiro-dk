@@ -63,6 +63,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       contato_adm: data.contato_adm !== undefined ? data.contato_adm.toUpperCase() : currentClient.contato_adm,
       telefone_adm: data.telefone_adm !== undefined ? data.telefone_adm : currentClient.telefone_adm,
       email_adm: data.email_adm !== undefined ? data.email_adm.toLowerCase() : currentClient.email_adm,
+      contribuinte_icms: data.contribuinte_icms !== undefined ? Number(data.contribuinte_icms) : (currentClient.contribuinte_icms ?? 0),
+      inscricao_estadual: data.inscricao_estadual !== undefined ? (data.inscricao_estadual?.replace(/[^\d]/g, "") || null) : currentClient.inscricao_estadual,
     }
 
     console.log("Dados mesclados para atualização:", updatedData)
@@ -95,6 +97,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         contato_adm = ?,
         telefone_adm = ?,
         email_adm = ?,
+        contribuinte_icms = ?,
+        inscricao_estadual = ?,
         updated_at = NOW()
       WHERE id = ?`,
       [
@@ -124,6 +128,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
         updatedData.contato_adm,
         updatedData.telefone_adm,
         updatedData.email_adm,
+        updatedData.contribuinte_icms,
+        updatedData.inscricao_estadual,
         id,
       ],
     )
