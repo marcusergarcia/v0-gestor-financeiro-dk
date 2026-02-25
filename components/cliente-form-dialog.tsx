@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Plus, Save, User, Lock, Search, MapPinned } from 'lucide-react'
 import { useCep } from "@/hooks/use-cep"
@@ -52,6 +53,8 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
     contato_adm: "",
     telefone_adm: "",
     email_adm: "",
+    contribuinte_icms: 0,
+    inscricao_estadual: "",
   })
 
   const { toast } = useToast()
@@ -147,6 +150,8 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
       contato_adm: "",
       telefone_adm: "",
       email_adm: "",
+      contribuinte_icms: 0,
+      inscricao_estadual: "",
     })
     setDocumentoUtilizado(null)
   }
@@ -167,6 +172,16 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
       toast({
         title: "Erro",
         description: "CNPJ ou CPF é obrigatório para gerar o código",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validar inscricao estadual quando contribuinte ICMS
+    if (formData.contribuinte_icms === 1 && !formData.inscricao_estadual.trim()) {
+      toast({
+        title: "Erro de validacao",
+        description: "Inscricao Estadual e obrigatoria para Contribuinte ICMS",
         variant: "destructive",
       })
       return
@@ -423,6 +438,50 @@ export function ClienteFormDialog({ children, open, onOpenChange, onSuccess }: C
                 onChange={(e) => handleInputChange("sindico", e.target.value)}
                 placeholder="Nome completo do síndico"
               />
+            </div>
+          </div>
+
+          {/* Informacoes Fiscais */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Informacoes Fiscais</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="contribuinte_icms_dialog">Contribuinte ICMS</Label>
+                <Select
+                  value={String(formData.contribuinte_icms)}
+                  onValueChange={(value) => {
+                    const numValue = Number(value)
+                    handleInputChange("contribuinte_icms", numValue)
+                    if (numValue !== 1) {
+                      handleInputChange("inscricao_estadual", "")
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Nao Contribuinte</SelectItem>
+                    <SelectItem value="1">Contribuinte ICMS</SelectItem>
+                    <SelectItem value="2">Contribuinte Isento</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">A maioria dos clientes e Nao Contribuinte</p>
+              </div>
+              {formData.contribuinte_icms === 1 && (
+                <div>
+                  <Label htmlFor="inscricao_estadual_dialog">Inscricao Estadual *</Label>
+                  <Input
+                    id="inscricao_estadual_dialog"
+                    value={formData.inscricao_estadual}
+                    onChange={(e) => handleInputChange("inscricao_estadual", e.target.value.replace(/[^\d]/g, ""))}
+                    placeholder="Ex: 123456789"
+                    maxLength={14}
+                    required
+                  />
+                  <p className="text-xs text-amber-600 mt-1">Obrigatorio para Contribuinte ICMS</p>
+                </div>
+              )}
             </div>
           </div>
 
