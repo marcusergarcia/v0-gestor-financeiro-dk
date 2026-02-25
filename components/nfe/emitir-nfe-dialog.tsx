@@ -487,7 +487,31 @@ export function EmitirNfeDialog({ open, onOpenChange, onSuccess, dadosOrigem }: 
               <span className="font-medium text-foreground whitespace-nowrap">{"e meu cliente"}</span>
               <Select
                 value={String(form.dest_ind_ie_dest)}
-                onValueChange={(v) => updateForm("dest_ind_ie_dest", Number(v))}
+                onValueChange={(v) => {
+                  const newIndIe = Number(v)
+                  // Quando mudar para Contribuinte ICMS, buscar IE do cliente selecionado
+                  if (newIndIe === 1 && form.cliente_id) {
+                    const cliente = clientes.find((c) => c.id === form.cliente_id)
+                    if (cliente && cliente.inscricao_estadual) {
+                      setForm((prev) => ({
+                        ...prev,
+                        dest_ind_ie_dest: newIndIe,
+                        dest_inscricao_estadual: cliente.inscricao_estadual || "",
+                      }))
+                      return
+                    }
+                  }
+                  // Quando mudar para Nao Contribuinte ou Isento, limpar IE
+                  if (newIndIe !== 1) {
+                    setForm((prev) => ({
+                      ...prev,
+                      dest_ind_ie_dest: newIndIe,
+                      dest_inscricao_estadual: "",
+                    }))
+                    return
+                  }
+                  updateForm("dest_ind_ie_dest", newIndIe)
+                }}
               >
                 <SelectTrigger className="w-[200px] h-8">
                   <SelectValue />
