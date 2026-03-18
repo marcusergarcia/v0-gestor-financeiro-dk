@@ -35,6 +35,8 @@ import {
   Receipt,
   Package,
   Wrench,
+  Download,
+  Calendar,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
@@ -100,6 +102,8 @@ export default function NotaFiscalPage() {
   const [statusFilter, setStatusFilter] = useState("todos")
   const [origemFilter, setOrigemFilter] = useState("todos")
   const [tipoFilter, setTipoFilter] = useState("todos")
+  const [periodoFilter, setPeriodoFilter] = useState("todos")
+  const [exportando, setExportando] = useState(false)
 
   // NFS-e states
   const [emitirNfseOpen, setEmitirNfseOpen] = useState(false)
@@ -472,6 +476,178 @@ export default function NotaFiscalPage() {
     }
   }
 
+  // Funcao para verificar se uma data esta no periodo selecionado
+  const isNoPeriodo = (dataStr: string | null, periodo: string): boolean => {
+    if (!dataStr || periodo === "todos") return true
+    
+    const data = new Date(dataStr)
+    const hoje = new Date()
+    const mesAtual = hoje.getMonth()
+    const anoAtual = hoje.getFullYear()
+    
+    if (periodo === "mes_atual") {
+      return data.getMonth() === mesAtual && data.getFullYear() === anoAtual
+    }
+    
+    if (periodo === "mes_anterior") {
+      const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1
+      const anoMesAnterior = mesAtual === 0 ? anoAtual - 1 : anoAtual
+      return data.getMonth() === mesAnterior && data.getFullYear() === anoMesAnterior
+    }
+    
+    return true
+  }
+
+  // Funcao para exportar as notas filtradas
+  const handleExportar = async (formato: "csv" | "xml") => {
+    setExportando(true)
+    try {
+      const notasParaExportar = notasFiltradas
+      
+      if (notasParaExportar.length === 0) {
+        toast({ 
+          title: "Nenhuma nota para exportar", 
+          description: "Aplique os filtros para selecionar as notas que deseja exportar.",
+          variant: "destructive" 
+        })
+        setExportando(false)
+        return
+      }
+
+      if (formato === "csv") {
+        // Gerar CSV
+        const headers = [
+          "Tipo",
+          "Numero",
+          "Serie",
+          "RPS",
+          "Chave Acesso",
+          "Codigo Verificacao",
+          "Cliente Nome",
+          "Cliente CNPJ/CPF",
+          "Origem",
+          "Origem Numero",
+          "Valor Total",
+          "Valor Servicos",
+          "Valor Produtos",
+          "Status",
+          "Data Emissao",
+          "Data Criacao",
+          "Descricao Servico",
+          "Natureza Operacao",
+          "Protocolo"
+        ]
+        
+        const rows = notasParaExportar.map(nota => [
+          nota.tipo.toUpperCase(),
+          nota.numero || "",
+          nota.tipo === "nfe" ? (nota.serie || "") : (nota.serie_rps || ""),
+          nota.tipo === "nfse" ? (nota.numero_rps || "") : "",
+          nota.chave_acesso || "",
+          nota.codigo_verificacao || "",
+          (nota.tomador_razao_social || nota.cliente_nome || "").replace(/"/g, '""'),
+          nota.tomador_cpf_cnpj || "",
+          nota.origem || "",
+          nota.origem_numero || "",
+          nota.valor_total?.toFixed(2) || "0.00",
+          nota.valor_servicos?.toFixed(2) || "0.00",
+          nota.valor_produtos?.toFixed(2) || "0.00",
+          nota.status || "",
+          nota.data_emissao ? formatDateBR(nota.data_emissao) : "",
+          nota.created_at ? formatDateBR(nota.created_at) : "",
+          (nota.descricao_servico || "").replace(/"/g, '""').replace(/\n/g, ' '),
+          (nota.natureza_operacao || "").replace(/"/g, '""'),
+          nota.protocolo || ""
+        ])
+        
+        const csvContent = [
+          headers.join(";"),
+          ...rows.map(row => row.map(cell => `"${cell}"`).join(";"))
+        ].join("\n")
+        
+        const BOM = '\uFEFF'
+        const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8" })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+        link.download = `notas_fiscais_${new Date().toISOString().split('T')[0]}.csv`
+        link.click()
+        URL.revokeObjectURL(url)
+        
+        toast({ title: "Exportado com sucesso!", description: `${notasParaExportar.length} notas exportadas em CSV.` })
+      } else {
+        // Gerar XML
+        let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n'
+        xmlContent += '<NotasFiscais>\n'
+        xmlContent += `  <DataExportacao>${new Date().toISOString()}</DataExportacao>\n`
+        xmlContent += `  <TotalNotas>${notasParaExportar.length}</TotalNotas>\n`
+        xmlContent += '  <Notas>\n'
+        
+        for (const nota of notasParaExportar) {
+          xmlContent += '    <Nota>\n'
+          xmlContent += `      <Tipo>${nota.tipo.toUpperCase()}</Tipo>\n`
+          xmlContent += `      <Numero>${nota.numero || ""}</Numero>\n`
+          xmlContent += `      <Serie>${nota.tipo === "nfe" ? (nota.serie || "") : (nota.serie_rps || "")}</Serie>\n`
+          if (nota.tipo === "nfse") {
+            xmlContent += `      <NumeroRPS>${nota.numero_rps || ""}</NumeroRPS>\n`
+            xmlContent += `      <CodigoVerificacao>${nota.codigo_verificacao || ""}</CodigoVerificacao>\n`
+          }
+          if (nota.tipo === "nfe") {
+            xmlContent += `      <ChaveAcesso>${nota.chave_acesso || ""}</ChaveAcesso>\n`
+            xmlContent += `      <Protocolo>${nota.protocolo || ""}</Protocolo>\n`
+          }
+          xmlContent += '      <Cliente>\n'
+          xmlContent += `        <Nome><![CDATA[${nota.tomador_razao_social || nota.cliente_nome || ""}]]></Nome>\n`
+          xmlContent += `        <CpfCnpj>${nota.tomador_cpf_cnpj || ""}</CpfCnpj>\n`
+          xmlContent += `        <ClienteId>${nota.cliente_id || ""}</ClienteId>\n`
+          xmlContent += '      </Cliente>\n'
+          xmlContent += '      <Origem>\n'
+          xmlContent += `        <Tipo>${nota.origem || ""}</Tipo>\n`
+          xmlContent += `        <Numero>${nota.origem_numero || ""}</Numero>\n`
+          xmlContent += `        <Id>${nota.origem_id || ""}</Id>\n`
+          xmlContent += '      </Origem>\n'
+          xmlContent += '      <Valores>\n'
+          xmlContent += `        <Total>${nota.valor_total?.toFixed(2) || "0.00"}</Total>\n`
+          if (nota.tipo === "nfse") {
+            xmlContent += `        <Servicos>${nota.valor_servicos?.toFixed(2) || "0.00"}</Servicos>\n`
+          }
+          if (nota.tipo === "nfe") {
+            xmlContent += `        <Produtos>${nota.valor_produtos?.toFixed(2) || "0.00"}</Produtos>\n`
+          }
+          xmlContent += '      </Valores>\n'
+          xmlContent += `      <Status>${nota.status || ""}</Status>\n`
+          xmlContent += `      <DataEmissao>${nota.data_emissao || ""}</DataEmissao>\n`
+          xmlContent += `      <DataCriacao>${nota.created_at || ""}</DataCriacao>\n`
+          if (nota.tipo === "nfse" && nota.descricao_servico) {
+            xmlContent += `      <DescricaoServico><![CDATA[${nota.descricao_servico}]]></DescricaoServico>\n`
+          }
+          if (nota.tipo === "nfe" && nota.natureza_operacao) {
+            xmlContent += `      <NaturezaOperacao><![CDATA[${nota.natureza_operacao}]]></NaturezaOperacao>\n`
+          }
+          xmlContent += '    </Nota>\n'
+        }
+        
+        xmlContent += '  </Notas>\n'
+        xmlContent += '</NotasFiscais>'
+        
+        const blob = new Blob([xmlContent], { type: "application/xml;charset=utf-8" })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+        link.download = `notas_fiscais_${new Date().toISOString().split('T')[0]}.xml`
+        link.click()
+        URL.revokeObjectURL(url)
+        
+        toast({ title: "Exportado com sucesso!", description: `${notasParaExportar.length} notas exportadas em XML.` })
+      }
+    } catch (error) {
+      console.error("Erro ao exportar:", error)
+      toast({ title: "Erro ao exportar", description: "Ocorreu um erro ao gerar o arquivo de exportacao.", variant: "destructive" })
+    } finally {
+      setExportando(false)
+    }
+  }
+
   const notasFiltradas = notas.filter((nota) => {
     // Filtro de tipo
     if (tipoFilter !== "todos" && nota.tipo !== tipoFilter) return false
@@ -483,6 +659,8 @@ export default function NotaFiscalPage() {
     }
     // Filtro de origem
     if (origemFilter !== "todos" && nota.origem !== origemFilter) return false
+    // Filtro de periodo
+    if (!isNoPeriodo(nota.data_emissao || nota.created_at, periodoFilter)) return false
     // Filtro de busca
     if (searchTerm) {
       const search = searchTerm.toLowerCase()
@@ -720,6 +898,60 @@ export default function NotaFiscalPage() {
                   <SelectItem value="avulsa">Avulsa</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={periodoFilter} onValueChange={setPeriodoFilter}>
+                <SelectTrigger className="w-full md:w-44">
+                  <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                  <SelectValue placeholder="Periodo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os Meses</SelectItem>
+                  <SelectItem value="mes_atual">Mes Atual</SelectItem>
+                  <SelectItem value="mes_anterior">Mes Anterior</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Barra de exportacao */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <FileCheck className="h-4 w-4" />
+                <span>
+                  <strong>{notasFiltradas.length}</strong> nota(s) encontrada(s)
+                  {tipoFilter !== "todos" && ` | Tipo: ${tipoFilter.toUpperCase()}`}
+                  {periodoFilter !== "todos" && ` | Periodo: ${periodoFilter === "mes_atual" ? "Mes Atual" : "Mes Anterior"}`}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500">Exportar para:</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleExportar("csv")}
+                  disabled={exportando || notasFiltradas.length === 0}
+                  className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                >
+                  {exportando ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleExportar("xml")}
+                  disabled={exportando || notasFiltradas.length === 0}
+                  className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                >
+                  {exportando ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  XML
+                </Button>
+              </div>
             </div>
 
             {/* Tabela */}
