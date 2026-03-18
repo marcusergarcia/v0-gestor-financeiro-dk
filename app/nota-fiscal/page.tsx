@@ -549,9 +549,9 @@ export default function NotaFiscalPage() {
           nota.tomador_cpf_cnpj || "",
           nota.origem || "",
           nota.origem_numero || "",
-          nota.valor_total?.toFixed(2) || "0.00",
-          nota.valor_servicos?.toFixed(2) || "0.00",
-          nota.valor_produtos?.toFixed(2) || "0.00",
+          Number(nota.valor_total || 0).toFixed(2),
+          Number(nota.valor_servicos || 0).toFixed(2),
+          Number(nota.valor_produtos || 0).toFixed(2),
           nota.status || "",
           nota.data_emissao ? formatDateBR(nota.data_emissao) : "",
           nota.created_at ? formatDateBR(nota.created_at) : "",
@@ -607,12 +607,12 @@ export default function NotaFiscalPage() {
           xmlContent += `        <Id>${nota.origem_id || ""}</Id>\n`
           xmlContent += '      </Origem>\n'
           xmlContent += '      <Valores>\n'
-          xmlContent += `        <Total>${nota.valor_total?.toFixed(2) || "0.00"}</Total>\n`
+          xmlContent += `        <Total>${Number(nota.valor_total || 0).toFixed(2)}</Total>\n`
           if (nota.tipo === "nfse") {
-            xmlContent += `        <Servicos>${nota.valor_servicos?.toFixed(2) || "0.00"}</Servicos>\n`
+            xmlContent += `        <Servicos>${Number(nota.valor_servicos || 0).toFixed(2)}</Servicos>\n`
           }
           if (nota.tipo === "nfe") {
-            xmlContent += `        <Produtos>${nota.valor_produtos?.toFixed(2) || "0.00"}</Produtos>\n`
+            xmlContent += `        <Produtos>${Number(nota.valor_produtos || 0).toFixed(2)}</Produtos>\n`
           }
           xmlContent += '      </Valores>\n'
           xmlContent += `      <Status>${nota.status || ""}</Status>\n`
