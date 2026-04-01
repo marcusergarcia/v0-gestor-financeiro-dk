@@ -23,11 +23,13 @@ import {
   FileCheck,
   CreditCard,
   Package as PackageIcon,
+  Shield,
 } from "lucide-react"
 import Link from "next/link"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { OrcamentoPrintEditor } from "@/components/orcamento-print-editor"
+import { LaudoTecnicoPrintEditor } from "@/components/laudo-tecnico-print-editor"
 import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
 import { EmitirNfeDialog } from "@/components/nfe/emitir-nfe-dialog"
 
@@ -113,6 +115,7 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
   const [logoMenu, setLogoMenu] = useState<string>("")
   const [valorPorKm, setValorPorKm] = useState(1.5)
   const [showPrintEditor, setShowPrintEditor] = useState(false)
+  const [showLaudoEditor, setShowLaudoEditor] = useState(false)
   const [nfseDialogOpen, setNfseDialogOpen] = useState(false)
   const [nfeDialogOpen, setNfeDialogOpen] = useState(false)
   const [numeroOrcamento, setNumeroOrcamento] = useState<string>("")
@@ -495,6 +498,13 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
             >
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
+            </Button>
+            <Button
+              onClick={() => setShowLaudoEditor(true)}
+              className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white shadow-lg"
+            >
+              <Shield className="h-4 w-4 mr-2" />
+              Laudo Seguradora
             </Button>
           </div>
         </div>
@@ -976,11 +986,15 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      {showPrintEditor && (
-        <OrcamentoPrintEditor orcamento={orcamento} itens={itens} onClose={() => setShowPrintEditor(false)} />
-      )}
+{showPrintEditor && (
+  <OrcamentoPrintEditor orcamento={orcamento} itens={itens} onClose={() => setShowPrintEditor(false)} />
+  )}
 
-      <EmitirNfseDialog
+  {showLaudoEditor && (
+  <LaudoTecnicoPrintEditor orcamento={orcamento} itens={itens} onClose={() => setShowLaudoEditor(false)} />
+  )}
+  
+  <EmitirNfseDialog
         open={nfseDialogOpen}
         onOpenChange={setNfseDialogOpen}
         onSuccess={handleNfseSuccess}
