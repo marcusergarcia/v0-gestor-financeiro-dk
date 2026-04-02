@@ -895,10 +895,10 @@ export default function ContratosPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredContratos.map((contrato) => {
-                          const equipamentos = parseEquipamentos(contrato)
-                          const nfseJaEmitida = notasEmitidasContrato[contrato.numero]?.temNfse || false
-                          return (
+                                {filteredContratos.map((contrato) => {
+                                  const equipamentos = parseEquipamentos(contrato)
+                                  // Botao sempre habilitado - verificacao de nota ja emitida sera feita no dialog apos selecionar o mes
+                                  return (
                           <TableRow key={contrato.id}>
                             <TableCell className="font-medium">
                               <Badge variant="outline" className="font-mono text-xs">
@@ -949,20 +949,17 @@ export default function ContratosPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1 justify-end">
-                                {contrato.status === "ativo" && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleIniciarEmitirNfse(contrato)}
-                                    className={`h-8 w-8 p-0 ${nfseJaEmitida
-                                      ? "text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed opacity-50"
-                                      : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-transparent"
-                                    }`}
-                                    title={nfseJaEmitida ? "NFS-e ja emitida" : "Emitir NFS-e (Servico)"}
-                                  >
-                                    <FileCheck className="h-4 w-4" />
-                                  </Button>
-                                )}
+                                      {contrato.status === "ativo" && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleIniciarEmitirNfse(contrato)}
+                                          className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-transparent"
+                                          title="Emitir NFS-e (Servico)"
+                                        >
+                                          <FileCheck className="h-4 w-4" />
+                                        </Button>
+                                      )}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
@@ -1114,20 +1111,38 @@ export default function ContratosPage() {
               </div>
             ) : mesRefContrato && (() => {
               const equipamentos = parseEquipamentos(mesRefContrato)
-              return equipamentos.length > 0 ? (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
-                    <Package className="h-3.5 w-3.5" />
-                    Equipamentos do Contrato
-                  </p>
-                  {equipamentos.map((eq, idx) => (
-                    <div key={idx} className="text-xs text-gray-600 flex items-center gap-1">
-                      <span>- {eq.nome}</span>
-                      {eq.quantidade > 1 && <span className="text-gray-400">(Qtd: {eq.quantidade})</span>}
+              const mesRef = mesRefSelecionado && anoRefSelecionado ? `${mesRefSelecionado}/${anoRefSelecionado}` : ""
+              const chaveVerificacao = mesRef ? `${mesRefContrato.numero}|${mesRef}` : ""
+              const jaEmitidaMes = chaveVerificacao && notasEmitidasContrato[chaveVerificacao]?.temNfse
+              return (
+                <div className="space-y-3">
+                  {jaEmitidaMes && (
+                    <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-3">
+                      <p className="text-xs font-semibold text-yellow-700 flex items-center gap-1">
+                        <FileCheck className="h-3.5 w-3.5" />
+                        NFS-e ja emitida para {MESES.find(m => m.value === mesRefSelecionado)?.label}/{anoRefSelecionado}
+                      </p>
+                      <p className="text-xs text-yellow-600 mt-1">
+                        Selecione outro mes ou continue para emitir novamente.
+                      </p>
                     </div>
-                  ))}
+                  )}
+                  {equipamentos.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
+                        <Package className="h-3.5 w-3.5" />
+                        Equipamentos do Contrato
+                      </p>
+                      {equipamentos.map((eq, idx) => (
+                        <div key={idx} className="text-xs text-gray-600 flex items-center gap-1">
+                          <span>- {eq.nome}</span>
+                          {eq.quantidade > 1 && <span className="text-gray-400">(Qtd: {eq.quantidade})</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ) : null
+              )
             })()}
           </div>
           <DialogFooter>
@@ -1185,7 +1200,7 @@ export default function ContratosPage() {
             cliente_cidade: nfseContrato.cliente_cidade,
             cliente_uf: nfseContrato.cliente_estado,
             cliente_cep: nfseContrato.cliente_cep,
-            descricao: buildDescricaoContrato(nfseContrato, nfseMesReferencia),
+            descricao: buildDescricaoContrato(nfseContrato, nfseMesReferencia, nfseMesReferencia ? getMesAnterior(nfseMesReferencia.split("/")[0], nfseMesReferencia.split("/")[1]) : undefined),
             valor: Number(nfseContrato.valor_mensal) || 0,
           }}
         />
