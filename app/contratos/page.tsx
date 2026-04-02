@@ -281,6 +281,7 @@ export default function ContratosPage() {
   }
 
   const handleIniciarEmitirNfse = (contrato: Contrato) => {
+    setEmissaoLote(false)
     setMesRefContrato(contrato)
     // Default to current month for nota, and previous month for preventiva
     const now = new Date()
