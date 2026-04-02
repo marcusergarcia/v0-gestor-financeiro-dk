@@ -148,6 +148,7 @@ export default function ContratosPage() {
   // Emissao em lote
   const [emissaoLote, setEmissaoLote] = useState(false)
   const [emitindoLote, setEmitindoLote] = useState(false)
+  const [contratosSelecionadosLote, setContratosSelecionadosLote] = useState<Set<number>>(new Set())
   const { toast } = useToast()
 
   const MESES = [
@@ -167,6 +168,21 @@ export default function ContratosPage() {
 
   const currentYear = new Date().getFullYear()
   const ANOS = Array.from({ length: 5 }, (_, i) => String(currentYear - 1 + i))
+
+  // Funcao para calcular o mes anterior
+  const getMesAnterior = (mes: string, ano: string): string => {
+    const mesNum = parseInt(mes)
+    const anoNum = parseInt(ano)
+    if (mesNum === 1) {
+      return `12/${anoNum - 1}`
+    }
+    return `${String(mesNum - 1).padStart(2, "0")}/${anoNum}`
+  }
+
+  // Funcao para obter nome do mes
+  const getMesNome = (mes: string): string => {
+    return MESES.find(m => m.value === mes)?.label || mes
+  }
 
   useEffect(() => {
     loadPropostas()
@@ -290,13 +306,22 @@ export default function ContratosPage() {
     const mesReferencia = `${mesRefSelecionado}/${anoRefSelecionado}`
 
     if (emissaoLote) {
-      // Emissao em lote para todos os contratos ativos
+      // Emissao em lote para contratos selecionados
+      if (contratosSelecionadosLote.size === 0) {
+        toast({
+          title: "Aviso",
+          description: "Selecione pelo menos um contrato para emitir.",
+          variant: "destructive",
+        })
+        return
+      }
+      
       setEmitindoLote(true)
-      const contratosAtivos = contratos.filter(c => c.status === "ativo")
+      const contratosParaEmitir = contratos.filter(c => c.status === "ativo" && contratosSelecionadosLote.has(c.id))
       let sucessos = 0
       let erros = 0
 
-      for (const contrato of contratosAtivos) {
+      for (const contrato of contratosParaEmitir) {
         // Verificar se ja existe nota para este mes
         const chaveVerificacao = `${contrato.numero}|${mesReferencia}`
         if (notasEmitidasContrato[chaveVerificacao]?.temNfse) {
@@ -304,7 +329,9 @@ export default function ContratosPage() {
         }
 
         try {
-          const descricao = buildDescricaoContrato(contrato, mesReferencia)
+          // Calcular mes anterior para a referencia da preventiva
+          const mesAnterior = getMesAnterior(mesRefSelecionado, anoRefSelecionado)
+          const descricao = buildDescricaoContrato(contrato, mesReferencia, mesAnterior)
           const response = await fetch("/api/nfse", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -342,6 +369,7 @@ export default function ContratosPage() {
       setEmitindoLote(false)
       setMesRefDialogOpen(false)
       setEmissaoLote(false)
+      setContratosSelecionadosLote(new Set())
 
       if (sucessos > 0) {
         toast({
@@ -372,8 +400,11 @@ export default function ContratosPage() {
     }
   }
 
-  const buildDescricaoContrato = (contrato: Contrato, mesReferencia: string): string => {
-    let descricao = `Ref. ${mesReferencia} - Contrato ${contrato.numero}`
+  const buildDescricaoContrato = (contrato: Contrato, mesReferencia: string, mesAnterior?: string): string => {
+    // Se tiver mes anterior, indica que a nota e do mes atual referente a preventiva do mes anterior
+    let descricao = mesAnterior 
+      ? `Ref. ${mesReferencia} - Referente a preventiva realizada em ${mesAnterior} - Contrato ${contrato.numero}`
+      : `Ref. ${mesReferencia} - Contrato ${contrato.numero}`
 
     const equipamentos = parseEquipamentos(contrato)
     if (equipamentos.length > 0) {
@@ -820,6 +851,8 @@ export default function ContratosPage() {
                         // Usar o primeiro contrato ativo como base para abrir o dialogo de mes
                         // mas setar um estado para indicar que e emissao em lote
                         setEmissaoLote(true)
+                        // Inicializar todos os contratos ativos como selecionados
+                        setContratosSelecionadosLote(new Set(contratosAtivos.map(c => c.id)))
                         const now = new Date()
                         setMesRefSelecionado(String(now.getMonth() + 1).padStart(2, "0"))
                         setAnoRefSelecionado(String(now.getFullYear()))
@@ -979,6 +1012,7 @@ export default function ContratosPage() {
         if (!open) {
           setMesRefContrato(null)
           setEmissaoLote(false)
+          setContratosSelecionadosLote(new Set())
         }
       }}>
         <DialogContent className="sm:max-w-[425px]">
@@ -1034,16 +1068,47 @@ export default function ContratosPage() {
             </div>
             {emissaoLote ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                <p className="text-xs font-semibold text-emerald-700 mb-2 flex items-center gap-1">
-                  <FileCheck className="h-3.5 w-3.5" />
-                  Contratos que serao processados
-                </p>
-                <div className="text-xs text-emerald-600 max-h-32 overflow-y-auto space-y-1">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                    <FileCheck className="h-3.5 w-3.5" />
+                    Selecione os contratos ({contratosSelecionadosLote.size} de {contratos.filter(c => c.status === "ativo").length})
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs text-emerald-700 hover:text-emerald-800"
+                    onClick={() => {
+                      const contratosAtivos = contratos.filter(c => c.status === "ativo")
+                      if (contratosSelecionadosLote.size === contratosAtivos.length) {
+                        setContratosSelecionadosLote(new Set())
+                      } else {
+                        setContratosSelecionadosLote(new Set(contratosAtivos.map(c => c.id)))
+                      }
+                    }}
+                  >
+                    {contratosSelecionadosLote.size === contratos.filter(c => c.status === "ativo").length ? "Desmarcar Todos" : "Selecionar Todos"}
+                  </Button>
+                </div>
+                <div className="text-xs text-emerald-600 max-h-40 overflow-y-auto space-y-2">
                   {contratos.filter(c => c.status === "ativo").map((c) => (
-                    <div key={c.id} className="flex items-center justify-between">
-                      <span>{c.numero} - {c.cliente_nome}</span>
+                    <label key={c.id} className="flex items-center gap-2 cursor-pointer hover:bg-emerald-100 p-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={contratosSelecionadosLote.has(c.id)}
+                        onChange={(e) => {
+                          const newSet = new Set(contratosSelecionadosLote)
+                          if (e.target.checked) {
+                            newSet.add(c.id)
+                          } else {
+                            newSet.delete(c.id)
+                          }
+                          setContratosSelecionadosLote(newSet)
+                        }}
+                        className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="flex-1">{c.numero} - {c.cliente_nome}</span>
                       <span className="text-emerald-500">{formatCurrency(c.valor_mensal)}</span>
-                    </div>
+                    </label>
                   ))}
                 </div>
               </div>
@@ -1075,7 +1140,7 @@ export default function ContratosPage() {
             </Button>
             <Button
               onClick={handleConfirmarMesRef}
-              disabled={!mesRefSelecionado || !anoRefSelecionado || emitindoLote}
+              disabled={!mesRefSelecionado || !anoRefSelecionado || emitindoLote || (emissaoLote && contratosSelecionadosLote.size === 0)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {emitindoLote ? (
