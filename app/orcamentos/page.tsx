@@ -936,68 +936,64 @@ export default function OrcamentosPage() {
         </div>
       </div>
 
-      {nfseOrcamento && (
-        <EmitirNfseDialog
-          open={nfseDialogOpen}
-          onOpenChange={(open) => {
-            setNfseDialogOpen(open)
-            if (!open) setNfseOrcamento(null)
-          }}
-          onSuccess={handleNfseSuccess}
-          dadosOrigem={{
-            origem: "orcamento",
-            origem_numero: nfseOrcamento.numero,
-            cliente_id: Number(nfseOrcamento.cliente_id),
-            cliente_nome: nfseOrcamento.cliente_nome,
-            cliente_cnpj: nfseOrcamento.cliente_cnpj,
-            cliente_cpf: nfseOrcamento.cliente_cpf,
-            cliente_email: nfseOrcamento.cliente_email,
-            cliente_telefone: nfseOrcamento.cliente_telefone,
-            cliente_endereco: nfseOrcamento.cliente_endereco,
-            cliente_bairro: nfseOrcamento.cliente_bairro,
-            cliente_cidade: nfseOrcamento.cliente_cidade,
-            cliente_uf: nfseOrcamento.cliente_estado,
-            cliente_cep: nfseOrcamento.cliente_cep,
-            descricao: nfseOrcamento.detalhes_servico || "",
-            valor: calcularSubtotalMdoOrcamento(nfseOrcamento),
-            valor_material: safeNumber(nfseOrcamento.valor_material),
-            valor_total_orcamento: safeNumber(nfseOrcamento.valor_total),
-          }}
-        />
-      )}
+      <EmitirNfseDialog
+        open={nfseDialogOpen}
+        onOpenChange={(open) => {
+          setNfseDialogOpen(open)
+          if (!open) setNfseOrcamento(null)
+        }}
+        onSuccess={handleNfseSuccess}
+        dadosOrigem={nfseOrcamento ? {
+          origem: "orcamento",
+          origem_numero: nfseOrcamento.numero,
+          cliente_id: Number(nfseOrcamento.cliente_id),
+          cliente_nome: nfseOrcamento.cliente_nome,
+          cliente_cnpj: nfseOrcamento.cliente_cnpj,
+          cliente_cpf: nfseOrcamento.cliente_cpf,
+          cliente_email: nfseOrcamento.cliente_email,
+          cliente_telefone: nfseOrcamento.cliente_telefone,
+          cliente_endereco: nfseOrcamento.cliente_endereco,
+          cliente_bairro: nfseOrcamento.cliente_bairro,
+          cliente_cidade: nfseOrcamento.cliente_cidade,
+          cliente_uf: nfseOrcamento.cliente_estado,
+          cliente_cep: nfseOrcamento.cliente_cep,
+          descricao: nfseOrcamento.detalhes_servico || "",
+          valor: calcularSubtotalMdoOrcamento(nfseOrcamento),
+          valor_material: safeNumber(nfseOrcamento.valor_material),
+          valor_total_orcamento: safeNumber(nfseOrcamento.valor_total),
+        } : undefined}
+      />
 
-      {nfeOrcamento && (
-        <EmitirNfeDialog
-          open={nfeDialogOpen}
-          onOpenChange={(open) => {
-            setNfeDialogOpen(open)
-            if (!open) {
-              setNfeOrcamento(null)
-              setNfeItens([])
-            }
-          }}
-          onSuccess={handleNfeSuccess}
-          dadosOrigem={{
-            origem: "orcamento",
-            origem_numero: nfeOrcamento.numero,
-            cliente_id: Number(nfeOrcamento.cliente_id),
-            cliente_nome: nfeOrcamento.cliente_nome,
-            cliente_cnpj: nfeOrcamento.cliente_cnpj,
-            cliente_cpf: nfeOrcamento.cliente_cpf,
-            cliente_email: nfeOrcamento.cliente_email,
-            cliente_telefone: nfeOrcamento.cliente_telefone,
-            cliente_endereco: nfeOrcamento.cliente_endereco,
-            cliente_numero: "",
-            cliente_complemento: "",
-            cliente_bairro: nfeOrcamento.cliente_bairro,
-            cliente_cidade: nfeOrcamento.cliente_cidade,
-            cliente_uf: nfeOrcamento.cliente_estado,
-            cliente_cep: nfeOrcamento.cliente_cep,
-            itens: nfeItens,
-            valor_material: calcularSubtotalMaterialOrcamento(nfeOrcamento),
-          }}
-        />
-      )}
+      <EmitirNfeDialog
+        open={nfeDialogOpen}
+        onOpenChange={(open) => {
+          setNfeDialogOpen(open)
+          if (!open) {
+            setNfeOrcamento(null)
+            setNfeItens([])
+          }
+        }}
+        onSuccess={handleNfeSuccess}
+        dadosOrigem={nfeOrcamento ? {
+          origem: "orcamento",
+          origem_numero: nfeOrcamento.numero,
+          cliente_id: Number(nfeOrcamento.cliente_id),
+          cliente_nome: nfeOrcamento.cliente_nome,
+          cliente_cnpj: nfeOrcamento.cliente_cnpj,
+          cliente_cpf: nfeOrcamento.cliente_cpf,
+          cliente_email: nfeOrcamento.cliente_email,
+          cliente_telefone: nfeOrcamento.cliente_telefone,
+          cliente_endereco: nfeOrcamento.cliente_endereco,
+          cliente_numero: "",
+          cliente_complemento: "",
+          cliente_bairro: nfeOrcamento.cliente_bairro,
+          cliente_cidade: nfeOrcamento.cliente_cidade,
+          cliente_uf: nfeOrcamento.cliente_estado,
+          cliente_cep: nfeOrcamento.cliente_cep,
+          itens: nfeItens,
+          valor_material: calcularSubtotalMaterialOrcamento(nfeOrcamento),
+        } : undefined}
+      />
     </div>
   )
 }
