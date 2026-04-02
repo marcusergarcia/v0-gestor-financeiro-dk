@@ -149,10 +149,6 @@ export default function ContratosPage() {
   // Mes da preventiva (para a descricao)
   const [mesPreventivaRef, setMesPreventivaRef] = useState("")
   const [anoPreventivaRef, setAnoPreventivaRef] = useState("")
-  // Emissao em lote
-  const [emissaoLote, setEmissaoLote] = useState(false)
-  const [emitindoLote, setEmitindoLote] = useState(false)
-  const [contratosSelecionadosLote, setContratosSelecionadosLote] = useState<Set<number>>(new Set())
   const { toast } = useToast()
 
   const MESES = [
@@ -299,111 +295,21 @@ export default function ContratosPage() {
     setMesRefDialogOpen(true)
   }
 
-  const handleConfirmarMesRef = async () => {
-    if (!mesRefSelecionado || !anoRefSelecionado) return
+  const handleConfirmarMesRef = () => {
+    if (!mesRefSelecionado || !anoRefSelecionado || !mesRefContrato) return
 
     const mesReferencia = `${mesRefSelecionado}/${anoRefSelecionado}`
-
-    if (emissaoLote) {
-      // Emissao em lote para contratos selecionados
-      if (contratosSelecionadosLote.size === 0) {
-        toast({
-          title: "Aviso",
-          description: "Selecione pelo menos um contrato para emitir.",
-          variant: "destructive",
-        })
-        return
-      }
-      
-      setEmitindoLote(true)
-      const contratosParaEmitir = contratos.filter(c => c.status === "ativo" && contratosSelecionadosLote.has(c.id))
-      let sucessos = 0
-      let erros = 0
-
-      for (const contrato of contratosParaEmitir) {
-        // Verificar se ja existe nota para este mes
-        const chaveVerificacao = `${contrato.numero}|${mesReferencia}`
-        if (notasEmitidasContrato[chaveVerificacao]?.temNfse) {
-          continue // Ja foi emitida para este mes
-        }
-
-        try {
-          // Usar o mes da preventiva selecionado pelo usuario
-          const mesPreventivaFormatado = mesPreventivaRef && anoPreventivaRef 
-            ? `${mesPreventivaRef}/${anoPreventivaRef}` 
-            : undefined
-          const descricao = buildDescricaoContrato(contrato, mesPreventivaFormatado)
-          const response = await fetch("/api/nfse", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              origem: "contrato",
-              origem_numero: contrato.numero,
-              cliente_id: Number(contrato.cliente_id),
-              cliente_nome: contrato.cliente_nome,
-              cliente_cnpj: contrato.cliente_cnpj,
-              cliente_cpf: contrato.cliente_cpf,
-              cliente_email: contrato.cliente_email,
-              cliente_telefone: contrato.cliente_telefone,
-              cliente_endereco: contrato.cliente_endereco,
-              cliente_bairro: contrato.cliente_bairro,
-              cliente_cidade: contrato.cliente_cidade,
-              cliente_uf: contrato.cliente_estado,
-              cliente_cep: contrato.cliente_cep,
-              descricao_servico: descricao,
-              valor_servicos: Number(contrato.valor_mensal) || 0,
-            }),
-          })
-
-          const result = await response.json()
-          if (result.success) {
-            sucessos++
-          } else {
-            erros++
-          }
-        } catch (error) {
-          console.error(`Erro ao emitir NFS-e para contrato ${contrato.numero}:`, error)
-          erros++
-        }
-      }
-
-      setEmitindoLote(false)
-      setMesRefDialogOpen(false)
-      setEmissaoLote(false)
-      setContratosSelecionadosLote(new Set())
-
-      if (sucessos > 0) {
-        toast({
-          title: "Emissao em Lote Concluida",
-          description: `${sucessos} NFS-e(s) emitida(s) com sucesso.${erros > 0 ? ` ${erros} erro(s).` : ""}`,
-        })
-        loadContratos()
-      } else if (erros > 0) {
-        toast({
-          title: "Erro na Emissao",
-          description: `Nenhuma NFS-e foi emitida. Verifique os dados dos contratos.`,
-          variant: "destructive",
-        })
-      } else {
-        toast({
-          title: "Aviso",
-          description: "Todas as NFS-e ja foram emitidas para este mes.",
-        })
-      }
-    } else {
-      // Emissao individual
-      if (!mesRefContrato) return
-      setNfseMesReferencia(mesReferencia)
-      // Guardar o mes da preventiva formatado
-      const mesPreventivaFormatado = mesPreventivaRef && anoPreventivaRef 
-        ? `${mesPreventivaRef}/${anoPreventivaRef}` 
-        : ""
-      setNfseMesPreventivaRef(mesPreventivaFormatado)
-      setNfseContrato(mesRefContrato)
-      setMesRefDialogOpen(false)
-      setMesRefContrato(null)
-      setNfseDialogOpen(true)
-    }
+    
+    setNfseMesReferencia(mesReferencia)
+    // Guardar o mes da preventiva formatado
+    const mesPreventivaFormatado = mesPreventivaRef && anoPreventivaRef 
+      ? `${mesPreventivaRef}/${anoPreventivaRef}` 
+      : ""
+    setNfseMesPreventivaRef(mesPreventivaFormatado)
+    setNfseContrato(mesRefContrato)
+    setMesRefDialogOpen(false)
+    setMesRefContrato(null)
+    setNfseDialogOpen(true)
   }
 
   const buildDescricaoContrato = (contrato: Contrato, mesPreventivaFormatado?: string): string => {
@@ -841,40 +747,7 @@ export default function ContratosPage() {
                       {filteredContratos.length !== 1 ? "s" : ""}
                     </CardDescription>
                   </div>
-                  {contratos.filter(c => c.status === "ativo").length > 0 && (
-                    <Button
-                      onClick={() => {
-                        // Abrir dialog para selecionar mes e emitir em lote
-                        const contratosAtivos = contratos.filter(c => c.status === "ativo")
-                        if (contratosAtivos.length === 0) {
-                          toast({
-                            title: "Aviso",
-                            description: "Nao ha contratos ativos para emitir NFS-e.",
-                            variant: "destructive",
-                          })
-                          return
-                        }
-                        // Usar o primeiro contrato ativo como base para abrir o dialogo de mes
-                        // mas setar um estado para indicar que e emissao em lote
-setEmissaoLote(true)
-                // Inicializar todos os contratos ativos como selecionados
-                setContratosSelecionadosLote(new Set(contratosAtivos.map(c => c.id)))
-                const now = new Date()
-                setMesRefSelecionado(String(now.getMonth() + 1).padStart(2, "0"))
-                setAnoRefSelecionado(String(now.getFullYear()))
-                // Mes anterior para a preventiva
-                const mesAnterior = now.getMonth() === 0 ? 12 : now.getMonth()
-                const anoAnterior = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
-                setMesPreventivaRef(String(mesAnterior).padStart(2, "0"))
-                setAnoPreventivaRef(String(anoAnterior))
-                setMesRefDialogOpen(true)
-                      }}
-                      className="bg-white text-green-600 hover:bg-green-50 text-sm lg:text-base"
-                    >
-                      <FileCheck className="h-4 w-4 mr-2" />
-                      Emitir NFS-e em Lote
-                    </Button>
-                  )}
+
                 </div>
               </CardHeader>
               <CardContent className="p-4 lg:p-6">
@@ -1019,28 +892,17 @@ setEmissaoLote(true)
         setMesRefDialogOpen(open)
         if (!open) {
           setMesRefContrato(null)
-          setEmissaoLote(false)
-          setContratosSelecionadosLote(new Set())
         }
       }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-emerald-600" />
-              {emissaoLote ? "Emitir NFS-e em Lote" : "Mes de Referencia"}
+              Mes de Referencia
             </DialogTitle>
             <DialogDescription>
-              {emissaoLote ? (
-                <>
-                  Selecione o mes e ano de referencia para emitir NFS-e de{" "}
-                  <span className="font-semibold">{contratos.filter(c => c.status === "ativo").length} contrato(s) ativo(s)</span>
-                </>
-              ) : (
-                <>
-                  Selecione o mes e ano de referencia para a NFS-e do contrato{" "}
-                  <span className="font-semibold">{mesRefContrato?.numero}</span>
-                </>
-              )}
+              Selecione o mes e ano de referencia para a NFS-e do contrato{" "}
+              <span className="font-semibold">{mesRefContrato?.numero}</span>
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -1113,53 +975,7 @@ setEmissaoLote(true)
               </p>
             </div>
             
-            {emissaoLote ? (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-                    <FileCheck className="h-3.5 w-3.5" />
-                    Selecione os contratos ({contratosSelecionadosLote.size} de {contratos.filter(c => c.status === "ativo").length})
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-xs text-emerald-700 hover:text-emerald-800"
-                    onClick={() => {
-                      const contratosAtivos = contratos.filter(c => c.status === "ativo")
-                      if (contratosSelecionadosLote.size === contratosAtivos.length) {
-                        setContratosSelecionadosLote(new Set())
-                      } else {
-                        setContratosSelecionadosLote(new Set(contratosAtivos.map(c => c.id)))
-                      }
-                    }}
-                  >
-                    {contratosSelecionadosLote.size === contratos.filter(c => c.status === "ativo").length ? "Desmarcar Todos" : "Selecionar Todos"}
-                  </Button>
-                </div>
-                <div className="text-xs text-emerald-600 max-h-40 overflow-y-auto space-y-2">
-                  {contratos.filter(c => c.status === "ativo").map((c) => (
-                    <label key={c.id} className="flex items-center gap-2 cursor-pointer hover:bg-emerald-100 p-1 rounded">
-                      <input
-                        type="checkbox"
-                        checked={contratosSelecionadosLote.has(c.id)}
-                        onChange={(e) => {
-                          const newSet = new Set(contratosSelecionadosLote)
-                          if (e.target.checked) {
-                            newSet.add(c.id)
-                          } else {
-                            newSet.delete(c.id)
-                          }
-                          setContratosSelecionadosLote(newSet)
-                        }}
-                        className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span className="flex-1">{c.numero} - {c.cliente_nome}</span>
-                      <span className="text-emerald-500">{formatCurrency(c.valor_mensal)}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ) : mesRefContrato && (() => {
+            {mesRefContrato && (() => {
               const equipamentos = parseEquipamentos(mesRefContrato)
               const mesRef = mesRefSelecionado && anoRefSelecionado ? `${mesRefSelecionado}/${anoRefSelecionado}` : ""
               const chaveVerificacao = mesRef ? `${mesRefContrato.numero}|${mesRef}` : ""
@@ -1199,26 +1015,16 @@ setEmissaoLote(true)
             <Button variant="outline" onClick={() => {
               setMesRefDialogOpen(false)
               setMesRefContrato(null)
-              setEmissaoLote(false)
-            }} disabled={emitindoLote}>
+            }}>
               Cancelar
             </Button>
             <Button
               onClick={handleConfirmarMesRef}
-              disabled={!mesRefSelecionado || !anoRefSelecionado || emitindoLote || (emissaoLote && contratosSelecionadosLote.size === 0)}
+              disabled={!mesRefSelecionado || !anoRefSelecionado}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
-              {emitindoLote ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Emitindo...
-                </>
-              ) : (
-                <>
-                  <FileCheck className="h-4 w-4 mr-2" />
-                  {emissaoLote ? "Emitir em Lote" : "Continuar para NFS-e"}
-                </>
-              )}
+              <FileCheck className="h-4 w-4 mr-2" />
+              Continuar para NFS-e
             </Button>
           </DialogFooter>
         </DialogContent>
