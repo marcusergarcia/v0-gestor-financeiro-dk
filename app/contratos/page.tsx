@@ -139,12 +139,16 @@ export default function ContratosPage() {
   const [nfseDialogOpen, setNfseDialogOpen] = useState(false)
   const [nfseContrato, setNfseContrato] = useState<Contrato | null>(null)
   const [nfseMesReferencia, setNfseMesReferencia] = useState("")
+  const [nfseMesPreventivaRef, setNfseMesPreventivaRef] = useState("")
   const [notasEmitidasContrato, setNotasEmitidasContrato] = useState<Record<string, { temNfse: boolean }>>({})
   // Month reference dialog
   const [mesRefDialogOpen, setMesRefDialogOpen] = useState(false)
   const [mesRefContrato, setMesRefContrato] = useState<Contrato | null>(null)
   const [mesRefSelecionado, setMesRefSelecionado] = useState("")
   const [anoRefSelecionado, setAnoRefSelecionado] = useState("")
+  // Mes da preventiva (para a descricao)
+  const [mesPreventivaRef, setMesPreventivaRef] = useState("")
+  const [anoPreventivaRef, setAnoPreventivaRef] = useState("")
   // Emissao em lote
   const [emissaoLote, setEmissaoLote] = useState(false)
   const [emitindoLote, setEmitindoLote] = useState(false)
@@ -168,16 +172,6 @@ export default function ContratosPage() {
 
   const currentYear = new Date().getFullYear()
   const ANOS = Array.from({ length: 5 }, (_, i) => String(currentYear - 1 + i))
-
-  // Funcao para calcular o mes anterior
-  const getMesAnterior = (mes: string, ano: string): string => {
-    const mesNum = parseInt(mes)
-    const anoNum = parseInt(ano)
-    if (mesNum === 1) {
-      return `12/${anoNum - 1}`
-    }
-    return `${String(mesNum - 1).padStart(2, "0")}/${anoNum}`
-  }
 
   // Funcao para obter nome do mes
   const getMesNome = (mes: string): string => {
@@ -293,10 +287,15 @@ export default function ContratosPage() {
   const handleIniciarEmitirNfse = (contrato: Contrato) => {
     setEmissaoLote(false)
     setMesRefContrato(contrato)
-    // Default to current month
+    // Default to current month for nota, and previous month for preventiva
     const now = new Date()
     setMesRefSelecionado(String(now.getMonth() + 1).padStart(2, "0"))
     setAnoRefSelecionado(String(now.getFullYear()))
+    // Mes anterior para a preventiva
+    const mesAnterior = now.getMonth() === 0 ? 12 : now.getMonth()
+    const anoAnterior = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+    setMesPreventivaRef(String(mesAnterior).padStart(2, "0"))
+    setAnoPreventivaRef(String(anoAnterior))
     setMesRefDialogOpen(true)
   }
 
@@ -329,9 +328,11 @@ export default function ContratosPage() {
         }
 
         try {
-          // Calcular mes anterior para a referencia da preventiva
-          const mesAnterior = getMesAnterior(mesRefSelecionado, anoRefSelecionado)
-          const descricao = buildDescricaoContrato(contrato, mesReferencia, mesAnterior)
+          // Usar o mes da preventiva selecionado pelo usuario
+          const mesPreventivaFormatado = mesPreventivaRef && anoPreventivaRef 
+            ? `${mesPreventivaRef}/${anoPreventivaRef}` 
+            : undefined
+          const descricao = buildDescricaoContrato(contrato, mesPreventivaFormatado)
           const response = await fetch("/api/nfse", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -393,6 +394,11 @@ export default function ContratosPage() {
       // Emissao individual
       if (!mesRefContrato) return
       setNfseMesReferencia(mesReferencia)
+      // Guardar o mes da preventiva formatado
+      const mesPreventivaFormatado = mesPreventivaRef && anoPreventivaRef 
+        ? `${mesPreventivaRef}/${anoPreventivaRef}` 
+        : ""
+      setNfseMesPreventivaRef(mesPreventivaFormatado)
       setNfseContrato(mesRefContrato)
       setMesRefDialogOpen(false)
       setMesRefContrato(null)
@@ -400,11 +406,11 @@ export default function ContratosPage() {
     }
   }
 
-  const buildDescricaoContrato = (contrato: Contrato, mesReferencia: string, mesAnterior?: string): string => {
-    // Se tiver mes anterior, indica que a nota e do mes atual referente a preventiva do mes anterior
-    let descricao = mesAnterior 
-      ? `Ref. ${mesReferencia} - Referente a preventiva realizada em ${mesAnterior} - Contrato ${contrato.numero}`
-      : `Ref. ${mesReferencia} - Contrato ${contrato.numero}`
+  const buildDescricaoContrato = (contrato: Contrato, mesPreventivaFormatado?: string): string => {
+    // Se tiver mes da preventiva, adicionar na descricao
+    let descricao = mesPreventivaFormatado 
+      ? `Referente a preventiva realizada em ${mesPreventivaFormatado} - Contrato ${contrato.numero}`
+      : `Contrato ${contrato.numero}`
 
     const equipamentos = parseEquipamentos(contrato)
     if (equipamentos.length > 0) {
@@ -850,13 +856,18 @@ export default function ContratosPage() {
                         }
                         // Usar o primeiro contrato ativo como base para abrir o dialogo de mes
                         // mas setar um estado para indicar que e emissao em lote
-                        setEmissaoLote(true)
-                        // Inicializar todos os contratos ativos como selecionados
-                        setContratosSelecionadosLote(new Set(contratosAtivos.map(c => c.id)))
-                        const now = new Date()
-                        setMesRefSelecionado(String(now.getMonth() + 1).padStart(2, "0"))
-                        setAnoRefSelecionado(String(now.getFullYear()))
-                        setMesRefDialogOpen(true)
+setEmissaoLote(true)
+                // Inicializar todos os contratos ativos como selecionados
+                setContratosSelecionadosLote(new Set(contratosAtivos.map(c => c.id)))
+                const now = new Date()
+                setMesRefSelecionado(String(now.getMonth() + 1).padStart(2, "0"))
+                setAnoRefSelecionado(String(now.getFullYear()))
+                // Mes anterior para a preventiva
+                const mesAnterior = now.getMonth() === 0 ? 12 : now.getMonth()
+                const anoAnterior = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+                setMesPreventivaRef(String(mesAnterior).padStart(2, "0"))
+                setAnoPreventivaRef(String(anoAnterior))
+                setMesRefDialogOpen(true)
                       }}
                       className="bg-white text-green-600 hover:bg-green-50 text-sm lg:text-base"
                     >
@@ -1063,6 +1074,45 @@ export default function ContratosPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Mes da Preventiva */}
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <Label className="text-sm font-semibold text-blue-700 mb-2 block">
+                Mes da Preventiva (para descricao)
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Select value={mesPreventivaRef} onValueChange={setMesPreventivaRef}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Mes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MESES.map((mes) => (
+                      <SelectItem key={mes.value} value={mes.value}>
+                        {mes.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={anoPreventivaRef} onValueChange={setAnoPreventivaRef}>
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Ano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ANOS.map((ano) => (
+                      <SelectItem key={ano} value={ano}>
+                        {ano}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-blue-600 mt-2">
+                Descricao: {mesPreventivaRef && anoPreventivaRef 
+                  ? `Referente a preventiva realizada em ${mesPreventivaRef}/${anoPreventivaRef} - Contrato ...`
+                  : "Contrato ..."}
+              </p>
+            </div>
+            
             {emissaoLote ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                 <div className="flex items-center justify-between mb-2">
@@ -1200,7 +1250,7 @@ export default function ContratosPage() {
             cliente_cidade: nfseContrato.cliente_cidade,
             cliente_uf: nfseContrato.cliente_estado,
             cliente_cep: nfseContrato.cliente_cep,
-            descricao: buildDescricaoContrato(nfseContrato, nfseMesReferencia, nfseMesReferencia ? getMesAnterior(nfseMesReferencia.split("/")[0], nfseMesReferencia.split("/")[1]) : undefined),
+            descricao: buildDescricaoContrato(nfseContrato, nfseMesPreventivaRef || undefined),
             valor: Number(nfseContrato.valor_mensal) || 0,
           }}
         />
