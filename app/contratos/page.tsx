@@ -145,6 +145,9 @@ export default function ContratosPage() {
   const [mesRefContrato, setMesRefContrato] = useState<Contrato | null>(null)
   const [mesRefSelecionado, setMesRefSelecionado] = useState("")
   const [anoRefSelecionado, setAnoRefSelecionado] = useState("")
+  // Emissao em lote
+  const [emissaoLote, setEmissaoLote] = useState(false)
+  const [emitindoLote, setEmitindoLote] = useState(false)
   const { toast } = useToast()
 
   const MESES = [
@@ -272,6 +275,7 @@ export default function ContratosPage() {
   }
 
   const handleIniciarEmitirNfse = (contrato: Contrato) => {
+    setEmissaoLote(false)
     setMesRefContrato(contrato)
     // Default to current month
     const now = new Date()
@@ -280,17 +284,92 @@ export default function ContratosPage() {
     setMesRefDialogOpen(true)
   }
 
-  const handleConfirmarMesRef = () => {
-    if (!mesRefContrato || !mesRefSelecionado || !anoRefSelecionado) return
+  const handleConfirmarMesRef = async () => {
+    if (!mesRefSelecionado || !anoRefSelecionado) return
 
-    const mesLabel = MESES.find(m => m.value === mesRefSelecionado)?.label || mesRefSelecionado
     const mesReferencia = `${mesRefSelecionado}/${anoRefSelecionado}`
 
-    setNfseMesReferencia(mesReferencia)
-    setNfseContrato(mesRefContrato)
-    setMesRefDialogOpen(false)
-    setMesRefContrato(null)
-    setNfseDialogOpen(true)
+    if (emissaoLote) {
+      // Emissao em lote para todos os contratos ativos
+      setEmitindoLote(true)
+      const contratosAtivos = contratos.filter(c => c.status === "ativo")
+      let sucessos = 0
+      let erros = 0
+
+      for (const contrato of contratosAtivos) {
+        // Verificar se ja existe nota para este mes
+        const chaveVerificacao = `${contrato.numero}|${mesReferencia}`
+        if (notasEmitidasContrato[chaveVerificacao]?.temNfse) {
+          continue // Ja foi emitida para este mes
+        }
+
+        try {
+          const descricao = buildDescricaoContrato(contrato, mesReferencia)
+          const response = await fetch("/api/nfse", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              origem: "contrato",
+              origem_numero: contrato.numero,
+              cliente_id: Number(contrato.cliente_id),
+              cliente_nome: contrato.cliente_nome,
+              cliente_cnpj: contrato.cliente_cnpj,
+              cliente_cpf: contrato.cliente_cpf,
+              cliente_email: contrato.cliente_email,
+              cliente_telefone: contrato.cliente_telefone,
+              cliente_endereco: contrato.cliente_endereco,
+              cliente_bairro: contrato.cliente_bairro,
+              cliente_cidade: contrato.cliente_cidade,
+              cliente_uf: contrato.cliente_estado,
+              cliente_cep: contrato.cliente_cep,
+              descricao_servico: descricao,
+              valor_servicos: Number(contrato.valor_mensal) || 0,
+            }),
+          })
+
+          const result = await response.json()
+          if (result.success) {
+            sucessos++
+          } else {
+            erros++
+          }
+        } catch (error) {
+          console.error(`Erro ao emitir NFS-e para contrato ${contrato.numero}:`, error)
+          erros++
+        }
+      }
+
+      setEmitindoLote(false)
+      setMesRefDialogOpen(false)
+      setEmissaoLote(false)
+
+      if (sucessos > 0) {
+        toast({
+          title: "Emissao em Lote Concluida",
+          description: `${sucessos} NFS-e(s) emitida(s) com sucesso.${erros > 0 ? ` ${erros} erro(s).` : ""}`,
+        })
+        loadContratos()
+      } else if (erros > 0) {
+        toast({
+          title: "Erro na Emissao",
+          description: `Nenhuma NFS-e foi emitida. Verifique os dados dos contratos.`,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Aviso",
+          description: "Todas as NFS-e ja foram emitidas para este mes.",
+        })
+      }
+    } else {
+      // Emissao individual
+      if (!mesRefContrato) return
+      setNfseMesReferencia(mesReferencia)
+      setNfseContrato(mesRefContrato)
+      setMesRefDialogOpen(false)
+      setMesRefContrato(null)
+      setNfseDialogOpen(true)
+    }
   }
 
   const buildDescricaoContrato = (contrato: Contrato, mesReferencia: string): string => {
@@ -714,14 +793,45 @@ export default function ContratosPage() {
           <TabsContent value="contratos" className="space-y-4 lg:space-y-6">
             <Card className="border-0 shadow-lg bg-white">
               <CardHeader className="bg-gradient-to-r from-green-500 to-blue-600 text-white rounded-t-lg p-4 lg:p-6">
-                <CardTitle className="text-white flex items-center gap-2 text-lg lg:text-xl">
-                  <TrendingUp className="h-4 w-4 lg:h-5 lg:w-5" />
-                  Contratos Ativos
-                </CardTitle>
-                <CardDescription className="text-green-100 text-sm">
-                  {filteredContratos.length} contrato{filteredContratos.length !== 1 ? "s" : ""} encontrado
-                  {filteredContratos.length !== 1 ? "s" : ""}
-                </CardDescription>
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-white flex items-center gap-2 text-lg lg:text-xl">
+                      <TrendingUp className="h-4 w-4 lg:h-5 lg:w-5" />
+                      Contratos Ativos
+                    </CardTitle>
+                    <CardDescription className="text-green-100 text-sm">
+                      {filteredContratos.length} contrato{filteredContratos.length !== 1 ? "s" : ""} encontrado
+                      {filteredContratos.length !== 1 ? "s" : ""}
+                    </CardDescription>
+                  </div>
+                  {contratos.filter(c => c.status === "ativo").length > 0 && (
+                    <Button
+                      onClick={() => {
+                        // Abrir dialog para selecionar mes e emitir em lote
+                        const contratosAtivos = contratos.filter(c => c.status === "ativo")
+                        if (contratosAtivos.length === 0) {
+                          toast({
+                            title: "Aviso",
+                            description: "Nao ha contratos ativos para emitir NFS-e.",
+                            variant: "destructive",
+                          })
+                          return
+                        }
+                        // Usar o primeiro contrato ativo como base para abrir o dialogo de mes
+                        // mas setar um estado para indicar que e emissao em lote
+                        setEmissaoLote(true)
+                        const now = new Date()
+                        setMesRefSelecionado(String(now.getMonth() + 1).padStart(2, "0"))
+                        setAnoRefSelecionado(String(now.getFullYear()))
+                        setMesRefDialogOpen(true)
+                      }}
+                      className="bg-white text-green-600 hover:bg-green-50 text-sm lg:text-base"
+                    >
+                      <FileCheck className="h-4 w-4 mr-2" />
+                      Emitir NFS-e em Lote
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-4 lg:p-6">
                 {filteredContratos.length === 0 ? (
@@ -866,17 +976,29 @@ export default function ContratosPage() {
       {/* Dialog de Mes de Referencia */}
       <Dialog open={mesRefDialogOpen} onOpenChange={(open) => {
         setMesRefDialogOpen(open)
-        if (!open) setMesRefContrato(null)
+        if (!open) {
+          setMesRefContrato(null)
+          setEmissaoLote(false)
+        }
       }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-emerald-600" />
-              Mes de Referencia
+              {emissaoLote ? "Emitir NFS-e em Lote" : "Mes de Referencia"}
             </DialogTitle>
             <DialogDescription>
-              Selecione o mes e ano de referencia para a NFS-e do contrato{" "}
-              <span className="font-semibold">{mesRefContrato?.numero}</span>
+              {emissaoLote ? (
+                <>
+                  Selecione o mes e ano de referencia para emitir NFS-e de{" "}
+                  <span className="font-semibold">{contratos.filter(c => c.status === "ativo").length} contrato(s) ativo(s)</span>
+                </>
+              ) : (
+                <>
+                  Selecione o mes e ano de referencia para a NFS-e do contrato{" "}
+                  <span className="font-semibold">{mesRefContrato?.numero}</span>
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -910,7 +1032,22 @@ export default function ContratosPage() {
                 </SelectContent>
               </Select>
             </div>
-            {mesRefContrato && (() => {
+            {emissaoLote ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <p className="text-xs font-semibold text-emerald-700 mb-2 flex items-center gap-1">
+                  <FileCheck className="h-3.5 w-3.5" />
+                  Contratos que serao processados
+                </p>
+                <div className="text-xs text-emerald-600 max-h-32 overflow-y-auto space-y-1">
+                  {contratos.filter(c => c.status === "ativo").map((c) => (
+                    <div key={c.id} className="flex items-center justify-between">
+                      <span>{c.numero} - {c.cliente_nome}</span>
+                      <span className="text-emerald-500">{formatCurrency(c.valor_mensal)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : mesRefContrato && (() => {
               const equipamentos = parseEquipamentos(mesRefContrato)
               return equipamentos.length > 0 ? (
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -932,16 +1069,26 @@ export default function ContratosPage() {
             <Button variant="outline" onClick={() => {
               setMesRefDialogOpen(false)
               setMesRefContrato(null)
-            }}>
+              setEmissaoLote(false)
+            }} disabled={emitindoLote}>
               Cancelar
             </Button>
             <Button
               onClick={handleConfirmarMesRef}
-              disabled={!mesRefSelecionado || !anoRefSelecionado}
+              disabled={!mesRefSelecionado || !anoRefSelecionado || emitindoLote}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
-              <FileCheck className="h-4 w-4 mr-2" />
-              Continuar para NFS-e
+              {emitindoLote ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Emitindo...
+                </>
+              ) : (
+                <>
+                  <FileCheck className="h-4 w-4 mr-2" />
+                  {emissaoLote ? "Emitir em Lote" : "Continuar para NFS-e"}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
