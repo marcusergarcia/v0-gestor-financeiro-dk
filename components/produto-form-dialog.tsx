@@ -440,7 +440,7 @@ export function ProdutoFormDialog({ open, onOpenChange, produto, onSuccess }: Pr
             {/* Categoria */}
             <div>
               <Label htmlFor="categoria">Categoria *</Label>
-              <Select value={categoriaId} onValueChange={setCategoriaId} required>
+              <Select value={categoriaId || undefined} onValueChange={setCategoriaId} required>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>

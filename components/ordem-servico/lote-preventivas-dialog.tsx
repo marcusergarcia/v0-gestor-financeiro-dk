@@ -147,7 +147,7 @@ export function LotePreventivasDialog({ open, onOpenChange, onSuccess }: LotePre
 
       <div className="space-y-2">
         <Label>Período (Opcional)</Label>
-        <Select value={periodoAgendamento} onValueChange={(v: any) => setPeriodoAgendamento(v)}>
+        <Select value={periodoAgendamento || undefined} onValueChange={(v: any) => setPeriodoAgendamento(v)}>
           <SelectTrigger>
             <SelectValue placeholder="Selecione o período" />
           </SelectTrigger>
