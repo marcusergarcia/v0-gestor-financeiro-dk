@@ -59,7 +59,7 @@ export function MarcaCombobox({
 
     const search = searchValue.toLowerCase()
     return marcas.filter(
-      (marca) => marca.nome.toLowerCase().includes(search) || marca.sigla.toLowerCase().includes(search),
+      (marca) => marca.nome?.toLowerCase().includes(search) || (marca.sigla && marca.sigla.toLowerCase().includes(search)),
     )
   }, [marcas, searchValue])
 
@@ -119,7 +119,7 @@ export function MarcaCombobox({
                         setOpen(false)
                         setSearchValue("")
                       }}
-                      keywords={[marca.nome.toLowerCase(), marca.sigla.toLowerCase()]}
+                      keywords={[marca.nome?.toLowerCase() || "", marca.sigla?.toLowerCase() || ""]}
                     >
                       <Check className={cn("mr-2 h-4 w-4", value === marca.nome ? "opacity-100" : "opacity-0")} />
                       <span className="truncate">
