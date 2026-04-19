@@ -155,15 +155,16 @@ export function ProdutoFormDialog({ open, onOpenChange, produto, onSuccess }: Pr
         setObservacoes(produtoData.observacoes || "")
         setAtivo(produtoData.ativo !== false)
 
-        // Definir marca - usar o valor do banco ou "Nenhuma marca" se for null/undefined
-        if (produtoData.marca && produtoData.marca.trim() !== "") {
+        // Definir marca - usar o valor do banco ou "Nenhuma marca" se for null/undefined/Nenhuma marca
+        if (produtoData.marca && produtoData.marca.trim() !== "" && produtoData.marca !== "Nenhuma marca") {
           setMarca(produtoData.marca)
         } else {
           setMarca("Nenhuma marca")
         }
 
         // Buscar categoria pelo nome do tipo
-        if (produtoData.tipo) {
+        // Ignorar valores como "Nenhuma categoria" que não são categorias válidas
+        if (produtoData.tipo && produtoData.tipo !== "Nenhuma categoria") {
           const categoria = categorias.find((c) => c.nome === produtoData.tipo)
           if (categoria) {
             setCategoriaId(categoria.id.toString())
