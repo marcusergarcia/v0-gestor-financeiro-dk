@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/database"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = params.id
+    const { id } = await params
 
     const [rows] = await pool.execute("SELECT * FROM tipos_produtos WHERE id = ?", [id])
 
@@ -21,9 +21,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = params.id
+    const { id } = await params
     const { codigo, nome, descricao, ativo } = await request.json()
 
     if (!codigo || !nome) {
@@ -65,9 +65,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = params.id
+    const { id } = await params
 
     // Verificar se categoria está sendo usada
     const [produtosRows] = await pool.execute(
