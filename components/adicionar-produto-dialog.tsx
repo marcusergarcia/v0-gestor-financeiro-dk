@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ProdutoCombobox } from "./produto-combobox"
+import { ProdutoCombobox, type Produto } from "./produto-combobox"
 import { useToast } from "@/hooks/use-toast"
 
 interface AdicionarProdutoDialogProps {
@@ -23,7 +23,7 @@ export function AdicionarProdutoDialog({
   orcamentoNumero,
   onProdutoAdicionado,
 }: AdicionarProdutoDialogProps) {
-  const [produtoId, setProdutoId] = useState("")
+  const [produtoSelecionado, setProdutoSelecionado] = useState<Produto | null>(null)
   const [quantidade, setQuantidade] = useState("1")
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
@@ -31,7 +31,7 @@ export function AdicionarProdutoDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!produtoId) {
+    if (!produtoSelecionado) {
       toast({
         title: "Erro",
         description: "Selecione um produto",
@@ -58,7 +58,7 @@ export function AdicionarProdutoDialog({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          produto_id: Number.parseInt(produtoId),
+          produto_id: Number.parseInt(produtoSelecionado.id),
           quantidade: Number.parseFloat(quantidade),
         }),
       })
@@ -70,7 +70,7 @@ export function AdicionarProdutoDialog({
           title: "Sucesso",
           description: "Produto adicionado com sucesso",
         })
-        setProdutoId("")
+        setProdutoSelecionado(null)
         setQuantidade("1")
         onOpenChange(false)
         onProdutoAdicionado()
@@ -94,9 +94,13 @@ export function AdicionarProdutoDialog({
   }
 
   const handleCancel = () => {
-    setProdutoId("")
+    setProdutoSelecionado(null)
     setQuantidade("1")
     onOpenChange(false)
+  }
+
+  const handleSelectProduto = (produto: Produto) => {
+    setProdutoSelecionado(produto)
   }
 
   return (
@@ -108,7 +112,15 @@ export function AdicionarProdutoDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="produto">Produto</Label>
-            <ProdutoCombobox value={produtoId} onValueChange={setProdutoId} placeholder="Selecione o produto" />
+            <ProdutoCombobox 
+              onSelect={handleSelectProduto} 
+              placeholder={produtoSelecionado ? `${produtoSelecionado.codigo} - ${produtoSelecionado.descricao}` : "Selecione o produto"} 
+            />
+            {produtoSelecionado && (
+              <div className="text-xs text-muted-foreground mt-1">
+                Selecionado: {produtoSelecionado.codigo} - {produtoSelecionado.descricao}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="quantidade">Quantidade</Label>
@@ -126,7 +138,7 @@ export function AdicionarProdutoDialog({
             <Button type="button" variant="outline" onClick={handleCancel}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || !produtoSelecionado}>
               {loading ? "Adicionando..." : "Adicionar"}
             </Button>
           </div>
