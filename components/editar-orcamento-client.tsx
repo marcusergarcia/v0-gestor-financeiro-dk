@@ -80,8 +80,8 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
   const [impostoMaterial, setImpostoMaterial] = useState(orcamento.imposto_material || 12.7)
   const [descontoMdoPercent, setDescontoMdoPercent] = useState(orcamento.desconto_mdo_percent || 0)
 
-  const [parcelamentoMdo, setParcelamentoMdo] = useState(orcamento.parcelamento_mdo || 1)
-  const [parcelamentoMaterial, setParcelamentoMaterial] = useState(orcamento.parcelamento_material || 1)
+  const [parcelamentoMdo, setParcelamentoMdo] = useState(orcamento.parcelamento_mdo ?? 1)
+  const [parcelamentoMaterial, setParcelamentoMaterial] = useState(orcamento.parcelamento_material ?? 1)
   const [materialAVista, setMaterialAVista] = useState(
     orcamento.material_a_vista === true || orcamento.material_a_vista === 1,
   )
