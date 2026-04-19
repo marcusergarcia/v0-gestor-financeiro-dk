@@ -1343,7 +1343,7 @@ export function OrcamentoPrintEditor({ orcamento, onClose }: OrcamentoPrintEdito
               <div className="space-y-2 p-4 border rounded-lg">
                 <h4 className="font-medium">Configurações de Orçamento Salvas</h4>
                 <div className="space-y-2">
-                  <Select value={selectedConfigId} onValueChange={handleLoadConfig}>
+                  <Select value={selectedConfigId || undefined} onValueChange={handleLoadConfig}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma configuração..." />
                     </SelectTrigger>

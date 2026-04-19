@@ -1012,7 +1012,7 @@ export function ContratoPrintEditor({ contrato, onClose }: ContratoPrintEditorPr
               <div className="space-y-3 p-4 border rounded-lg">
                 <h4 className="font-medium">Configurações Salvas (Contratos)</h4>
                 <div className="space-y-2">
-                  <Select value={selectedConfigId} onValueChange={handleLoadConfig}>
+                  <Select value={selectedConfigId || undefined} onValueChange={handleLoadConfig}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione uma configuração..." />
                     </SelectTrigger>
