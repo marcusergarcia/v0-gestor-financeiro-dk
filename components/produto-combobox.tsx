@@ -9,23 +9,23 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge"
 
 export interface Produto {
-  tipo: undefined
-  marca: undefined
+  tipo?: string
+  marca?: string
   id: string
   codigo: string
   descricao: string
-  categoria_id: string
-  marca_id: string
+  categoria_id?: string
+  marca_id?: string
   ncm?: string
   unidade: string
   valor_unitario: number
   valor_mao_obra: number
-  valor_custo: number
-  margem_lucro: number
-  estoque: number
-  estoque_minimo: number
+  valor_custo?: number
+  margem_lucro?: number
+  estoque?: number
+  estoque_minimo?: number
   observacoes?: string
-  ativo: boolean
+  ativo?: boolean
 }
 
 interface ProdutoComboboxProps {

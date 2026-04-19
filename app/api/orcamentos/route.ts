@@ -179,8 +179,8 @@ export async function POST(request: NextRequest) {
       data.imposto_material || 0,
       data.desconto_mdo_percent || 0,
       data.desconto_mdo_valor || 0,
-      data.parcelamento_mdo || 1,
-      data.parcelamento_material || 1,
+      data.parcelamento_mdo ?? 1,
+      data.parcelamento_material ?? 1,
       data.material_a_vista ? 1 : 0, // Adicionado material_a_vista
     ])
 
