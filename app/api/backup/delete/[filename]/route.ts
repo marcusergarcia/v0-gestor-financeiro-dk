@@ -2,9 +2,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { unlink, stat } from "fs/promises"
 import { join } from "path"
 
-export async function DELETE(request: NextRequest, { params }: { params: { filename: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ filename: string }> }) {
   try {
-    const { filename } = params
+    const { filename } = await params
 
     // Verificar se o arquivo existe nos diretórios de backup
     let filepath: string

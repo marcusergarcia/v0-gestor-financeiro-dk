@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 
-export async function GET(request: NextRequest, { params }: { params: { numero: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ numero: string }> }) {
   try {
-    const { numero } = params
+    const { numero } = await params
 
     const orcamentoQuery = `
       SELECT 
@@ -65,9 +65,9 @@ export async function GET(request: NextRequest, { params }: { params: { numero: 
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { numero: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ numero: string }> }) {
   try {
-    const { numero } = params
+    const { numero } = await params
     const data = await request.json()
 
     // Formatar data para MySQL (YYYY-MM-DD)
@@ -221,9 +221,9 @@ export async function PUT(request: NextRequest, { params }: { params: { numero: 
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { numero: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ numero: string }> }) {
   try {
-    const { numero } = params
+    const { numero } = await params
     const data = await request.json()
 
     if (!data.situacao) {
@@ -243,9 +243,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { numero
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { numero: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ numero: string }> }) {
   try {
-    const { numero } = params
+    const { numero } = await params
 
     // Deletar itens primeiro (por causa da foreign key)
     await query("DELETE FROM orcamentos_itens WHERE orcamento_numero = ?", [numero])
