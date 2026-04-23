@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -29,11 +29,14 @@ import {
   LogOut,
   Crown,
   Shield,
+  ChevronDown,
+  Clock,
+  X,
 } from "lucide-react"
 import Link from "next/link"
 import { useSidebar } from "./sidebar-provider"
 import { useAuth } from "@/contexts/auth-context"
-import { useLogos } from "@/hooks/use-logos"
+import { cn } from "@/lib/utils"
 
 interface Feriado {
   id: number
@@ -54,33 +57,19 @@ interface BoletoVencido {
 export function Header() {
   const { toggleSidebar } = useSidebar()
   const { user, logout } = useAuth()
-  const { logos, loading: logosLoading } = useLogos()
   const [feriados, setFeriados] = useState<Feriado[]>([])
   const [boletosVencidos, setBoletosVencidos] = useState<BoletoVencido[]>([])
-  const [location, setLocation] = useState({ cidade: "São Paulo", estado: "SP" })
   const [currentDate, setCurrentDate] = useState("")
   const [welcomeMessage, setWelcomeMessage] = useState("")
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     loadNotifications()
     setCurrentDateAndWelcome()
-
-    // Verificar se é mobile
-    const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 1024)
-    }
-
-    checkIfMobile()
-    window.addEventListener("resize", checkIfMobile)
-
-    return () => {
-      window.removeEventListener("resize", checkIfMobile)
-    }
   }, [])
 
-  // Recarregar notificações quando o popover abrir
   useEffect(() => {
     if (isNotificationOpen) {
       loadNotifications()
@@ -91,9 +80,8 @@ export function Header() {
     const now = new Date()
     const options: Intl.DateTimeFormatOptions = {
       weekday: "long",
-      year: "numeric",
-      month: "long",
       day: "numeric",
+      month: "long",
     }
     const dateString = now.toLocaleDateString("pt-BR", options)
     setCurrentDate(dateString)
@@ -112,25 +100,20 @@ export function Header() {
 
   const parseDate = (dateString: string): Date | null => {
     try {
-      // Se a data vem no formato YYYY-MM-DD (formato do banco)
       if (dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
         const [year, month, day] = dateString.split("-")
-        // Cria data local sem conversão UTC
         return new Date(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day), 0, 0, 0, 0)
       }
 
-      // Se a data já vem no formato ISO com timezone
       if (dateString.includes("T")) {
         return new Date(dateString)
       }
 
-      // Se a data vem no formato DD/MM/YYYY
       if (dateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
         const [day, month, year] = dateString.split("/")
         return new Date(Number.parseInt(year), Number.parseInt(month) - 1, Number.parseInt(day))
       }
 
-      // Tentar parsing direto como último recurso
       const date = new Date(dateString)
       if (isNaN(date.getTime())) {
         return null
@@ -144,7 +127,6 @@ export function Header() {
 
   const loadNotifications = async () => {
     try {
-      // Carregar feriados do mês atual
       const feriadosResponse = await fetch("/api/configuracoes/feriados")
       if (feriadosResponse.ok) {
         const feriadosResult = await feriadosResponse.json()
@@ -160,43 +142,22 @@ export function Header() {
         }
       }
 
-      // Carregar boletos vencidos
       const boletosResponse = await fetch("/api/boletos")
       if (boletosResponse.ok) {
         const boletosResult = await boletosResponse.json()
-
-        console.log("[v0] Resposta da API de boletos:", {
-          success: boletosResult.success,
-          totalBoletos: boletosResult.data?.length || 0,
-          primeirosBoletos: boletosResult.data?.slice(0, 3).map((b: any) => ({
-            numero: b.numero,
-            status: b.status,
-            data_vencimento: b.data_vencimento,
-          })),
-        })
 
         if (boletosResult.success && Array.isArray(boletosResult.data)) {
           const hoje = new Date()
           hoje.setHours(0, 0, 0, 0)
 
           const vencidos = boletosResult.data.filter((boleto: any) => {
-            console.log("[v0] Processando boleto:", {
-              numero: boleto.numero,
-              status: boleto.status,
-              data_vencimento: boleto.data_vencimento,
-            })
-
-            // Se o status já é "vencido", deve aparecer na notificação
             if (boleto.status === "vencido") {
-              console.log("[v0] Boleto vencido encontrado:", boleto.numero)
               return true
             }
 
-            // Se o status é "pendente", verifica se a data de vencimento já passou
             if (boleto.status === "pendente" && boleto.data_vencimento) {
               const dataStr = boleto.data_vencimento.split("T")[0]
 
-              // Verificar se está no formato YYYY-MM-DD
               if (dataStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
                 const [year, month, day] = dataStr.split("-")
                 const vencimento = new Date(
@@ -208,22 +169,13 @@ export function Header() {
                   0,
                   0,
                 )
-                // Boleto vencido = vencimento é ANTES de hoje (não inclui hoje)
-                const estaVencido = vencimento < hoje
-                console.log("[v0] Boleto pendente - Comparação:", {
-                  numero: boleto.numero,
-                  vencimento: vencimento.toISOString(),
-                  hoje: hoje.toISOString(),
-                  estaVencido,
-                })
-                return estaVencido
+                return vencimento < hoje
               }
             }
 
             return false
           })
 
-          console.log("[v0] Total de boletos vencidos filtrados:", vencidos.length)
           setBoletosVencidos(vencidos)
         }
       }
@@ -241,16 +193,14 @@ export function Header() {
 
   const formatDate = (dateString: string) => {
     try {
-      // Para formato YYYY-MM-DD (do banco) ou qualquer variação com hífen
       if (dateString.includes("-")) {
-        const parts = dateString.split("T")[0].split("-") // Remove hora se existir
+        const parts = dateString.split("T")[0].split("-")
         if (parts.length === 3) {
           const [year, month, day] = parts
           return `${day}/${month}`
         }
       }
 
-      // Para formato DD/MM/YYYY
       if (dateString.includes("/")) {
         const [day, month] = dateString.split("/")
         return `${day}/${month}`
@@ -258,7 +208,7 @@ export function Header() {
 
       return dateString
     } catch (error) {
-      console.error("[v0] Erro ao formatar data:", dateString, error)
+      console.error("Erro ao formatar data:", dateString, error)
       return dateString
     }
   }
@@ -272,100 +222,77 @@ export function Header() {
       .substring(0, 2)
   }
 
-  const getTipoColor = (tipo: string) => {
+  const getTipoConfig = (tipo: string) => {
     switch (tipo) {
       case "admin":
-        return "bg-purple-100 text-purple-800"
+        return { bg: "bg-primary/10", text: "text-primary", icon: Crown, label: "Admin" }
       case "tecnico":
-        return "bg-blue-100 text-blue-800"
+        return { bg: "bg-accent/10", text: "text-accent", icon: Shield, label: "Técnico" }
       case "vendedor":
-        return "bg-green-100 text-green-800"
+        return { bg: "bg-[hsl(var(--success))]/10", text: "text-[hsl(var(--success))]", icon: User, label: "Vendedor" }
       case "usuario":
-        return "bg-gray-100 text-gray-800"
+        return { bg: "bg-muted", text: "text-muted-foreground", icon: User, label: "Usuário" }
       default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const getTipoIcon = (tipo: string) => {
-    switch (tipo) {
-      case "admin":
-        return <Crown className="w-3 h-3" />
-      case "tecnico":
-        return <Shield className="w-3 h-3" />
-      default:
-        return <User className="w-3 h-3" />
+        return { bg: "bg-muted", text: "text-muted-foreground", icon: User, label: tipo }
     }
   }
 
   const totalNotifications = feriados.length + boletosVencidos.length
+  const tipoConfig = getTipoConfig(user?.tipo || "")
+  const TipoIcon = tipoConfig.icon
 
   return (
-    <header className="bg-white/95 backdrop-blur-sm shadow-sm border-b border-gray-200 px-4 md:px-6 py-4 sticky top-0 z-40">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          {/* Botão do menu hamburger */}
+    <header className="bg-card/80 backdrop-blur-xl border-b border-border sticky top-0 z-40 shadow-sm">
+      <div className="flex items-center justify-between h-16 px-4 md:px-6">
+        {/* Lado Esquerdo */}
+        <div className="flex items-center gap-4">
+          {/* Menu Hamburger (Mobile) */}
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden hover:bg-gray-100 transition-colors duration-200 rounded-xl"
+            className="lg:hidden hover:bg-muted rounded-xl h-10 w-10"
             onClick={toggleSidebar}
             aria-label="Menu"
           >
-            <Menu className="w-5 h-5 text-gray-600" />
+            <Menu className="w-5 h-5 text-foreground" />
           </Button>
 
-          <div className="flex items-center gap-3">
-            {/* Logo do menu - sempre mostra fallback se não carregar */}
-            <div className="h-8 w-8 flex items-center justify-center">
-              {!logosLoading && logos.menu ? (
-                <img
-                  src={logos.menu || "/placeholder.svg"}
-                  alt="Logo"
-                  className="h-8 w-8 object-contain rounded"
-                  style={{
-                    imageRendering: "auto",
-                    WebkitImageSmoothing: true,
-                  }}
-                  onError={(e) => {
-                    // Se der erro ao carregar, mostra fallback
-                    e.currentTarget.style.display = "none"
-                  }}
-                />
-              ) : null}
-              {/* Fallback sempre presente */}
-              {(logosLoading || !logos.menu) && (
-                <div className="h-8 w-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">GF</span>
-                </div>
-              )}
-            </div>
-            <div className="hidden md:block">
-              <h1 className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Gestor Financeiro
-              </h1>
+          {/* Data e Saudação */}
+          <div className="hidden md:flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground capitalize">{currentDate}</span>
             </div>
           </div>
 
-          <div className="relative hidden md:block">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          {/* Busca Desktop */}
+          <div className="relative hidden lg:block">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
               type="text"
               placeholder="Buscar clientes, orçamentos..."
-              className="pl-10 w-64 md:w-80 lg:w-96 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 transition-all duration-200"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-72 xl:w-96 h-10 bg-muted/50 border-0 focus:bg-card focus:ring-2 focus:ring-primary/20 rounded-xl transition-all duration-200"
             />
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
-          {/* Botão de busca em telas pequenas */}
+        {/* Lado Direito */}
+        <div className="flex items-center gap-2">
+          {/* Busca Mobile */}
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden hover:bg-gray-100 transition-colors duration-200 rounded-xl"
+            className="lg:hidden hover:bg-muted rounded-xl h-10 w-10"
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
             aria-label="Buscar"
           >
-            <Search className="w-5 h-5 text-gray-600" />
+            {isSearchOpen ? (
+              <X className="w-5 h-5 text-foreground" />
+            ) : (
+              <Search className="w-5 h-5 text-foreground" />
+            )}
           </Button>
 
           {/* Notificações */}
@@ -374,48 +301,55 @@ export function Header() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="relative hover:bg-gray-100 transition-colors duration-200 rounded-xl"
+                className="relative hover:bg-muted rounded-xl h-10 w-10"
               >
-                <Bell className="w-5 h-5 text-gray-600" />
+                <Bell className="w-5 h-5 text-foreground" />
                 {totalNotifications > 0 && (
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500 hover:bg-red-500 animate-pulse">
-                    {totalNotifications}
-                  </Badge>
+                  <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-40" />
+                    <span className="relative inline-flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                      {totalNotifications > 9 ? "9+" : totalNotifications}
+                    </span>
+                  </span>
                 )}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-0" align="end">
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Bell className="w-5 h-5" />
-                    Notificações
-                  </CardTitle>
-                  <CardDescription>
-                    {totalNotifications > 0
-                      ? `Você tem ${totalNotifications} notificação${totalNotifications > 1 ? "ões" : ""}`
-                      : "Nenhuma notificação"}
-                  </CardDescription>
+            <PopoverContent className="w-80 p-0 rounded-xl shadow-xl border-border" align="end">
+              <Card className="border-0 shadow-none">
+                <CardHeader className="pb-3 border-b border-border">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-primary" />
+                      Notificações
+                    </CardTitle>
+                    {totalNotifications > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {totalNotifications}
+                      </Badge>
+                    )}
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-4 max-h-96 overflow-y-auto">
+                <CardContent className="p-0 max-h-80 overflow-y-auto">
                   {/* Feriados do mês */}
                   {feriados.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <PartyPopper className="w-4 h-4 text-green-600" />
-                        <span className="font-medium text-sm text-green-700">Feriados deste mês</span>
+                    <div className="p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <PartyPopper className="w-4 h-4 text-[hsl(var(--success))]" />
+                        <span className="font-medium text-sm">Feriados deste mês</span>
                       </div>
                       <div className="space-y-2">
                         {feriados.map((feriado) => (
                           <div
                             key={feriado.id}
-                            className="flex items-center justify-between p-2 bg-green-50 rounded-lg border border-green-200"
+                            className="flex items-center justify-between p-3 bg-[hsl(var(--success))]/5 rounded-lg border border-[hsl(var(--success))]/20"
                           >
                             <div>
-                              <p className="font-medium text-sm text-green-800">{feriado.nome}</p>
-                              <p className="text-xs text-green-600">{formatDate(feriado.data)}</p>
+                              <p className="font-medium text-sm">{feriado.nome}</p>
+                              <p className="text-xs text-muted-foreground">{formatDate(feriado.data)}</p>
                             </div>
-                            <Badge className="bg-green-100 text-green-800 border-green-200">{feriado.tipo}</Badge>
+                            <Badge className="bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-0 text-xs">
+                              {feriado.tipo}
+                            </Badge>
                           </div>
                         ))}
                       </div>
@@ -426,19 +360,19 @@ export function Header() {
 
                   {/* Boletos vencidos */}
                   {boletosVencidos.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <AlertTriangle className="w-4 h-4 text-red-600" />
-                          <span className="font-medium text-sm text-red-700">
+                          <AlertTriangle className="w-4 h-4 text-destructive" />
+                          <span className="font-medium text-sm">
                             Boletos vencidos ({boletosVencidos.length})
                           </span>
                         </div>
                         <Link href="/financeiro?status=vencido">
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="text-xs border-red-200 text-red-700 hover:bg-red-50 bg-transparent"
+                            variant="ghost"
+                            className="text-xs h-7 text-primary hover:text-primary hover:bg-primary/10"
                             onClick={() => setIsNotificationOpen(false)}
                           >
                             Ver todos
@@ -449,20 +383,20 @@ export function Header() {
                         {boletosVencidos.slice(0, 3).map((boleto) => (
                           <div
                             key={boleto.id}
-                            className="flex items-center justify-between p-2 bg-red-50 rounded-lg border border-red-200"
+                            className="flex items-center justify-between p-3 bg-destructive/5 rounded-lg border border-destructive/20"
                           >
                             <div>
-                              <p className="font-medium text-sm text-red-800">{boleto.numero}</p>
-                              <p className="text-xs text-red-600">{boleto.cliente_nome}</p>
+                              <p className="font-medium text-sm">{boleto.numero}</p>
+                              <p className="text-xs text-muted-foreground">{boleto.cliente_nome}</p>
                             </div>
                             <div className="text-right">
-                              <p className="font-medium text-sm text-red-800">{formatCurrency(boleto.valor)}</p>
-                              <p className="text-xs text-red-600">Venc: {formatDate(boleto.data_vencimento)}</p>
+                              <p className="font-semibold text-sm text-destructive">{formatCurrency(boleto.valor)}</p>
+                              <p className="text-xs text-muted-foreground">Venc: {formatDate(boleto.data_vencimento)}</p>
                             </div>
                           </div>
                         ))}
                         {boletosVencidos.length > 3 && (
-                          <p className="text-xs text-gray-500 text-center">
+                          <p className="text-xs text-muted-foreground text-center py-1">
                             E mais {boletosVencidos.length - 3} boleto(s) vencido(s)
                           </p>
                         )}
@@ -471,9 +405,12 @@ export function Header() {
                   )}
 
                   {totalNotifications === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">Nenhuma notificação no momento</p>
+                    <div className="text-center py-10 px-4">
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
+                        <Bell className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm font-medium">Tudo em dia</p>
+                      <p className="text-xs text-muted-foreground mt-1">Nenhuma notificação no momento</p>
                     </div>
                   )}
                 </CardContent>
@@ -481,59 +418,68 @@ export function Header() {
             </PopoverContent>
           </Popover>
 
+          {/* Separador */}
+          <div className="hidden md:block h-8 w-px bg-border mx-1" />
+
           {/* Menu do Usuário */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="flex items-center gap-3 px-3 py-2 h-auto hover:bg-gray-100 transition-colors duration-200 rounded-xl"
+                className="flex items-center gap-2 px-2 md:px-3 py-2 h-auto hover:bg-muted rounded-xl transition-all duration-200"
               >
-                <Avatar className="h-8 w-8">
+                <Avatar className="h-9 w-9 ring-2 ring-primary/20">
                   <AvatarImage src="/placeholder.svg" alt={user?.nome} />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white text-sm">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
                     {user ? getInitials(user.nome) : "U"}
                   </AvatarFallback>
                 </Avatar>
-                <div className="hidden md:block text-left">
-                  <p className="text-sm font-medium text-slate-700">{user?.nome}</p>
-                  <Badge className={`text-xs ${getTipoColor(user?.tipo || "")}`}>
-                    {getTipoIcon(user?.tipo || "")}
-                    <span className="ml-1">{user?.tipo}</span>
-                  </Badge>
+                <div className="hidden md:flex flex-col items-start">
+                  <span className="text-sm font-medium text-foreground leading-tight">
+                    {user?.nome?.split(" ")[0]}
+                  </span>
+                  <span className={cn("text-xs", tipoConfig.text)}>
+                    {tipoConfig.label}
+                  </span>
                 </div>
+                <ChevronDown className="hidden md:block w-4 h-4 text-muted-foreground ml-1" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel>
-                <div className="flex flex-col space-y-2">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{welcomeMessage}!</p>
-                  </div>
-                  <p className="text-sm font-medium">{user?.nome}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Calendar className="w-3 h-3" />
-                    <span className="capitalize">{currentDate}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <MapPin className="w-3 h-3" />
-                    <span>
-                      {location.cidade}, {location.estado}
-                    </span>
+            <DropdownMenuContent align="end" className="w-64 rounded-xl shadow-xl border-border p-2">
+              <DropdownMenuLabel className="pb-3">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+                    <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+                      {user ? getInitials(user.nome) : "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-sm">{user?.nome}</span>
+                    <span className="text-xs text-muted-foreground">{user?.email}</span>
                   </div>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuSeparator className="my-2" />
+              <div className="px-2 py-2 mb-2 bg-muted/50 rounded-lg">
+                <p className="text-xs font-medium text-muted-foreground mb-1">{welcomeMessage}!</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Calendar className="w-3 h-3" />
+                  <span className="capitalize">{currentDate}</span>
+                </div>
+              </div>
+              <DropdownMenuItem className="rounded-lg cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
                 <span>Meu Perfil</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem className="rounded-lg cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Configurações</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+              <DropdownMenuSeparator className="my-2" />
+              <DropdownMenuItem
+                onClick={logout}
+                className="rounded-lg cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Sair do Sistema</span>
               </DropdownMenuItem>
@@ -541,6 +487,23 @@ export function Header() {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Barra de Busca Mobile */}
+      {isSearchOpen && (
+        <div className="lg:hidden px-4 pb-4 animate-in slide-in-from-top-2 duration-200">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              type="text"
+              placeholder="Buscar clientes, orçamentos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-full h-10 bg-muted/50 border-0 focus:bg-card focus:ring-2 focus:ring-primary/20 rounded-xl"
+              autoFocus
+            />
+          </div>
+        </div>
+      )}
     </header>
   )
 }

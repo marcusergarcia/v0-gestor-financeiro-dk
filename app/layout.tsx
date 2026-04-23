@@ -39,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className="bg-background">
       <head>
         <link rel="icon" href="/favicon.ico" type="image/x-icon" />
         <meta name="mobile-web-app-capable" content="yes" />
