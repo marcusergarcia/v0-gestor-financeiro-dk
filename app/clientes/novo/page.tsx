@@ -194,16 +194,22 @@ export default function NovoClientePage() {
           Math.sin(dLon / 2)
 
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-      const distancia = R * c
+      const distanciaLinhaReta = R * c
+      
+      // Adicionar 40% para compensar que as ruas não são em linha reta
+      const distanciaComAjuste = Math.round((distanciaLinhaReta * 1.4) * 100) / 100
 
       setFormData((prev) => ({
         ...prev,
-        distancia_km: distancia,
+        distancia_km: distanciaComAjuste,
+        // Arredondar coordenadas para 6 casas decimais
+        latitude_cliente: latCliente.toFixed(6),
+        longitude_cliente: lonCliente.toFixed(6),
       }))
 
       toast({
         title: "Distância calculada!",
-        description: `Distância: ${distancia.toFixed(1)} km (via coordenadas manuais)`,
+        description: `Distância: ${distanciaComAjuste.toFixed(2)} km (linha reta ${distanciaLinhaReta.toFixed(2)} km + 40%)`,
       })
       return
     }
@@ -600,8 +606,8 @@ export default function NovoClientePage() {
                     <div className="relative flex-1">
                       <Input
                         id="distancia_km"
-                        type="number"
-                        value={formData.distancia_km}
+                        type="text"
+                        value={typeof formData.distancia_km === 'number' ? formData.distancia_km.toFixed(2) : formData.distancia_km}
                         readOnly={true}
                         placeholder="Calculado automaticamente"
                         className="h-9 bg-gray-50 text-gray-600 pr-10"
