@@ -20,18 +20,21 @@ function calcularDistanciaHaversine(lat1: number, lon1: number, lat2: number, lo
 // Função para buscar coordenadas via Nominatim (OpenStreetMap)
 async function buscarCoordenadas(
   endereco: string,
+  bairro: string,
   cidade: string,
   uf: string,
 ): Promise<{ lat: number; lng: number } | null> {
-  // Tentar primeiro com endereço completo
+  // Tentar com diferentes combinações, do mais específico ao menos específico
   const tentativas = [
+    `${endereco}, ${bairro}, ${cidade}, ${uf}, Brazil`,
     `${endereco}, ${cidade}, ${uf}, Brazil`,
-    `${cidade}, ${uf}, Brazil`,
+    `${bairro}, ${cidade}, ${uf}, Brazil`,
   ]
 
   for (const searchQuery of tentativas) {
     try {
       const encodedQuery = encodeURIComponent(searchQuery)
+      console.log(`[v0] Nominatim tentando: ${searchQuery}`)
 
       const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&limit=1`, {
         headers: {
@@ -46,6 +49,7 @@ async function buscarCoordenadas(
       }
 
       const data = await response.json()
+      console.log(`[v0] Nominatim resposta para "${searchQuery}":`, JSON.stringify(data))
 
       if (data.length > 0) {
         return {
@@ -118,6 +122,7 @@ export async function POST(request: Request) {
     console.log("[v0] calcular-distancia - Buscando Nominatim...")
     const coordenadasCliente = await buscarCoordenadas(
       enderecoData.logradouro || "",
+      enderecoData.bairro || "",
       enderecoData.localidade,
       enderecoData.uf,
     )
