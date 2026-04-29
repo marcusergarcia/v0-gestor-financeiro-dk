@@ -25,7 +25,7 @@ export default function EditarClientePage() {
   const params = useParams()
   const clienteId = params.id as string
   const { buscarCep, buscarCoordenadas, loading: loadingCep } = useCep()
-  const { calcularDistancia, loading: loadingDistancia } = useDistancia()
+  const { calcularDistancia, loading: loadingDistancia, resultado: resultadoDistancia, erro: erroDistancia } = useDistancia()
 
   const [formData, setFormData] = useState({
     codigo: "",
@@ -229,7 +229,7 @@ export default function EditarClientePage() {
     } else {
       toast({
         title: "Erro ao calcular",
-        description: "Verifique se o CEP da empresa está configurado em Configurações",
+        description: erroDistancia || "Verifique se o CEP da empresa está configurado em Configurações",
         variant: "destructive",
       })
     }
@@ -605,7 +605,18 @@ export default function EditarClientePage() {
                       )}
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500">Calculado automaticamente pelo CEP</p>
+                  {resultadoDistancia && (
+                    <div className="text-xs text-blue-600 space-y-0.5 mt-1">
+                      <p>Empresa: {resultadoDistancia.coordenadasEmpresa.latitude.toFixed(6)}, {resultadoDistancia.coordenadasEmpresa.longitude.toFixed(6)}</p>
+                      <p>Cliente: {resultadoDistancia.coordenadasCliente.latitude.toFixed(6)}, {resultadoDistancia.coordenadasCliente.longitude.toFixed(6)}</p>
+                    </div>
+                  )}
+                  {erroDistancia && (
+                    <p className="text-xs text-red-500 mt-1">{erroDistancia}</p>
+                  )}
+                  {!resultadoDistancia && !erroDistancia && (
+                    <p className="text-xs text-gray-500">Calculado automaticamente pelo CEP</p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
