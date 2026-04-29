@@ -39,6 +39,8 @@ export default function NovoClientePage() {
     cep: "",
     contato: "",
     distancia_km: 0,
+    latitude_cliente: "",
+    longitude_cliente: "",
     sindico: "",
     rg_sindico: "",
     cpf_sindico: "",
@@ -145,12 +147,74 @@ export default function NovoClientePage() {
   }
 
   const handleCalcularDistanciaManual = async () => {
+    // Se coordenadas manuais foram preenchidas, calcular com elas
+    if (formData.latitude_cliente && formData.longitude_cliente) {
+      const latCliente = Number.parseFloat(formData.latitude_cliente)
+      const lonCliente = Number.parseFloat(formData.longitude_cliente)
+      
+      if (isNaN(latCliente) || isNaN(lonCliente)) {
+        toast({
+          title: "Erro",
+          description: "Latitude e longitude devem ser números válidos",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Buscar coordenadas da empresa
+      const response = await fetch("/api/configuracoes/empresa")
+      const result = await response.json()
+      
+      if (!result.success || !result.data?.empresa_latitude) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar coordenadas da empresa",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const latEmpresa = Number.parseFloat(result.data.empresa_latitude)
+      const lonEmpresa = Number.parseFloat(result.data.empresa_longitude)
+
+      // Calcular distância usando fórmula de Haversine
+      function toRad(value: number) {
+        return (value * Math.PI) / 180
+      }
+
+      const R = 6371 // raio da terra em km
+      const dLat = toRad(latCliente - latEmpresa)
+      const dLon = toRad(lonCliente - lonEmpresa)
+
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(latEmpresa)) *
+          Math.cos(toRad(latCliente)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2)
+
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+      const distancia = R * c
+
+      setFormData((prev) => ({
+        ...prev,
+        distancia_km: distancia,
+      }))
+
+      toast({
+        title: "Distância calculada!",
+        description: `Distância: ${distancia.toFixed(1)} km (via coordenadas manuais)`,
+      })
+      return
+    }
+
+    // Caso contrário, tentar pelo CEP
     const cepLimpo = formData.cep.replace(/\D/g, "")
     
     if (cepLimpo.length !== 8) {
       toast({
         title: "CEP inválido",
-        description: "Preencha um CEP válido com 8 dígitos",
+        description: "Preencha um CEP válido com 8 dígitos ou forneça coordenadas manuais",
         variant: "destructive",
       })
       return
@@ -169,7 +233,7 @@ export default function NovoClientePage() {
     } else {
       toast({
         title: "Erro ao calcular",
-        description: erroDistancia || "Verifique se o CEP da empresa está configurado em Configurações",
+        description: erroDistancia || "Verifique se o CEP da empresa está configurado em Configurações ou forneça coordenadas manuais",
         variant: "destructive",
       })
     }
@@ -550,7 +614,7 @@ export default function NovoClientePage() {
                       size="sm"
                       className="h-9 px-3"
                       onClick={handleCalcularDistanciaManual}
-                      disabled={loadingDistancia || !formData.cep}
+                      disabled={loadingDistancia || (!formData.cep && !formData.latitude_cliente)}
                       title="Calcular distância manualmente"
                     >
                       {loadingDistancia ? (
@@ -570,9 +634,37 @@ export default function NovoClientePage() {
                     <p className="text-xs text-red-500 mt-1">{erroDistancia}</p>
                   )}
                   {!resultadoDistancia && !erroDistancia && (
-                    <p className="text-xs text-gray-500">Calculado automaticamente pelo CEP</p>
+                    <p className="text-xs text-gray-500">Calculado automaticamente pelo CEP ou coordenadas</p>
                   )}
                 </div>
+                <div className="space-y-1">
+                  <Label htmlFor="latitude_cliente">Latitude do Cliente (opcional)</Label>
+                  <Input
+                    id="latitude_cliente"
+                    type="number"
+                    step="0.000001"
+                    value={formData.latitude_cliente}
+                    onChange={(e) => handleInputChange("latitude_cliente", e.target.value)}
+                    placeholder="Ex: -23.550651"
+                    className="h-9"
+                  />
+                  <p className="text-xs text-gray-500">Se preenchido, usa para calcular distância</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="longitude_cliente">Longitude do Cliente (opcional)</Label>
+                  <Input
+                    id="longitude_cliente"
+                    type="number"
+                    step="0.000001"
+                    value={formData.longitude_cliente}
+                    onChange={(e) => handleInputChange("longitude_cliente", e.target.value)}
+                    placeholder="Ex: -46.633382"
+                    className="h-9"
+                  />
+                  <p className="text-xs text-gray-500">Se preenchido, usa para calcular distância</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="tem_contrato" className="flex items-center space-x-2">
                     <Switch
