@@ -23,7 +23,7 @@ export default function NovoClientePage() {
   const { toast } = useToast()
   const router = useRouter()
   const { buscarCep, loading: loadingCep } = useCep()
-  const { calcularDistancia, loading: loadingDistancia } = useDistancia()
+  const { calcularDistancia, loading: loadingDistancia, resultado: resultadoDistancia, erro: erroDistancia } = useDistancia()
 
   const [formData, setFormData] = useState({
     codigo: "",
@@ -169,7 +169,7 @@ export default function NovoClientePage() {
     } else {
       toast({
         title: "Erro ao calcular",
-        description: "Verifique se o CEP da empresa está configurado em Configurações",
+        description: erroDistancia || "Verifique se o CEP da empresa está configurado em Configurações",
         variant: "destructive",
       })
     }
@@ -560,7 +560,18 @@ export default function NovoClientePage() {
                       )}
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500">Calculado automaticamente pelo CEP</p>
+                  {resultadoDistancia && (
+                    <div className="text-xs text-blue-600 space-y-0.5 mt-1">
+                      <p>Empresa: {resultadoDistancia.coordenadasEmpresa.latitude.toFixed(6)}, {resultadoDistancia.coordenadasEmpresa.longitude.toFixed(6)}</p>
+                      <p>Cliente: {resultadoDistancia.coordenadasCliente.latitude.toFixed(6)}, {resultadoDistancia.coordenadasCliente.longitude.toFixed(6)}</p>
+                    </div>
+                  )}
+                  {erroDistancia && (
+                    <p className="text-xs text-red-500 mt-1">{erroDistancia}</p>
+                  )}
+                  {!resultadoDistancia && !erroDistancia && (
+                    <p className="text-xs text-gray-500">Calculado automaticamente pelo CEP</p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="tem_contrato" className="flex items-center space-x-2">
