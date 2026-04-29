@@ -27,6 +27,7 @@
     "@radix-ui/react-switch": "latest",
     "@radix-ui/react-tabs": "latest",
     "@radix-ui/react-toast": "latest",
+    "@radix-ui/react-tooltip": "latest",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.7",
     "@vercel/blob": "^0.27.3",
