@@ -576,69 +576,112 @@ export default function NotaFiscalPage() {
         
         toast({ title: "Exportado com sucesso!", description: `${notasParaExportar.length} notas exportadas em CSV.` })
       } else {
-        // Gerar XML
-        let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n'
-        xmlContent += '<NotasFiscais>\n'
-        xmlContent += `  <DataExportacao>${new Date().toISOString()}</DataExportacao>\n`
-        xmlContent += `  <TotalNotas>${notasParaExportar.length}</TotalNotas>\n`
-        xmlContent += '  <Notas>\n'
+        // Exportar XMLs no formato padrao SEFAZ (NF-e) 
+        // Filtrar apenas NF-e autorizadas (NFS-e usa formato diferente)
+        const nfesAutorizadas = notasParaExportar.filter(n => n.tipo === "nfe" && n.status === "autorizada")
+        const nfsesAutorizadas = notasParaExportar.filter(n => n.tipo === "nfse" && (n.status === "emitida" || n.status === "autorizada"))
         
-        for (const nota of notasParaExportar) {
-          xmlContent += '    <Nota>\n'
-          xmlContent += `      <Tipo>${nota.tipo.toUpperCase()}</Tipo>\n`
-          xmlContent += `      <Numero>${nota.numero || ""}</Numero>\n`
-          xmlContent += `      <Serie>${nota.tipo === "nfe" ? (nota.serie || "") : (nota.serie_rps || "")}</Serie>\n`
-          if (nota.tipo === "nfse") {
-            xmlContent += `      <NumeroRPS>${nota.numero_rps || ""}</NumeroRPS>\n`
-            xmlContent += `      <CodigoVerificacao>${nota.codigo_verificacao || ""}</CodigoVerificacao>\n`
+        if (nfesAutorizadas.length === 0 && nfsesAutorizadas.length === 0) {
+          toast({ 
+            title: "Nenhuma nota autorizada", 
+            description: "Selecione notas com status 'Autorizada' ou 'Emitida' para exportar o XML.",
+            variant: "destructive" 
+          })
+          setExportando(false)
+          return
+        }
+
+        // Buscar XMLs das NF-e autorizadas via API
+        let xmlsExportados = 0
+        
+        if (nfesAutorizadas.length > 0) {
+          const nfeIds = nfesAutorizadas.map(n => n.id)
+          const response = await fetch("/api/nfe/exportar-xml", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nfeIds })
+          })
+          
+          const result = await response.json()
+          
+          if (result.success && result.data?.length > 0) {
+            // Se tiver apenas 1 XML, baixar direto
+            if (result.data.length === 1) {
+              const nfe = result.data[0]
+              if (nfe.xml) {
+                const blob = new Blob([nfe.xml], { type: "application/xml;charset=utf-8" })
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement("a")
+                link.href = url
+                link.download = `NFe_${nfe.chaveAcesso || nfe.numero}.xml`
+                link.click()
+                URL.revokeObjectURL(url)
+                xmlsExportados++
+              }
+            } else {
+              // Multiplos XMLs - baixar cada um separadamente
+              for (const nfe of result.data) {
+                if (nfe.xml) {
+                  const blob = new Blob([nfe.xml], { type: "application/xml;charset=utf-8" })
+                  const url = URL.createObjectURL(blob)
+                  const link = document.createElement("a")
+                  link.href = url
+                  link.download = `NFe_${nfe.chaveAcesso || nfe.numero}.xml`
+                  link.click()
+                  URL.revokeObjectURL(url)
+                  xmlsExportados++
+                  // Pequeno delay entre downloads
+                  await new Promise(resolve => setTimeout(resolve, 300))
+                }
+              }
+            }
           }
-          if (nota.tipo === "nfe") {
-            xmlContent += `      <ChaveAcesso>${nota.chave_acesso || ""}</ChaveAcesso>\n`
-            xmlContent += `      <Protocolo>${nota.protocolo || ""}</Protocolo>\n`
-          }
-          xmlContent += '      <Cliente>\n'
-          xmlContent += `        <Nome><![CDATA[${nota.tomador_razao_social || nota.cliente_nome || ""}]]></Nome>\n`
-          xmlContent += `        <CpfCnpj>${nota.tomador_cpf_cnpj || ""}</CpfCnpj>\n`
-          xmlContent += `        <ClienteId>${nota.cliente_id || ""}</ClienteId>\n`
-          xmlContent += '      </Cliente>\n'
-          xmlContent += '      <Origem>\n'
-          xmlContent += `        <Tipo>${nota.origem || ""}</Tipo>\n`
-          xmlContent += `        <Numero>${nota.origem_numero || ""}</Numero>\n`
-          xmlContent += `        <Id>${nota.origem_id || ""}</Id>\n`
-          xmlContent += '      </Origem>\n'
-          xmlContent += '      <Valores>\n'
-          xmlContent += `        <Total>${Number(nota.valor_total || 0).toFixed(2)}</Total>\n`
-          if (nota.tipo === "nfse") {
-            xmlContent += `        <Servicos>${Number(nota.valor_servicos || 0).toFixed(2)}</Servicos>\n`
-          }
-          if (nota.tipo === "nfe") {
-            xmlContent += `        <Produtos>${Number(nota.valor_produtos || 0).toFixed(2)}</Produtos>\n`
-          }
-          xmlContent += '      </Valores>\n'
-          xmlContent += `      <Status>${nota.status || ""}</Status>\n`
-          xmlContent += `      <DataEmissao>${nota.data_emissao || ""}</DataEmissao>\n`
-          xmlContent += `      <DataCriacao>${nota.created_at || ""}</DataCriacao>\n`
-          if (nota.tipo === "nfse" && nota.descricao_servico) {
-            xmlContent += `      <DescricaoServico><![CDATA[${nota.descricao_servico}]]></DescricaoServico>\n`
-          }
-          if (nota.tipo === "nfe" && nota.natureza_operacao) {
-            xmlContent += `      <NaturezaOperacao><![CDATA[${nota.natureza_operacao}]]></NaturezaOperacao>\n`
-          }
-          xmlContent += '    </Nota>\n'
         }
         
-        xmlContent += '  </Notas>\n'
-        xmlContent += '</NotasFiscais>'
+        // Para NFS-e, manter o formato simplificado (XML proprio da prefeitura nao e armazenado completo)
+        if (nfsesAutorizadas.length > 0) {
+          let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n'
+          xmlContent += '<NotasFiscaisServico>\n'
+          xmlContent += `  <DataExportacao>${new Date().toISOString()}</DataExportacao>\n`
+          xmlContent += `  <TotalNotas>${nfsesAutorizadas.length}</TotalNotas>\n`
+          xmlContent += '  <Notas>\n'
+          
+          for (const nota of nfsesAutorizadas) {
+            xmlContent += '    <NFS-e>\n'
+            xmlContent += `      <Numero>${nota.numero || nota.numero_nfse || ""}</Numero>\n`
+            xmlContent += `      <NumeroRPS>${nota.numero_rps || ""}</NumeroRPS>\n`
+            xmlContent += `      <SerieRPS>${nota.serie_rps || ""}</SerieRPS>\n`
+            xmlContent += `      <CodigoVerificacao>${nota.codigo_verificacao || ""}</CodigoVerificacao>\n`
+            xmlContent += `      <Tomador><![CDATA[${nota.tomador_razao_social || nota.cliente_nome || ""}]]></Tomador>\n`
+            xmlContent += `      <CpfCnpjTomador>${nota.tomador_cpf_cnpj || ""}</CpfCnpjTomador>\n`
+            xmlContent += `      <ValorServicos>${Number(nota.valor_servicos || nota.valor_total || 0).toFixed(2)}</ValorServicos>\n`
+            xmlContent += `      <DataEmissao>${nota.data_emissao || ""}</DataEmissao>\n`
+            xmlContent += `      <DescricaoServico><![CDATA[${nota.descricao_servico || ""}]]></DescricaoServico>\n`
+            xmlContent += '    </NFS-e>\n'
+          }
+          
+          xmlContent += '  </Notas>\n'
+          xmlContent += '</NotasFiscaisServico>'
+          
+          const blob = new Blob([xmlContent], { type: "application/xml;charset=utf-8" })
+          const url = URL.createObjectURL(blob)
+          const link = document.createElement("a")
+          link.href = url
+          link.download = `NFSe_${new Date().toISOString().split('T')[0]}.xml`
+          link.click()
+          URL.revokeObjectURL(url)
+          xmlsExportados += nfsesAutorizadas.length
+        }
         
-        const blob = new Blob([xmlContent], { type: "application/xml;charset=utf-8" })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement("a")
-        link.href = url
-        link.download = `notas_fiscais_${new Date().toISOString().split('T')[0]}.xml`
-        link.click()
-        URL.revokeObjectURL(url)
-        
-        toast({ title: "Exportado com sucesso!", description: `${notasParaExportar.length} notas exportadas em XML.` })
+        if (xmlsExportados > 0) {
+          toast({ title: "Exportado com sucesso!", description: `${xmlsExportados} XML(s) exportado(s) no formato padrao.` })
+        } else {
+          toast({ 
+            title: "Nenhum XML encontrado", 
+            description: "Os XMLs autorizados nao foram encontrados no banco de dados.",
+            variant: "destructive" 
+          })
+        }
       }
     } catch (error) {
       console.error("Erro ao exportar:", error)
