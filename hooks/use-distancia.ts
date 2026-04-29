@@ -7,16 +7,13 @@ export function useDistancia() {
 
   const calcularDistancia = async (cepCliente: string): Promise<number | null> => {
     const cepLimpo = cepCliente.replace(/\D/g, "")
-    console.log("[v0] useDistancia - CEP limpo:", cepLimpo)
 
     if (cepLimpo.length !== 8) {
-      console.log("[v0] useDistancia - CEP inválido, length:", cepLimpo.length)
       return null
     }
 
     try {
       setLoading(true)
-      console.log("[v0] useDistancia - Chamando API...")
 
       const response = await fetch("/api/utils/calcular-distancia", {
         method: "POST",
@@ -27,16 +24,14 @@ export function useDistancia() {
       })
 
       const result = await response.json()
-      console.log("[v0] useDistancia - Resposta API:", JSON.stringify(result))
 
       if (result.success) {
         return result.data.distanciaKm
       } else {
-        console.log("[v0] useDistancia - Erro:", result.message)
         return null
       }
     } catch (error) {
-      console.error("[v0] useDistancia - Erro catch:", error)
+      console.error("Erro ao calcular distância:", error)
       return null
     } finally {
       setLoading(false)
