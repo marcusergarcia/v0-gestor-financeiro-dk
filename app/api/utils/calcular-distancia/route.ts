@@ -17,33 +17,36 @@ function calcularDistanciaHaversine(lat1: number, lon1: number, lat2: number, lo
   return Math.round(distancia * 10) / 10 // Arredonda para 1 casa decimal
 }
 
-// Função auxiliar para fazer requisição ao Nominatim
-async function buscarNoNominatim(searchQuery: string): Promise<{ lat: number; lng: number } | null> {
+// Função auxiliar para fazer requisição ao Photon (geocoding baseado no OpenStreetMap, mais permissivo)
+async function buscarNoPhoton(searchQuery: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const encodedQuery = encodeURIComponent(searchQuery)
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&limit=1&countrycodes=br`, {
-      headers: {
-        "User-Agent": "GestorFinanceiro/1.0 (contact@example.com)",
-        "Accept-Language": "pt-BR,pt;q=0.9",
-      },
-    })
+    // Photon API da Komoot - mais permissiva que Nominatim
+    const response = await fetch(`https://photon.komoot.io/api/?q=${encodedQuery}&limit=1&lang=pt`)
+
+    if (!response.ok) {
+      console.log("[v0] Photon response não ok:", response.status, response.statusText)
+      return null
+    }
 
     const data = await response.json()
 
-    if (data.length > 0) {
+    if (data.features && data.features.length > 0) {
+      const coords = data.features[0].geometry.coordinates
+      // GeoJSON é [longitude, latitude]
       return {
-        lat: Number.parseFloat(data[0].lat),
-        lng: Number.parseFloat(data[0].lon),
+        lat: coords[1],
+        lng: coords[0],
       }
     }
     return null
   } catch (error) {
-    console.error("Erro ao buscar no Nominatim:", error)
+    console.error("[v0] Erro ao buscar no Photon:", error)
     return null
   }
 }
 
-// Função para buscar coordenadas via Nominatim (OpenStreetMap) com múltiplas tentativas
+// Função para buscar coordenadas via Photon (OpenStreetMap) com múltiplas tentativas
 async function buscarCoordenadas(
   endereco: string,
   bairro: string,
@@ -54,7 +57,7 @@ async function buscarCoordenadas(
   if (endereco) {
     const query1 = `${endereco}, ${bairro}, ${cidade}, ${uf}, Brasil`
     console.log("[v0] Tentativa 1 - Endereço completo:", query1)
-    const result1 = await buscarNoNominatim(query1)
+    const result1 = await buscarNoPhoton(query1)
     if (result1) return result1
   }
 
@@ -62,14 +65,14 @@ async function buscarCoordenadas(
   if (bairro) {
     const query2 = `${bairro}, ${cidade}, ${uf}, Brasil`
     console.log("[v0] Tentativa 2 - Bairro e cidade:", query2)
-    const result2 = await buscarNoNominatim(query2)
+    const result2 = await buscarNoPhoton(query2)
     if (result2) return result2
   }
 
   // Estratégia 3: Só cidade e estado
   const query3 = `${cidade}, ${uf}, Brasil`
   console.log("[v0] Tentativa 3 - Cidade e estado:", query3)
-  const result3 = await buscarNoNominatim(query3)
+  const result3 = await buscarNoPhoton(query3)
   if (result3) return result3
 
   return null
@@ -141,10 +144,10 @@ export async function POST(request: Request) {
       enderecoData.localidade,
       enderecoData.uf,
     )
-    console.log("[v0] Resultado final Nominatim:", JSON.stringify(coordenadasCliente))
+    console.log("[v0] Resultado final Photon:", JSON.stringify(coordenadasCliente))
 
     if (!coordenadasCliente) {
-      console.log("[v0] ERRO: Não foi possível obter coordenadas do cliente via Nominatim")
+      console.log("[v0] ERRO: Não foi possível obter coordenadas do cliente via Photon")
       return NextResponse.json(
         {
           success: false,
