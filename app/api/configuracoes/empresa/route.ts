@@ -16,6 +16,8 @@ export async function GET() {
           telefone: "",
           email: "",
           site: "",
+          empresa_latitude: "",
+          empresa_longitude: "",
         },
       })
     }
@@ -30,6 +32,8 @@ export async function GET() {
         telefone: config.empresa_telefone || "",
         email: config.empresa_email || "",
         site: config.empresa_site || "",
+        empresa_latitude: config.empresa_latitude || "",
+        empresa_longitude: config.empresa_longitude || "",
       },
     })
   } catch (error) {
