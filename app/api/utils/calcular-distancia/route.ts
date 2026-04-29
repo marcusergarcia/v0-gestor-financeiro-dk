@@ -52,6 +52,7 @@ async function buscarCoordenadas(
 export async function POST(request: Request) {
   try {
     const { cepCliente } = await request.json()
+    console.log("[v0] calcular-distancia - CEP recebido:", cepCliente)
 
     if (!cepCliente) {
       return NextResponse.json({ success: false, message: "CEP do cliente é obrigatório" }, { status: 400 })
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
 
     // Buscar coordenadas da empresa do banco de dados
     const [configRows] = await pool.execute("SELECT empresa_latitude, empresa_longitude FROM timbrado_config LIMIT 1")
+    console.log("[v0] calcular-distancia - configRows:", JSON.stringify(configRows))
 
     if (!Array.isArray(configRows) || configRows.length === 0) {
       return NextResponse.json(
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
     const config = configRows[0] as any
     const latEmpresa = Number(config.empresa_latitude)
     const lonEmpresa = Number(config.empresa_longitude)
+    console.log("[v0] calcular-distancia - Coords empresa:", latEmpresa, lonEmpresa)
 
     if (!latEmpresa || !lonEmpresa) {
       return NextResponse.json(
@@ -101,6 +104,7 @@ export async function POST(request: Request) {
     )
 
     if (!coordenadasCliente) {
+      console.log("[v0] calcular-distancia - Não foi possível obter coordenadas do cliente")
       return NextResponse.json(
         {
           success: false,
@@ -109,6 +113,7 @@ export async function POST(request: Request) {
         { status: 404 },
       )
     }
+    console.log("[v0] calcular-distancia - Coords cliente:", coordenadasCliente.lat, coordenadasCliente.lng)
 
     // Calcular distância
     const distanciaKm = calcularDistanciaHaversine(

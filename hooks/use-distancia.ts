@@ -1,21 +1,22 @@
 "use client"
 
 import { useState } from "react"
-import { useToast } from "@/hooks/use-toast"
 
 export function useDistancia() {
   const [loading, setLoading] = useState(false)
-  const { toast } = useToast()
 
   const calcularDistancia = async (cepCliente: string): Promise<number | null> => {
     const cepLimpo = cepCliente.replace(/\D/g, "")
+    console.log("[v0] useDistancia - CEP limpo:", cepLimpo)
 
     if (cepLimpo.length !== 8) {
+      console.log("[v0] useDistancia - CEP inválido, length:", cepLimpo.length)
       return null
     }
 
     try {
       setLoading(true)
+      console.log("[v0] useDistancia - Chamando API...")
 
       const response = await fetch("/api/utils/calcular-distancia", {
         method: "POST",
@@ -26,28 +27,16 @@ export function useDistancia() {
       })
 
       const result = await response.json()
+      console.log("[v0] useDistancia - Resposta API:", JSON.stringify(result))
 
       if (result.success) {
-        toast({
-          title: "Distância calculada!",
-          description: `Distância: ${result.data.distanciaKm} km`,
-        })
         return result.data.distanciaKm
       } else {
-        toast({
-          title: "Aviso",
-          description: result.message || "Não foi possível calcular a distância",
-          variant: "destructive",
-        })
+        console.log("[v0] useDistancia - Erro:", result.message)
         return null
       }
     } catch (error) {
-      console.error("Erro ao calcular distância:", error)
-      toast({
-        title: "Erro",
-        description: "Erro ao calcular distância. Tente novamente.",
-        variant: "destructive",
-      })
+      console.error("[v0] useDistancia - Erro catch:", error)
       return null
     } finally {
       setLoading(false)
