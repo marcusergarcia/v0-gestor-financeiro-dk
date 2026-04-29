@@ -605,33 +605,23 @@ export default function NotaFiscalPage() {
           const result = await response.json()
           
           if (result.success && result.data?.length > 0) {
-            // Se tiver apenas 1 XML, baixar direto
-            if (result.data.length === 1) {
-              const nfe = result.data[0]
+            // Baixar cada XML individualmente no formato padrao SEFAZ
+            // Cada arquivo deve ser no formato: chaveAcesso.xml (padrao Contabilizei)
+            for (const nfe of result.data) {
               if (nfe.xml) {
                 const blob = new Blob([nfe.xml], { type: "application/xml;charset=utf-8" })
                 const url = URL.createObjectURL(blob)
                 const link = document.createElement("a")
                 link.href = url
-                link.download = `NFe_${nfe.chaveAcesso || nfe.numero}.xml`
+                // Nome do arquivo: chave de acesso (44 digitos) + .xml
+                const nomeArquivo = nfe.chaveAcesso ? `${nfe.chaveAcesso}.xml` : `NFe_${nfe.numero}.xml`
+                link.download = nomeArquivo
                 link.click()
                 URL.revokeObjectURL(url)
                 xmlsExportados++
-              }
-            } else {
-              // Multiplos XMLs - baixar cada um separadamente
-              for (const nfe of result.data) {
-                if (nfe.xml) {
-                  const blob = new Blob([nfe.xml], { type: "application/xml;charset=utf-8" })
-                  const url = URL.createObjectURL(blob)
-                  const link = document.createElement("a")
-                  link.href = url
-                  link.download = `NFe_${nfe.chaveAcesso || nfe.numero}.xml`
-                  link.click()
-                  URL.revokeObjectURL(url)
-                  xmlsExportados++
-                  // Pequeno delay entre downloads
-                  await new Promise(resolve => setTimeout(resolve, 300))
+                // Pequeno delay entre downloads para evitar bloqueio do navegador
+                if (result.data.length > 1) {
+                  await new Promise(resolve => setTimeout(resolve, 500))
                 }
               }
             }
