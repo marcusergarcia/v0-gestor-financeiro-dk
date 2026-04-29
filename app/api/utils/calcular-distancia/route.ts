@@ -1,3 +1,4 @@
+// API para calcular distância entre empresa e cliente usando coordenadas geográficas
 import { NextResponse } from "next/server"
 import { pool } from "@/lib/database"
 
@@ -17,30 +18,50 @@ function calcularDistanciaHaversine(lat1: number, lon1: number, lat2: number, lo
   return Math.round(distancia * 10) / 10 // Arredonda para 1 casa decimal
 }
 
-// Função para buscar coordenadas via Nominatim (OpenStreetMap)
-async function buscarCoordenadas(
+// Função para buscar coordenadas via BrasilAPI (tem dados de CEPs brasileiros com coordenadas)
+async function buscarCoordenadasPorCep(cep: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    // BrasilAPI retorna coordenadas para alguns CEPs
+    const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`)
+    
+    if (!response.ok) {
+      return null
+    }
+    
+    const data = await response.json()
+    
+    if (data.location?.coordinates?.latitude && data.location?.coordinates?.longitude) {
+      return {
+        lat: data.location.coordinates.latitude,
+        lng: data.location.coordinates.longitude,
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error("Erro ao buscar coordenadas via BrasilAPI:", error)
+    return null
+  }
+}
+
+// Função para buscar coordenadas via Nominatim (OpenStreetMap) - fallback
+async function buscarCoordenadasNominatim(
   endereco: string,
   bairro: string,
   cidade: string,
   uf: string,
-  cep: string,
 ): Promise<{ lat: number; lng: number } | null> {
-  // Usar busca estruturada do Nominatim para maior precisão
-  // Importante: incluir o município específico para evitar confusão com bairros de outras cidades
+  // Tentar múltiplas buscas do mais específico ao menos específico
   const tentativas = [
-    // Busca estruturada com CEP
-    `https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(endereco)}&city=${encodeURIComponent(cidade)}&state=${encodeURIComponent(uf)}&country=Brazil&postalcode=${cep}&format=json&limit=5&addressdetails=1`,
-    // Busca com endereço completo incluindo "município de"
-    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(`${endereco}, ${bairro}, município de ${cidade}, ${uf}, Brasil`)}&format=json&limit=5&addressdetails=1`,
-    // Busca com bairro e município específico
-    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(`${bairro}, município de ${cidade}, ${uf}, Brasil`)}&format=json&limit=5&addressdetails=1`,
-    // Busca estruturada apenas com cidade (fallback)
-    `https://nominatim.openstreetmap.org/search?city=${encodeURIComponent(cidade)}&state=${encodeURIComponent(uf)}&country=Brazil&format=json&limit=1&addressdetails=1`,
+    `${endereco}, ${bairro}, ${cidade}, ${uf}, Brazil`,
+    `${bairro}, ${cidade}, ${uf}, Brazil`,
+    `${cidade}, ${uf}, Brazil`,
   ]
 
-  for (const url of tentativas) {
+  for (const query of tentativas) {
     try {
-      console.log(`[v0] Nominatim tentando: ${url}`)
+      const encodedQuery = encodeURIComponent(query)
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&limit=5&addressdetails=1`
 
       const response = await fetch(url, {
         headers: {
@@ -49,56 +70,56 @@ async function buscarCoordenadas(
         },
       })
 
-      if (!response.ok) {
-        console.log(`Nominatim retornou status ${response.status}`)
-        continue
-      }
+      if (!response.ok) continue
 
       const data = await response.json()
-      console.log(`[v0] Nominatim resposta:`, JSON.stringify(data))
 
       if (data.length > 0) {
-        // Filtrar resultados para garantir que estejam na cidade correta
-        const resultadoValido = data.find((item: any) => {
-          const lat = Number.parseFloat(item.lat)
-          const lon = Number.parseFloat(item.lon)
+        // Filtrar para garantir que está na cidade correta
+        const resultado = data.find((item: any) => {
           const displayName = item.display_name?.toLowerCase() || ""
-          
-          // Verificar se está dentro da região metropolitana de São Paulo (capital)
-          // São Paulo capital: lat entre -24.0 e -23.4, lon entre -46.85 e -46.35
-          const dentroSPCapital = lat >= -24.0 && lat <= -23.4 && lon >= -46.85 && lon <= -46.35
-          
-          // Verificar se NÃO é de Sorocaba ou outra cidade
-          const naoEhSorocaba = !displayName.includes("sorocaba")
-          
-          // Verificar se contém "são paulo" no display_name
-          const contemSaoPaulo = displayName.includes("são paulo") || displayName.includes("sao paulo")
-          
-          console.log(`[v0] Validando: lat=${lat}, lon=${lon}, dentroSPCapital=${dentroSPCapital}, naoEhSorocaba=${naoEhSorocaba}, contemSaoPaulo=${contemSaoPaulo}, displayName=${displayName.substring(0, 100)}`)
-          
-          return dentroSPCapital && naoEhSorocaba && contemSaoPaulo
+          return displayName.includes(cidade.toLowerCase())
         })
 
-        if (resultadoValido) {
-          console.log(`[v0] Resultado válido encontrado: ${resultadoValido.display_name}`)
+        if (resultado) {
           return {
-            lat: Number.parseFloat(resultadoValido.lat),
-            lng: Number.parseFloat(resultadoValido.lon),
+            lat: Number.parseFloat(resultado.lat),
+            lng: Number.parseFloat(resultado.lon),
           }
         }
       }
     } catch (error) {
-      console.error("Erro ao buscar coordenadas:", error)
+      console.error("Erro ao buscar coordenadas via Nominatim:", error)
     }
   }
 
-  // Se não encontrou nada válido, retornar coordenadas aproximadas do centro de São Paulo
-  // como último recurso (melhor do que retornar Sorocaba)
-  console.log(`[v0] Nenhum resultado válido encontrado, usando centro de São Paulo como fallback`)
-  return {
-    lat: -23.5505,
-    lng: -46.6333,
+  return null
+}
+
+// Função principal que tenta BrasilAPI primeiro, depois Nominatim
+async function buscarCoordenadas(
+  endereco: string,
+  bairro: string,
+  cidade: string,
+  uf: string,
+  cep: string,
+): Promise<{ lat: number; lng: number } | null> {
+  // 1. Tentar BrasilAPI primeiro (mais precisa para CEPs brasileiros)
+  const coordsBrasilAPI = await buscarCoordenadasPorCep(cep)
+  if (coordsBrasilAPI) {
+    console.log(`[v0] Coordenadas encontradas via BrasilAPI: ${coordsBrasilAPI.lat}, ${coordsBrasilAPI.lng}`)
+    return coordsBrasilAPI
   }
+
+  // 2. Fallback para Nominatim
+  const coordsNominatim = await buscarCoordenadasNominatim(endereco, bairro, cidade, uf)
+  if (coordsNominatim) {
+    console.log(`[v0] Coordenadas encontradas via Nominatim: ${coordsNominatim.lat}, ${coordsNominatim.lng}`)
+    return coordsNominatim
+  }
+
+  console.log("[v0] Nenhuma coordenada encontrada")
+  return null
 }
 
 export async function POST(request: Request) {
@@ -154,8 +175,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "CEP não encontrado" }, { status: 404 })
     }
 
-    // Buscar coordenadas do cliente via Nominatim
-    console.log("[v0] calcular-distancia - Buscando Nominatim...")
+    // Buscar coordenadas do cliente (BrasilAPI primeiro, depois Nominatim como fallback)
+    console.log("[v0] calcular-distancia - Buscando coordenadas (BrasilAPI/Nominatim)...")
     const coordenadasCliente = await buscarCoordenadas(
       enderecoData.logradouro || "",
       enderecoData.bairro || "",
