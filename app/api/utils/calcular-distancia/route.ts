@@ -64,15 +64,19 @@ async function buscarCoordenadas(
 export async function POST(request: Request) {
   try {
     const { cepCliente } = await request.json()
+    console.log("[v0] calcular-distancia - CEP recebido:", cepCliente)
 
     if (!cepCliente) {
       return NextResponse.json({ success: false, message: "CEP do cliente é obrigatório" }, { status: 400 })
     }
 
     // Buscar coordenadas da empresa do banco de dados
+    console.log("[v0] calcular-distancia - Buscando config da empresa...")
     const [configRows] = await pool.execute("SELECT empresa_latitude, empresa_longitude FROM timbrado_config LIMIT 1")
+    console.log("[v0] calcular-distancia - configRows:", JSON.stringify(configRows))
 
     if (!Array.isArray(configRows) || configRows.length === 0) {
+      console.log("[v0] calcular-distancia - Nenhuma config encontrada")
       return NextResponse.json(
         {
           success: false,
@@ -83,10 +87,13 @@ export async function POST(request: Request) {
     }
 
     const config = configRows[0] as any
+    console.log("[v0] calcular-distancia - config raw:", config)
     const latEmpresa = Number(config.empresa_latitude)
     const lonEmpresa = Number(config.empresa_longitude)
+    console.log("[v0] calcular-distancia - Coords empresa:", latEmpresa, lonEmpresa)
 
     if (!latEmpresa || !lonEmpresa) {
+      console.log("[v0] calcular-distancia - Coords vazias")
       return NextResponse.json(
         {
           success: false,
@@ -98,21 +105,26 @@ export async function POST(request: Request) {
 
     // Buscar endereço do cliente via ViaCEP
     const cepLimpo = cepCliente.replace(/\D/g, "")
+    console.log("[v0] calcular-distancia - Buscando ViaCEP:", cepLimpo)
     const viaCepResponse = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
     const enderecoData = await viaCepResponse.json()
+    console.log("[v0] calcular-distancia - ViaCEP resposta:", JSON.stringify(enderecoData))
 
     if (enderecoData.erro) {
       return NextResponse.json({ success: false, message: "CEP não encontrado" }, { status: 404 })
     }
 
     // Buscar coordenadas do cliente via Nominatim
+    console.log("[v0] calcular-distancia - Buscando Nominatim...")
     const coordenadasCliente = await buscarCoordenadas(
       enderecoData.logradouro || "",
       enderecoData.localidade,
       enderecoData.uf,
     )
+    console.log("[v0] calcular-distancia - Coords cliente:", JSON.stringify(coordenadasCliente))
 
     if (!coordenadasCliente) {
+      console.log("[v0] calcular-distancia - Coords cliente não encontradas")
       return NextResponse.json(
         {
           success: false,
