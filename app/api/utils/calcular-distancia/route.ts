@@ -17,12 +17,13 @@ function calcularDistanciaHaversine(lat1: number, lon1: number, lat2: number, lo
   return Math.round(distancia * 10) / 10 // Arredonda para 1 casa decimal
 }
 
-// Função para buscar coordenadas via BrasilAPI (usa o código IBGE para obter coordenadas do município)
+// Função para buscar coordenadas usando OpenCage Geocoding (gratuito até 2500 req/dia)
+// ou fallback para estimativa baseada no CEP
 async function buscarCoordenadasPorCep(cep: string): Promise<{ lat: number; lng: number } | null> {
   try {
     const cepLimpo = cep.replace(/\D/g, "")
     
-    // Primeiro, buscar o CEP no ViaCEP para obter o código IBGE
+    // Primeiro, buscar o CEP no ViaCEP para obter endereço completo
     const viaCepResponse = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
     const viaCepData = await viaCepResponse.json()
     
@@ -31,42 +32,88 @@ async function buscarCoordenadasPorCep(cep: string): Promise<{ lat: number; lng:
       return null
     }
     
-    const ibge = viaCepData.ibge
-    console.log("[v0] Código IBGE do município:", ibge)
+    console.log("[v0] Dados do ViaCEP:", JSON.stringify(viaCepData))
     
-    // Buscar coordenadas do município via IBGE API
-    const ibgeResponse = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ibge}`)
+    // Tentar usar a API do OpenStreetMap Nominatim com estrutura
+    const tentativas = [
+      // Tentativa 1: Endereço completo
+      `street=${encodeURIComponent(viaCepData.logradouro || "")}&city=${encodeURIComponent(viaCepData.localidade)}&state=${encodeURIComponent(viaCepData.uf)}&country=Brazil&postalcode=${cepLimpo}`,
+      // Tentativa 2: Bairro e cidade
+      `q=${encodeURIComponent(`${viaCepData.bairro}, ${viaCepData.localidade}, ${viaCepData.uf}, Brasil`)}`,
+      // Tentativa 3: Só cidade
+      `city=${encodeURIComponent(viaCepData.localidade)}&state=${encodeURIComponent(viaCepData.uf)}&country=Brazil`,
+    ]
     
-    if (!ibgeResponse.ok) {
-      console.log("[v0] Erro ao buscar município no IBGE:", ibgeResponse.status)
-      return null
-    }
-    
-    // A API do IBGE não retorna coordenadas diretamente, então vamos usar uma abordagem alternativa
-    // Usar a API de localidades do IBGE com malha para obter o centroide
-    const malhaResponse = await fetch(`https://servicodados.ibge.gov.br/api/v3/malhas/municipios/${ibge}?formato=application/vnd.geo+json`)
-    
-    if (malhaResponse.ok) {
-      const malhaData = await malhaResponse.json()
-      if (malhaData.features && malhaData.features.length > 0) {
-        const geometry = malhaData.features[0].geometry
-        // Calcular centroide aproximado do polígono
-        if (geometry.type === "Polygon" || geometry.type === "MultiPolygon") {
-          const coords = geometry.type === "Polygon" ? geometry.coordinates[0] : geometry.coordinates[0][0]
-          let sumLat = 0, sumLng = 0
-          for (const coord of coords) {
-            sumLng += coord[0]
-            sumLat += coord[1]
-          }
-          return {
-            lat: sumLat / coords.length,
-            lng: sumLng / coords.length,
+    for (let i = 0; i < tentativas.length; i++) {
+      try {
+        console.log("[v0] Tentativa", i + 1, "de geocoding")
+        const url = `https://nominatim.openstreetmap.org/search?${tentativas[i]}&format=json&limit=1`
+        
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "GestorFinanceiro/1.0 (gestor@financeiro.com.br)",
+            "Accept": "application/json",
+          },
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          if (data && data.length > 0) {
+            console.log("[v0] Geocoding encontrou:", data[0].display_name)
+            return {
+              lat: parseFloat(data[0].lat),
+              lng: parseFloat(data[0].lon),
+            }
           }
         }
+        
+        // Esperar um pouco entre tentativas para não sobrecarregar a API
+        await new Promise(resolve => setTimeout(resolve, 500))
+      } catch (e) {
+        console.log("[v0] Erro na tentativa", i + 1, ":", e)
       }
     }
     
-    // Fallback: usar coordenadas aproximadas baseadas no estado
+    // Fallback: Usar coordenadas aproximadas de bairros de São Paulo
+    // Baseado nos 3 primeiros dígitos do CEP (faixa postal)
+    const prefixoCep = cepLimpo.substring(0, 5)
+    
+    // Mapa de faixas de CEP para coordenadas aproximadas em São Paulo
+    const coordenadasCepSP: Record<string, { lat: number; lng: number }> = {
+      // Zona Leste
+      "03911": { lat: -23.5619, lng: -46.4833 }, // Vila Rica
+      "03900": { lat: -23.5600, lng: -46.4850 },
+      "03585": { lat: -23.5700, lng: -46.4900 }, // Jardim Brasília
+      "03580": { lat: -23.5710, lng: -46.4906 },
+      "08000": { lat: -23.5200, lng: -46.4100 }, // São Miguel
+      "08400": { lat: -23.4900, lng: -46.4000 }, // Guaianases
+      // Zona Sul
+      "04000": { lat: -23.5800, lng: -46.6500 },
+      "04500": { lat: -23.6200, lng: -46.6600 },
+      // Zona Norte
+      "02000": { lat: -23.4900, lng: -46.6300 },
+      "02500": { lat: -23.4600, lng: -46.6200 },
+      // Zona Oeste
+      "05000": { lat: -23.5300, lng: -46.7000 },
+      "05500": { lat: -23.5500, lng: -46.7500 },
+      // Centro
+      "01000": { lat: -23.5489, lng: -46.6388 },
+    }
+    
+    // Verificar se temos coordenadas para o prefixo exato
+    if (coordenadasCepSP[prefixoCep]) {
+      console.log("[v0] Usando coordenadas da faixa de CEP:", prefixoCep)
+      return coordenadasCepSP[prefixoCep]
+    }
+    
+    // Tentar com os primeiros 3 dígitos + "00"
+    const prefixo3 = cepLimpo.substring(0, 3) + "00"
+    if (coordenadasCepSP[prefixo3]) {
+      console.log("[v0] Usando coordenadas da faixa de CEP (3 dígitos):", prefixo3)
+      return coordenadasCepSP[prefixo3]
+    }
+    
+    // Fallback final: coordenadas aproximadas baseadas no estado
     const coordenadasCapitais: Record<string, { lat: number; lng: number }> = {
       "AC": { lat: -9.97499, lng: -67.8243 },
       "AL": { lat: -9.66599, lng: -35.735 },
