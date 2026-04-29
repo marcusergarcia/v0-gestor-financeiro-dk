@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Save, User, Phone, MapPin, Lock, Building2, Search, MapPinned, FileText } from "lucide-react"
+import { ArrowLeft, Save, User, Phone, MapPin, Lock, Building2, Search, MapPinned, FileText, Navigation } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useCep } from "@/hooks/use-cep"
@@ -141,6 +141,37 @@ export default function NovoClientePage() {
           distancia_km: distancia,
         }))
       }
+    }
+  }
+
+  const handleCalcularDistanciaManual = async () => {
+    const cepLimpo = formData.cep.replace(/\D/g, "")
+    
+    if (cepLimpo.length !== 8) {
+      toast({
+        title: "CEP inválido",
+        description: "Preencha um CEP válido com 8 dígitos",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const distancia = await calcularDistancia(formData.cep)
+    if (distancia !== null) {
+      setFormData((prev) => ({
+        ...prev,
+        distancia_km: distancia,
+      }))
+      toast({
+        title: "Distância calculada!",
+        description: `Distância: ${distancia.toFixed(1)} km`,
+      })
+    } else {
+      toast({
+        title: "Erro ao calcular",
+        description: "Verifique se o CEP da empresa está configurado em Configurações",
+        variant: "destructive",
+      })
     }
   }
 
@@ -501,16 +532,33 @@ export default function NovoClientePage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="distancia_km">Distância (km)</Label>
-                  <div className="relative">
-                    <Input
-                      id="distancia_km"
-                      type="number"
-                      value={formData.distancia_km}
-                      readOnly={true}
-                      placeholder="Calculado automaticamente"
-                      className="h-9 bg-gray-50 text-gray-600 pr-10"
-                    />
-                    <MapPinned className="absolute right-3 top-2 h-4 w-4 text-gray-400" />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="distancia_km"
+                        type="number"
+                        value={formData.distancia_km}
+                        readOnly={true}
+                        placeholder="Calculado automaticamente"
+                        className="h-9 bg-gray-50 text-gray-600 pr-10"
+                      />
+                      <MapPinned className="absolute right-3 top-2 h-4 w-4 text-gray-400" />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={handleCalcularDistanciaManual}
+                      disabled={loadingDistancia || !formData.cep}
+                      title="Calcular distância manualmente"
+                    >
+                      {loadingDistancia ? (
+                        <Search className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Navigation className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                   <p className="text-xs text-gray-500">Calculado automaticamente pelo CEP</p>
                 </div>
