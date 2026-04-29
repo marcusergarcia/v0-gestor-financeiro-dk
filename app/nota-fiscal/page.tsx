@@ -605,26 +605,37 @@ export default function NotaFiscalPage() {
           const result = await response.json()
           
           if (result.success && result.data?.length > 0) {
-            // Baixar cada XML individualmente no formato padrao SEFAZ
-            // Cada arquivo deve ser no formato: chaveAcesso.xml (padrao Contabilizei)
-            for (const nfe of result.data) {
+            // Ordenar por numero da nota em ordem crescente
+            const nfesOrdenadas = result.data.sort((a: any, b: any) => {
+              const numA = parseInt(a.numero) || 0
+              const numB = parseInt(b.numero) || 0
+              return numA - numB
+            })
+            
+            // Gerar um unico arquivo XML com todas as notas em sequencia
+            let xmlConsolidado = '<?xml version="1.0" encoding="UTF-8"?>\n'
+            xmlConsolidado += '<nfeProcs xmlns="http://www.portalfiscal.inf.br/nfe">\n'
+            
+            for (const nfe of nfesOrdenadas) {
               if (nfe.xml) {
-                const blob = new Blob([nfe.xml], { type: "application/xml;charset=utf-8" })
-                const url = URL.createObjectURL(blob)
-                const link = document.createElement("a")
-                link.href = url
-                // Nome do arquivo: chave de acesso (44 digitos) + .xml
-                const nomeArquivo = nfe.chaveAcesso ? `${nfe.chaveAcesso}.xml` : `NFe_${nfe.numero}.xml`
-                link.download = nomeArquivo
-                link.click()
-                URL.revokeObjectURL(url)
+                // Remover declaracao XML de cada nota individual para evitar duplicacao
+                let xmlNota = nfe.xml.replace(/<\?xml[^?]*\?>\s*/gi, '')
+                xmlConsolidado += xmlNota + '\n'
                 xmlsExportados++
-                // Pequeno delay entre downloads para evitar bloqueio do navegador
-                if (result.data.length > 1) {
-                  await new Promise(resolve => setTimeout(resolve, 500))
-                }
               }
             }
+            
+            xmlConsolidado += '</nfeProcs>'
+            
+            // Baixar arquivo unico com todas as notas
+            const blob = new Blob([xmlConsolidado], { type: "application/xml;charset=utf-8" })
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement("a")
+            link.href = url
+            const dataAtual = new Date().toISOString().split('T')[0]
+            link.download = `NFe_${dataAtual}_${xmlsExportados}notas.xml`
+            link.click()
+            URL.revokeObjectURL(url)
           }
         }
         
