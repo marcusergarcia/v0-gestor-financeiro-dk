@@ -17,36 +17,62 @@ function calcularDistanciaHaversine(lat1: number, lon1: number, lat2: number, lo
   return Math.round(distancia * 10) / 10 // Arredonda para 1 casa decimal
 }
 
-// Função para buscar coordenadas via Nominatim (OpenStreetMap)
-async function buscarCoordenadas(
-  endereco: string,
-  cidade: string,
-  uf: string,
-): Promise<{ lat: number; lng: number } | null> {
+// Função auxiliar para fazer requisição ao Nominatim
+async function buscarNoNominatim(searchQuery: string): Promise<{ lat: number; lng: number } | null> {
   try {
-    const searchQuery = `${endereco}, ${cidade}, ${uf}, Brazil`
     const encodedQuery = encodeURIComponent(searchQuery)
-
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&limit=1`, {
+    const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&limit=1&countrycodes=br`, {
       headers: {
-        "User-Agent": "GestorFinanceiro/1.0",
+        "User-Agent": "GestorFinanceiro/1.0 (contact@example.com)",
+        "Accept-Language": "pt-BR,pt;q=0.9",
       },
     })
 
     const data = await response.json()
 
-    if (data.length === 0) {
-      return null
+    if (data.length > 0) {
+      return {
+        lat: Number.parseFloat(data[0].lat),
+        lng: Number.parseFloat(data[0].lon),
+      }
     }
-
-    return {
-      lat: Number.parseFloat(data[0].lat),
-      lng: Number.parseFloat(data[0].lon),
-    }
+    return null
   } catch (error) {
-    console.error("Erro ao buscar coordenadas:", error)
+    console.error("Erro ao buscar no Nominatim:", error)
     return null
   }
+}
+
+// Função para buscar coordenadas via Nominatim (OpenStreetMap) com múltiplas tentativas
+async function buscarCoordenadas(
+  endereco: string,
+  bairro: string,
+  cidade: string,
+  uf: string,
+): Promise<{ lat: number; lng: number } | null> {
+  // Estratégia 1: Endereço completo com bairro
+  if (endereco) {
+    const query1 = `${endereco}, ${bairro}, ${cidade}, ${uf}, Brasil`
+    console.log("[v0] Tentativa 1 - Endereço completo:", query1)
+    const result1 = await buscarNoNominatim(query1)
+    if (result1) return result1
+  }
+
+  // Estratégia 2: Só bairro e cidade
+  if (bairro) {
+    const query2 = `${bairro}, ${cidade}, ${uf}, Brasil`
+    console.log("[v0] Tentativa 2 - Bairro e cidade:", query2)
+    const result2 = await buscarNoNominatim(query2)
+    if (result2) return result2
+  }
+
+  // Estratégia 3: Só cidade e estado
+  const query3 = `${cidade}, ${uf}, Brasil`
+  console.log("[v0] Tentativa 3 - Cidade e estado:", query3)
+  const result3 = await buscarNoNominatim(query3)
+  if (result3) return result3
+
+  return null
 }
 
 export async function POST(request: Request) {
@@ -108,13 +134,14 @@ export async function POST(request: Request) {
     }
 
     // Buscar coordenadas do cliente via Nominatim
-    console.log("[v0] Buscando coordenadas para:", enderecoData.logradouro, enderecoData.localidade, enderecoData.uf)
+    console.log("[v0] Buscando coordenadas para:", enderecoData.logradouro, enderecoData.bairro, enderecoData.localidade, enderecoData.uf)
     const coordenadasCliente = await buscarCoordenadas(
       enderecoData.logradouro || "",
+      enderecoData.bairro || "",
       enderecoData.localidade,
       enderecoData.uf,
     )
-    console.log("[v0] Resultado Nominatim:", JSON.stringify(coordenadasCliente))
+    console.log("[v0] Resultado final Nominatim:", JSON.stringify(coordenadasCliente))
 
     if (!coordenadasCliente) {
       console.log("[v0] ERRO: Não foi possível obter coordenadas do cliente via Nominatim")
