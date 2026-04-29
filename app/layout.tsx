@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata, Viewport } from "next"
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
@@ -7,13 +7,6 @@ import { Toaster } from "sonner"
 import { LayoutContent } from "@/components/layout-content"
 
 const inter = Inter({ subsets: ["latin"] })
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-}
 
 export const metadata: Metadata = {
   title: "Gestor Financeiro",
@@ -32,6 +25,12 @@ export const metadata: Metadata = {
     apple: "/icon-192.jpg",
   },
   generator: "v0.app",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
 }
 
 export default function RootLayout({
