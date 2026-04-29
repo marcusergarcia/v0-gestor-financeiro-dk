@@ -3,42 +3,81 @@
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 
-// Função para buscar coordenadas via Nominatim (funciona no navegador)
+// Função para buscar coordenadas via Nominatim usando parâmetros estruturados
 async function buscarCoordenadasNominatim(
   endereco: string,
   bairro: string,
   cidade: string,
-  uf: string
+  uf: string,
+  cep: string
 ): Promise<{ lat: number; lng: number } | null> {
-  // Tentar várias combinações de busca
-  const queries = [
-    `${endereco}, ${bairro}, ${cidade}, ${uf}, Brasil`,
-    `${bairro}, ${cidade}, ${uf}, Brasil`,
-    `${cidade}, ${uf}, Brasil`,
-  ].filter(q => q.replace(/,/g, "").trim().length > 10)
+  // Mapa de UF para nome completo do estado
+  const estadosMap: Record<string, string> = {
+    "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas",
+    "BA": "Bahia", "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo",
+    "GO": "Goiás", "MA": "Maranhão", "MT": "Mato Grosso", "MS": "Mato Grosso do Sul",
+    "MG": "Minas Gerais", "PA": "Pará", "PB": "Paraíba", "PR": "Paraná",
+    "PE": "Pernambuco", "PI": "Piauí", "RJ": "Rio de Janeiro", "RN": "Rio Grande do Norte",
+    "RS": "Rio Grande do Sul", "RO": "Rondônia", "RR": "Roraima", "SC": "Santa Catarina",
+    "SP": "São Paulo", "SE": "Sergipe", "TO": "Tocantins"
+  }
 
-  for (const searchQuery of queries) {
+  const estado = estadosMap[uf] || uf
+
+  // Estratégias de busca com parâmetros estruturados (mais preciso)
+  const tentativas = [
+    // Tentativa 1: Busca estruturada com endereço completo
+    `street=${encodeURIComponent(endereco)}&city=${encodeURIComponent(cidade)}&state=${encodeURIComponent(estado)}&country=Brazil&postalcode=${cep}`,
+    // Tentativa 2: Busca estruturada só com cidade e estado
+    `city=${encodeURIComponent(cidade)}&state=${encodeURIComponent(estado)}&country=Brazil`,
+    // Tentativa 3: Query de texto com cidade e estado (fallback)
+    `q=${encodeURIComponent(`${cidade}, ${estado}, Brasil`)}`,
+  ]
+
+  for (let i = 0; i < tentativas.length; i++) {
     try {
-      const encodedQuery = encodeURIComponent(searchQuery)
+      console.log(`[v0] Tentativa ${i + 1} de geocoding:`, tentativas[i])
+      
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&limit=1&countrycodes=br`,
+        `https://nominatim.openstreetmap.org/search?${tentativas[i]}&format=json&limit=5&countrycodes=br`,
         {
           headers: {
-            "User-Agent": "GestorFinanceiro/1.0",
+            "User-Agent": "GestorFinanceiro/1.0 (contact@gestor.com)",
           },
         }
       )
 
       const data = await response.json()
+      console.log(`[v0] Resultados da tentativa ${i + 1}:`, data.length)
 
       if (data.length > 0) {
-        return {
-          lat: Number.parseFloat(data[0].lat),
-          lng: Number.parseFloat(data[0].lon),
+        // Filtrar resultados que contenham a cidade correta no display_name
+        const resultadoCorreto = data.find((item: any) => {
+          const displayName = item.display_name.toLowerCase()
+          const cidadeLower = cidade.toLowerCase()
+          // Verificar se o resultado contém a cidade correta
+          return displayName.includes(cidadeLower) && !displayName.includes("sorocaba")
+        })
+
+        if (resultadoCorreto) {
+          console.log(`[v0] Resultado encontrado:`, resultadoCorreto.display_name)
+          return {
+            lat: Number.parseFloat(resultadoCorreto.lat),
+            lng: Number.parseFloat(resultadoCorreto.lon),
+          }
+        }
+
+        // Se não encontrou resultado filtrado, usar o primeiro resultado da busca estruturada (tentativas 0 e 1)
+        if (i < 2 && data[0]) {
+          console.log(`[v0] Usando primeiro resultado:`, data[0].display_name)
+          return {
+            lat: Number.parseFloat(data[0].lat),
+            lng: Number.parseFloat(data[0].lon),
+          }
         }
       }
     } catch (err) {
-      console.error("Erro ao buscar coordenadas:", err)
+      console.error(`[v0] Erro na tentativa ${i + 1}:`, err)
     }
   }
 
@@ -73,12 +112,15 @@ export function useDistancia() {
       }
 
       // 2. Buscar coordenadas do cliente via Nominatim (no navegador funciona!)
+      console.log("[v0] Buscando coordenadas para:", enderecoData)
       const coordenadasCliente = await buscarCoordenadasNominatim(
         enderecoData.logradouro || "",
         enderecoData.bairro || "",
         enderecoData.localidade,
-        enderecoData.uf
+        enderecoData.uf,
+        cepLimpo
       )
+      console.log("[v0] Coordenadas encontradas:", coordenadasCliente)
 
       if (!coordenadasCliente) {
         toast({
