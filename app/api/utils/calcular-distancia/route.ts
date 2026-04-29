@@ -17,65 +17,97 @@ function calcularDistanciaHaversine(lat1: number, lon1: number, lat2: number, lo
   return Math.round(distancia * 10) / 10 // Arredonda para 1 casa decimal
 }
 
-// Função auxiliar para fazer requisição ao Photon (geocoding baseado no OpenStreetMap, mais permissivo)
-async function buscarNoPhoton(searchQuery: string): Promise<{ lat: number; lng: number } | null> {
+// Função para buscar coordenadas via BrasilAPI (usa o código IBGE para obter coordenadas do município)
+async function buscarCoordenadasPorCep(cep: string): Promise<{ lat: number; lng: number } | null> {
   try {
-    const encodedQuery = encodeURIComponent(searchQuery)
-    // Photon API da Komoot - mais permissiva que Nominatim
-    const response = await fetch(`https://photon.komoot.io/api/?q=${encodedQuery}&limit=1&lang=pt`)
-
-    if (!response.ok) {
-      console.log("[v0] Photon response não ok:", response.status, response.statusText)
+    const cepLimpo = cep.replace(/\D/g, "")
+    
+    // Primeiro, buscar o CEP no ViaCEP para obter o código IBGE
+    const viaCepResponse = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
+    const viaCepData = await viaCepResponse.json()
+    
+    if (viaCepData.erro) {
+      console.log("[v0] CEP não encontrado no ViaCEP")
       return null
     }
-
-    const data = await response.json()
-
-    if (data.features && data.features.length > 0) {
-      const coords = data.features[0].geometry.coordinates
-      // GeoJSON é [longitude, latitude]
-      return {
-        lat: coords[1],
-        lng: coords[0],
+    
+    const ibge = viaCepData.ibge
+    console.log("[v0] Código IBGE do município:", ibge)
+    
+    // Buscar coordenadas do município via IBGE API
+    const ibgeResponse = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/municipios/${ibge}`)
+    
+    if (!ibgeResponse.ok) {
+      console.log("[v0] Erro ao buscar município no IBGE:", ibgeResponse.status)
+      return null
+    }
+    
+    // A API do IBGE não retorna coordenadas diretamente, então vamos usar uma abordagem alternativa
+    // Usar a API de localidades do IBGE com malha para obter o centroide
+    const malhaResponse = await fetch(`https://servicodados.ibge.gov.br/api/v3/malhas/municipios/${ibge}?formato=application/vnd.geo+json`)
+    
+    if (malhaResponse.ok) {
+      const malhaData = await malhaResponse.json()
+      if (malhaData.features && malhaData.features.length > 0) {
+        const geometry = malhaData.features[0].geometry
+        // Calcular centroide aproximado do polígono
+        if (geometry.type === "Polygon" || geometry.type === "MultiPolygon") {
+          const coords = geometry.type === "Polygon" ? geometry.coordinates[0] : geometry.coordinates[0][0]
+          let sumLat = 0, sumLng = 0
+          for (const coord of coords) {
+            sumLng += coord[0]
+            sumLat += coord[1]
+          }
+          return {
+            lat: sumLat / coords.length,
+            lng: sumLng / coords.length,
+          }
+        }
       }
     }
+    
+    // Fallback: usar coordenadas aproximadas baseadas no estado
+    const coordenadasCapitais: Record<string, { lat: number; lng: number }> = {
+      "AC": { lat: -9.97499, lng: -67.8243 },
+      "AL": { lat: -9.66599, lng: -35.735 },
+      "AP": { lat: 0.034934, lng: -51.0694 },
+      "AM": { lat: -3.10194, lng: -60.025 },
+      "BA": { lat: -12.9714, lng: -38.5014 },
+      "CE": { lat: -3.71722, lng: -38.5433 },
+      "DF": { lat: -15.7942, lng: -47.8822 },
+      "ES": { lat: -20.3155, lng: -40.3128 },
+      "GO": { lat: -16.6869, lng: -49.2648 },
+      "MA": { lat: -2.52972, lng: -44.3028 },
+      "MT": { lat: -15.596, lng: -56.0969 },
+      "MS": { lat: -20.4697, lng: -54.6201 },
+      "MG": { lat: -19.9167, lng: -43.9345 },
+      "PA": { lat: -1.45583, lng: -48.5044 },
+      "PB": { lat: -7.11509, lng: -34.8641 },
+      "PR": { lat: -25.4284, lng: -49.2733 },
+      "PE": { lat: -8.04756, lng: -34.877 },
+      "PI": { lat: -5.08921, lng: -42.8016 },
+      "RJ": { lat: -22.9068, lng: -43.1729 },
+      "RN": { lat: -5.79448, lng: -35.211 },
+      "RS": { lat: -30.0346, lng: -51.2177 },
+      "RO": { lat: -8.76077, lng: -63.8999 },
+      "RR": { lat: 2.81972, lng: -60.6733 },
+      "SC": { lat: -27.5954, lng: -48.548 },
+      "SP": { lat: -23.5505, lng: -46.6333 },
+      "SE": { lat: -10.9472, lng: -37.0731 },
+      "TO": { lat: -10.1689, lng: -48.3317 },
+    }
+    
+    const uf = viaCepData.uf
+    if (coordenadasCapitais[uf]) {
+      console.log("[v0] Usando coordenadas da capital do estado:", uf)
+      return coordenadasCapitais[uf]
+    }
+    
     return null
   } catch (error) {
-    console.error("[v0] Erro ao buscar no Photon:", error)
+    console.error("[v0] Erro ao buscar coordenadas:", error)
     return null
   }
-}
-
-// Função para buscar coordenadas via Photon (OpenStreetMap) com múltiplas tentativas
-async function buscarCoordenadas(
-  endereco: string,
-  bairro: string,
-  cidade: string,
-  uf: string,
-): Promise<{ lat: number; lng: number } | null> {
-  // Estratégia 1: Endereço completo com bairro
-  if (endereco) {
-    const query1 = `${endereco}, ${bairro}, ${cidade}, ${uf}, Brasil`
-    console.log("[v0] Tentativa 1 - Endereço completo:", query1)
-    const result1 = await buscarNoPhoton(query1)
-    if (result1) return result1
-  }
-
-  // Estratégia 2: Só bairro e cidade
-  if (bairro) {
-    const query2 = `${bairro}, ${cidade}, ${uf}, Brasil`
-    console.log("[v0] Tentativa 2 - Bairro e cidade:", query2)
-    const result2 = await buscarNoPhoton(query2)
-    if (result2) return result2
-  }
-
-  // Estratégia 3: Só cidade e estado
-  const query3 = `${cidade}, ${uf}, Brasil`
-  console.log("[v0] Tentativa 3 - Cidade e estado:", query3)
-  const result3 = await buscarNoPhoton(query3)
-  if (result3) return result3
-
-  return null
 }
 
 export async function POST(request: Request) {
@@ -124,30 +156,13 @@ export async function POST(request: Request) {
 
     console.log("[v0] Coordenadas da empresa válidas:", { latEmpresa, lonEmpresa })
 
-    // Buscar endereço do cliente via ViaCEP
-    const cepLimpo = cepCliente.replace(/\D/g, "")
-    console.log("[v0] Buscando CEP do cliente:", cepLimpo)
-    const viaCepResponse = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`)
-    const enderecoData = await viaCepResponse.json()
-    console.log("[v0] Resposta ViaCEP:", JSON.stringify(enderecoData))
-
-    if (enderecoData.erro) {
-      console.log("[v0] ERRO: CEP não encontrado no ViaCEP")
-      return NextResponse.json({ success: false, message: "CEP não encontrado" }, { status: 404 })
-    }
-
-    // Buscar coordenadas do cliente via Nominatim
-    console.log("[v0] Buscando coordenadas para:", enderecoData.logradouro, enderecoData.bairro, enderecoData.localidade, enderecoData.uf)
-    const coordenadasCliente = await buscarCoordenadas(
-      enderecoData.logradouro || "",
-      enderecoData.bairro || "",
-      enderecoData.localidade,
-      enderecoData.uf,
-    )
-    console.log("[v0] Resultado final Photon:", JSON.stringify(coordenadasCliente))
+    // Buscar coordenadas do cliente pelo CEP
+    console.log("[v0] Buscando coordenadas do cliente pelo CEP:", cepCliente)
+    const coordenadasCliente = await buscarCoordenadasPorCep(cepCliente)
+    console.log("[v0] Coordenadas do cliente:", JSON.stringify(coordenadasCliente))
 
     if (!coordenadasCliente) {
-      console.log("[v0] ERRO: Não foi possível obter coordenadas do cliente via Photon")
+      console.log("[v0] ERRO: Não foi possível obter coordenadas do cliente")
       return NextResponse.json(
         {
           success: false,
@@ -181,7 +196,6 @@ export async function POST(request: Request) {
           latitude: coordenadasCliente.lat,
           longitude: coordenadasCliente.lng,
         },
-        endereco: enderecoData,
       },
     })
   } catch (error) {
