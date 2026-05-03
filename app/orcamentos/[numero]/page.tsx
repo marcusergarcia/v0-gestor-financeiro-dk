@@ -119,6 +119,8 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
   const [nfseDialogOpen, setNfseDialogOpen] = useState(false)
   const [nfeDialogOpen, setNfeDialogOpen] = useState(false)
   const [numeroOrcamento, setNumeroOrcamento] = useState<string>("")
+  const [nfseEmitida, setNfseEmitida] = useState(false)
+  const [nfeEmitida, setNfeEmitida] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -144,8 +146,47 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
       loadOrcamento()
       loadLogoMenu()
       loadValorPorKm()
+      loadNotasEmitidas()
     }
   }, [numeroOrcamento])
+
+  const loadNotasEmitidas = async () => {
+    if (!numeroOrcamento) return
+    try {
+      const [nfseRes, nfeRes] = await Promise.all([
+        fetch("/api/nfse").catch(() => null),
+        fetch("/api/nfe").catch(() => null),
+      ])
+
+      if (nfseRes?.ok) {
+        const nfseData = await nfseRes.json()
+        if (nfseData.success && nfseData.data) {
+          const temNfse = nfseData.data.some(
+            (nf: any) => 
+              nf.origem === "orcamento" && 
+              String(nf.origem_numero) === String(numeroOrcamento) && 
+              (nf.status === "emitida" || nf.status === "processando")
+          )
+          setNfseEmitida(temNfse)
+        }
+      }
+
+      if (nfeRes?.ok) {
+        const nfeData = await nfeRes.json()
+        if (nfeData.success && nfeData.data) {
+          const temNfe = nfeData.data.some(
+            (nf: any) => 
+              nf.origem === "orcamento" && 
+              String(nf.origem_numero) === String(numeroOrcamento) && 
+              (nf.status === "autorizada" || nf.status === "processando")
+          )
+          setNfeEmitida(temNfe)
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao buscar notas emitidas:", error)
+    }
+  }
 
   const loadLogoMenu = async () => {
     try {
@@ -266,16 +307,38 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
   const handleNfseSuccess = async () => {
     if (orcamento) {
       try {
-        await fetch(`/api/orcamentos/${orcamento.numero}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ situacao: "nota fiscal emitida" }),
-        })
-        toast({
-          title: "Sucesso",
-          description: "NFS-e emitida e situação atualizada para 'NF Emitida'",
-        })
+        setNfseEmitida(true)
+        
+        // Verificar se precisa emitir NF-e (parcelamento_material !== 0 e > 0 subtotal)
+        const parcelamentoMaterial = safeNumber(orcamento.parcelamento_material)
+        const subtotalMaterial = calcularSubtotalMaterial()
+        const precisaNfe = parcelamentoMaterial !== 0 && subtotalMaterial > 0
+        
+        // Se nao precisa de NF-e OU ja tem NF-e emitida, marcar como concluido
+        if (!precisaNfe || nfeEmitida) {
+          await fetch(`/api/orcamentos/${orcamento.numero}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ situacao: "concluido" }),
+          })
+          toast({
+            title: "Sucesso",
+            description: "NFS-e emitida e orçamento concluído!",
+          })
+        } else {
+          await fetch(`/api/orcamentos/${orcamento.numero}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ situacao: "nota fiscal emitida" }),
+          })
+          toast({
+            title: "Sucesso",
+            description: "NFS-e emitida. Ainda falta emitir NF-e de material.",
+          })
+        }
+        
         loadOrcamento()
+        loadNotasEmitidas()
       } catch (error) {
         console.error("Erro ao atualizar situação:", error)
       }
@@ -285,11 +348,38 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
   const handleNfeSuccess = async () => {
     if (orcamento) {
       try {
-        toast({
-          title: "Sucesso",
-          description: "NF-e de material emitida com sucesso!",
-        })
+        setNfeEmitida(true)
+        
+        // Verificar se precisa emitir NFS-e (parcelamento_mdo !== 0 e > 0 subtotal)
+        const parcelamentoMdo = safeNumber(orcamento.parcelamento_mdo)
+        const subtotalMdo = calcularSubtotalMdo()
+        const precisaNfse = parcelamentoMdo !== 0 && subtotalMdo > 0
+        
+        // Se nao precisa de NFS-e OU ja tem NFS-e emitida, marcar como concluido
+        if (!precisaNfse || nfseEmitida) {
+          await fetch(`/api/orcamentos/${orcamento.numero}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ situacao: "concluido" }),
+          })
+          toast({
+            title: "Sucesso",
+            description: "NF-e emitida e orçamento concluído!",
+          })
+        } else {
+          await fetch(`/api/orcamentos/${orcamento.numero}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ situacao: "nota fiscal emitida" }),
+          })
+          toast({
+            title: "Sucesso",
+            description: "NF-e de material emitida. Ainda falta emitir NFS-e de serviço.",
+          })
+        }
+        
         loadOrcamento()
+        loadNotasEmitidas()
       } catch (error) {
         console.error("Erro ao atualizar após NF-e:", error)
       }
@@ -474,24 +564,48 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
                 Editar
               </Button>
             </Link>
-            {orcamento.situacao === "aprovado" && (
-              <Button
-                onClick={() => setNfseDialogOpen(true)}
-                className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg"
-              >
-                <FileCheck className="h-4 w-4 mr-2" />
-                Emitir NFS-e
-              </Button>
-            )}
-            {orcamento.situacao === "aprovado" && calcularSubtotalMaterial() > 0 && (
-              <Button
-                onClick={() => setNfeDialogOpen(true)}
-                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg"
-              >
-                <PackageIcon className="h-4 w-4 mr-2" />
-                Emitir NF-e
-              </Button>
-            )}
+            {(orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida") && (() => {
+              const parcelamentoMdo = safeNumber(orcamento.parcelamento_mdo)
+              const subtotalMdo = calcularSubtotalMdo()
+              const precisaNfse = parcelamentoMdo !== 0 && subtotalMdo > 0
+              const desabilitado = !precisaNfse || nfseEmitida
+              
+              return (
+                <Button
+                  onClick={() => !desabilitado && setNfseDialogOpen(true)}
+                  disabled={desabilitado}
+                  className={desabilitado 
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+                    : "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg"
+                  }
+                  title={!precisaNfse ? "Sem cobrança de serviço" : nfseEmitida ? "NFS-e já emitida" : "Emitir NFS-e"}
+                >
+                  <FileCheck className="h-4 w-4 mr-2" />
+                  Emitir NFS-e
+                </Button>
+              )
+            })()}
+            {(orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida") && (() => {
+              const parcelamentoMaterial = safeNumber(orcamento.parcelamento_material)
+              const subtotalMaterial = calcularSubtotalMaterial()
+              const precisaNfe = parcelamentoMaterial !== 0 && subtotalMaterial > 0
+              const desabilitado = !precisaNfe || nfeEmitida
+              
+              return (
+                <Button
+                  onClick={() => !desabilitado && setNfeDialogOpen(true)}
+                  disabled={desabilitado}
+                  className={desabilitado 
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+                    : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg"
+                  }
+                  title={!precisaNfe ? "Sem cobrança de material" : nfeEmitida ? "NF-e já emitida" : "Emitir NF-e"}
+                >
+                  <PackageIcon className="h-4 w-4 mr-2" />
+                  Emitir NF-e
+                </Button>
+              )
+            })()}
             <Button
               onClick={() => setShowPrintEditor(true)}
               className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-lg"
@@ -956,24 +1070,48 @@ export default function VisualizarOrcamentoPage({ params }: { params: Promise<{ 
                         Editar Orçamento
                       </Button>
                     </Link>
-                    {orcamento.situacao === "aprovado" && calcularSubtotalMdo() > 0 && (
-                      <Button
-                        onClick={() => setNfseDialogOpen(true)}
-                        className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg"
-                      >
-                        <FileCheck className="h-4 w-4 mr-2" />
-                        Emitir NFS-e (Servico)
-                      </Button>
-                    )}
-                    {orcamento.situacao === "aprovado" && calcularSubtotalMaterial() > 0 && (
-                      <Button
-                        onClick={() => setNfeDialogOpen(true)}
-                        className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg"
-                      >
-                        <PackageIcon className="h-4 w-4 mr-2" />
-                        Emitir NF-e (Material)
-                      </Button>
-                    )}
+                    {(orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida") && (() => {
+                      const parcelamentoMdo = safeNumber(orcamento.parcelamento_mdo)
+                      const subtotalMdo = calcularSubtotalMdo()
+                      const precisaNfse = parcelamentoMdo !== 0 && subtotalMdo > 0
+                      const desabilitado = !precisaNfse || nfseEmitida
+                      
+                      return (
+                        <Button
+                          onClick={() => !desabilitado && setNfseDialogOpen(true)}
+                          disabled={desabilitado}
+                          className={`w-full ${desabilitado 
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+                            : "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg"
+                          }`}
+                          title={!precisaNfse ? "Sem cobrança de serviço" : nfseEmitida ? "NFS-e já emitida" : "Emitir NFS-e"}
+                        >
+                          <FileCheck className="h-4 w-4 mr-2" />
+                          Emitir NFS-e (Serviço)
+                        </Button>
+                      )
+                    })()}
+                    {(orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida") && (() => {
+                      const parcelamentoMaterial = safeNumber(orcamento.parcelamento_material)
+                      const subtotalMaterial = calcularSubtotalMaterial()
+                      const precisaNfe = parcelamentoMaterial !== 0 && subtotalMaterial > 0
+                      const desabilitado = !precisaNfe || nfeEmitida
+                      
+                      return (
+                        <Button
+                          onClick={() => !desabilitado && setNfeDialogOpen(true)}
+                          disabled={desabilitado}
+                          className={`w-full ${desabilitado 
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+                            : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg"
+                          }`}
+                          title={!precisaNfe ? "Sem cobrança de material" : nfeEmitida ? "NF-e já emitida" : "Emitir NF-e"}
+                        >
+                          <PackageIcon className="h-4 w-4 mr-2" />
+                          Emitir NF-e (Material)
+                        </Button>
+                      )
+                    })()}
                     <Button onClick={() => setShowPrintEditor(true)} variant="outline" className="w-full">
                       <Printer className="h-4 w-4 mr-2" />
                       Imprimir
