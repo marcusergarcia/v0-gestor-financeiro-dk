@@ -786,13 +786,13 @@ export default function OrcamentosPage() {
                           </div>
                         </TableCell>
                         <TableCell className="whitespace-nowrap">{getStatusBadge(orcamento.situacao)}</TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <div className="flex gap-1">
+                        <TableCell className="min-w-[120px]">
+                          <div className="flex flex-wrap gap-1">
                             <Link href={`/orcamentos/${orcamento.numero}`}>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-8 w-8 p-0"
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-8 w-8 p-0 flex-shrink-0"
                                 title="Visualizar orçamento"
                               >
                                 <Eye className="h-4 w-4" />
@@ -802,7 +802,7 @@ export default function OrcamentosPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-8 w-8 p-0"
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-8 w-8 p-0 flex-shrink-0"
                                 title="Editar orçamento"
                               >
                                 <Edit className="h-4 w-4" />
@@ -821,7 +821,7 @@ export default function OrcamentosPage() {
                                   variant="outline"
                                   onClick={() => !desabilitado && handleEmitirNfse(orcamento)}
                                   disabled={desabilitado}
-                                  className={`h-8 w-8 p-0 ${desabilitado
+                                  className={`h-8 w-8 p-0 flex-shrink-0 ${desabilitado
                                     ? "text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed opacity-50"
                                     : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-transparent"
                                   }`}
@@ -844,7 +844,7 @@ export default function OrcamentosPage() {
                                   variant="outline"
                                   onClick={() => !desabilitado && handleEmitirNfe(orcamento)}
                                   disabled={desabilitado}
-                                  className={`h-8 w-8 p-0 ${desabilitado
+                                  className={`h-8 w-8 p-0 flex-shrink-0 ${desabilitado
                                     ? "text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed opacity-50"
                                     : "text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent"
                                   }`}
@@ -858,7 +858,7 @@ export default function OrcamentosPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => handleDelete(orcamento.numero)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 bg-transparent h-8 w-8 p-0"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 bg-transparent h-8 w-8 p-0 flex-shrink-0"
                               title="Excluir orçamento"
                             >
                               <Trash2 className="h-4 w-4" />
