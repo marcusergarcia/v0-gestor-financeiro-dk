@@ -619,3 +619,38 @@ function getDateStringSP(date: Date): string {
   const get = (type: string) => parts.find((p) => p.type === type)?.value || ""
   return `${get("year")}-${get("month")}-${get("day")}`
 }
+
+/**
+ * Monta o XML nfeProc (NF-e processada) no padrao SEFAZ.
+ * Esta funcao e exportada para uso em outros modulos.
+ * 
+ * Estrutura padrao SEFAZ (PL_009_V4):
+ * <?xml version="1.0" encoding="UTF-8"?>
+ * <nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+ *   <NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+ *     <infNFe Id="NFe..." versao="4.00">...</infNFe>
+ *     <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">...</Signature>
+ *   </NFe>
+ *   <protNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
+ *     <infProt Id="ID...">
+ *       <tpAmb>1</tpAmb>
+ *       <verAplic>...</verAplic>
+ *       <chNFe>...</chNFe>
+ *       <dhRecbto>...</dhRecbto>
+ *       <nProt>...</nProt>
+ *       <digVal>...</digVal>
+ *       <cStat>100</cStat>
+ *       <xMotivo>Autorizado o uso da NF-e</xMotivo>
+ *     </infProt>
+ *   </protNFe>
+ * </nfeProc>
+ */
+export function montarNfeProcPadrao(xmlNFeAssinado: string, xmlRetorno: string): string {
+  // Extrair protNFe do retorno - incluir todo o conteudo
+  const protMatch = xmlRetorno.match(/<protNFe[^>]*>[\s\S]*?<\/protNFe>/)
+  const protNFe = protMatch ? protMatch[0] : ""
+
+  // Montar nfeProc com xmlns ANTES de versao (ordem correta no XSD)
+  // O namespace deve estar no elemento raiz nfeProc
+  return `<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">${xmlNFeAssinado}${protNFe}</nfeProc>`
+}

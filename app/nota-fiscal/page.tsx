@@ -612,30 +612,49 @@ export default function NotaFiscalPage() {
               return numA - numB
             })
             
-            // Gerar um unico arquivo XML com todas as notas em sequencia
-            let xmlConsolidado = '<?xml version="1.0" encoding="UTF-8"?>\n'
-            xmlConsolidado += '<nfeProcs xmlns="http://www.portalfiscal.inf.br/nfe">\n'
+            // PADRAO SEFAZ: Cada NF-e deve ser um arquivo XML individual
+            // Formato: NFe + chave de acesso (44 digitos) + .xml
+            // Ex: NFe35260349895742000111550010000001651009568690.xml
             
-            for (const nfe of nfesOrdenadas) {
+            if (nfesOrdenadas.length === 1) {
+              // Apenas uma nota: baixar diretamente o XML individual
+              const nfe = nfesOrdenadas[0]
               if (nfe.xml) {
-                // Remover declaracao XML de cada nota individual para evitar duplicacao
-                let xmlNota = nfe.xml.replace(/<\?xml[^?]*\?>\s*/gi, '')
-                xmlConsolidado += xmlNota + '\n'
-                xmlsExportados++
+                const blob = new Blob([nfe.xml], { type: "application/xml;charset=utf-8" })
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement("a")
+                link.href = url
+                // Nome do arquivo no padrao SEFAZ: NFe + chave de acesso
+                link.download = nfe.nomeArquivo || `NFe${nfe.chaveAcesso}.xml`
+                link.click()
+                URL.revokeObjectURL(url)
+                xmlsExportados = 1
               }
+            } else {
+              // Multiplas notas: criar um ZIP com arquivos individuais
+              // Usar JSZip para criar o arquivo ZIP
+              const JSZip = (await import("jszip")).default
+              const zip = new JSZip()
+              
+              for (const nfe of nfesOrdenadas) {
+                if (nfe.xml) {
+                  // Adicionar cada XML individual ao ZIP com nome padrao SEFAZ
+                  const nomeArquivo = nfe.nomeArquivo || `NFe${nfe.chaveAcesso}.xml`
+                  zip.file(nomeArquivo, nfe.xml)
+                  xmlsExportados++
+                }
+              }
+              
+              // Gerar e baixar o ZIP
+              const zipContent = await zip.generateAsync({ type: "blob" })
+              const url = URL.createObjectURL(zipContent)
+              const link = document.createElement("a")
+              link.href = url
+              const dataAtual = new Date().toISOString().split('T')[0]
+              link.download = `NFe_${dataAtual}_${xmlsExportados}notas.zip`
+              link.click()
+              URL.revokeObjectURL(url)
             }
-            
-            xmlConsolidado += '</nfeProcs>'
-            
-            // Baixar arquivo unico com todas as notas
-            const blob = new Blob([xmlConsolidado], { type: "application/xml;charset=utf-8" })
-            const url = URL.createObjectURL(blob)
-            const link = document.createElement("a")
-            link.href = url
-            const dataAtual = new Date().toISOString().split('T')[0]
-            link.download = `NFe_${dataAtual}_${xmlsExportados}notas.xml`
-            link.click()
-            URL.revokeObjectURL(url)
           }
         }
         
