@@ -3,6 +3,7 @@ import { pool } from "@/lib/db"
 import {
   gerarXmlNFe,
   gerarXmlEnviNFe,
+  montarNfeProcPadrao,
   type DadosNFe,
   type DadosEmitente,
   type DadosDestinatario,
@@ -382,8 +383,8 @@ export async function POST(request: NextRequest) {
       const cStat = cStatReal
       const xMotivo = xMotivoReal
 
-      // Montar XML do nfeProc (NF-e processada = NF-e + protocolo)
-      const xmlProtocolo = montarNfeProc(xmlAssinado, resultado.xml)
+      // Montar XML do nfeProc (NF-e processada = NF-e + protocolo) no padrao SEFAZ
+      const xmlProtocolo = montarNfeProcPadrao(xmlAssinado, resultado.xml)
 
       // Atualizar registro como autorizada
       await connection.execute(
@@ -491,10 +492,4 @@ function extrairDadosProtNFe(xml: string): { cStat: string; xMotivo: string; nPr
   }
 }
 
-function montarNfeProc(xmlNFeAssinado: string, xmlRetorno: string): string {
-  // Extrair protNFe do retorno
-  const protMatch = xmlRetorno.match(/<protNFe[\s\S]*?<\/protNFe>/)
-  const protNFe = protMatch ? protMatch[0] : ""
-
-  return `<nfeProc versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">${xmlNFeAssinado}${protNFe}</nfeProc>`
-}
+// Funcao montarNfeProcPadrao movida para lib/nfe/xml-builder.ts
