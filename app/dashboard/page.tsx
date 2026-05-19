@@ -166,21 +166,48 @@ function KPICard({
 
   const classes = colorClasses[color]
 
+  const cardGradientStyles = {
+    primary: "from-white to-blue-100/50 dark:from-card dark:to-blue-950/20",
+    success: "from-white to-teal-100/50 dark:from-card dark:to-teal-950/20",
+    warning: "from-white to-amber-100/50 dark:from-card dark:to-amber-950/20",
+    destructive: "from-white to-rose-100/50 dark:from-card dark:to-rose-950/20",
+    info: "from-white to-indigo-100/50 dark:from-card dark:to-indigo-950/20",
+  }
+
+  const cardHoverBorders = {
+    primary: "hover:border-blue-500/35 hover:shadow-blue-500/5",
+    success: "hover:border-emerald-500/35 hover:shadow-emerald-500/5",
+    warning: "hover:border-amber-500/35 hover:shadow-amber-500/5",
+    destructive: "hover:border-rose-500/35 hover:shadow-rose-500/5",
+    info: "hover:border-indigo-500/35 hover:shadow-indigo-500/5",
+  }
+
+  const iconShadows = {
+    primary: "shadow-[0_4px_20px_rgba(59,130,246,0.15)]",
+    success: "shadow-[0_4px_20px_rgba(16,185,129,0.15)]",
+    warning: "shadow-[0_4px_20px_rgba(245,158,11,0.15)]",
+    destructive: "shadow-[0_4px_20px_rgba(239,68,68,0.15)]",
+    info: "shadow-[0_4px_20px_rgba(139,92,246,0.15)]",
+  }
+
   return (
     <Card
       className={cn(
-        "border border-border bg-card hover:shadow-lg transition-all duration-300 group",
-        onClick && "cursor-pointer hover:border-primary/30",
+        "border border-border/60 bg-gradient-to-b backdrop-blur-md shadow-sm transition-all duration-300 group hover:-translate-y-1 hover:shadow-lg relative overflow-hidden rounded-2xl",
+        cardGradientStyles[color],
+        cardHoverBorders[color],
+        onClick && "cursor-pointer",
       )}
       onClick={onClick}
     >
+      <div className="absolute top-0 left-0 w-full h-[2.5px] bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
-          <div className={cn("p-2.5 rounded-xl", classes.bg)}>
+          <div className={cn("p-2.5 rounded-xl transition-transform duration-300 group-hover:scale-110", classes.bg, iconShadows[color])}>
             <Icon className={cn("h-5 w-5", classes.icon)} />
           </div>
           {trend && trendValue && (
-            <Badge variant="secondary" className={cn("text-xs font-medium", classes.badge)}>
+            <Badge variant="secondary" className={cn("text-xs font-semibold border-0", classes.badge)}>
               {trend === "up" && <TrendingUp className="h-3 w-3 mr-1" />}
               {trend === "down" && <TrendingDown className="h-3 w-3 mr-1" />}
               {trendValue}
@@ -188,14 +215,14 @@ function KPICard({
           )}
         </div>
         <div className="mt-4">
-          <p className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">{value}</p>
-          <p className="text-xs text-muted-foreground mt-1">{title}</p>
-          <p className="text-[10px] lg:text-xs text-muted-foreground/70 mt-0.5">{subtitle}</p>
+          <p className="text-2xl lg:text-3xl font-extrabold text-foreground tracking-tight font-display">{value}</p>
+          <p className="text-xs font-semibold text-muted-foreground mt-1.5">{title}</p>
+          <p className="text-[10px] lg:text-xs text-muted-foreground/75 mt-0.5">{subtitle}</p>
         </div>
         {onClick && (
-          <div className="mt-3 flex items-center text-xs text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="mt-4 flex items-center text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
             <span>Ver detalhes</span>
-            <ArrowRight className="h-3 w-3 ml-1" />
+            <ArrowRight className="h-3.5 w-3.5 ml-1 transition-transform group-hover:translate-x-1" />
           </div>
         )}
       </CardContent>
@@ -381,7 +408,7 @@ export default function DashboardPage() {
             <div className="w-16 h-16 rounded-full bg-[hsl(var(--warning))]/10 flex items-center justify-center mx-auto mb-4">
               <AlertTriangle className="h-8 w-8 text-[hsl(var(--warning))]" />
             </div>
-            <CardTitle>Acesso Restrito</CardTitle>
+            <CardTitle className="font-display font-bold text-xl">Acesso Restrito</CardTitle>
             <CardDescription>Você não tem permissão para acessar o Dashboard.</CardDescription>
           </CardHeader>
         </Card>
@@ -398,7 +425,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+          <h1 className="text-2xl lg:text-3xl font-extrabold text-foreground tracking-tight font-display bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
             Dashboard
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -470,11 +497,12 @@ export default function DashboardPage() {
       {/* Main Content */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Recent Activity */}
-        <Card className="xl:col-span-2 border border-border bg-card">
+        <Card className="xl:col-span-2 border border-border/60 bg-gradient-to-b from-white to-slate-50/30 dark:from-card dark:to-card/85 backdrop-blur-md shadow-sm rounded-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-semibold">Atividade Recente</CardTitle>
+                <CardTitle className="text-lg font-bold font-display text-foreground">Atividade Recente</CardTitle>
                 <CardDescription className="text-sm">Últimos boletos e orçamentos</CardDescription>
               </div>
               <Button variant="ghost" size="sm" asChild className="text-primary hover:text-primary hover:bg-primary/10">
@@ -544,9 +572,10 @@ export default function DashboardPage() {
         </Card>
 
         {/* Quick Actions */}
-        <Card className="border border-border bg-card">
+        <Card className="border border-border/60 bg-gradient-to-b from-white to-slate-50/30 dark:from-card dark:to-card/85 backdrop-blur-md shadow-sm rounded-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold">Ações Rápidas</CardTitle>
+            <CardTitle className="text-lg font-bold font-display text-foreground">Ações Rápidas</CardTitle>
             <CardDescription className="text-sm">Acesso às principais funcionalidades</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
