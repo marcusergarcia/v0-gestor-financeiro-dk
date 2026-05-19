@@ -82,10 +82,10 @@ export function LayoutContent({ children }: LayoutContentProps) {
   // Mostrar loading apenas se realmente estiver carregando
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="flex h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
         </div>
       </div>
     )
@@ -107,11 +107,11 @@ export function LayoutContent({ children }: LayoutContentProps) {
   // Se está logado e em rota protegida, renderiza o layout completo
   return (
     <SidebarProvider>
-      <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="flex h-screen bg-background">
         <AppSidebar />
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header />
-          <main className="flex-1 overflow-auto p-4 lg:p-6">
+          <main className="flex-1 overflow-auto">
             <div className="mx-auto max-w-7xl">{children}</div>
           </main>
         </div>

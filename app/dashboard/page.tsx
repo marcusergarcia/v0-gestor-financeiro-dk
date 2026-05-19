@@ -167,11 +167,11 @@ function KPICard({
   const classes = colorClasses[color]
 
   const cardGradientStyles = {
-    primary: "from-white to-blue-100/50 dark:from-card dark:to-blue-950/20",
-    success: "from-white to-teal-100/50 dark:from-card dark:to-teal-950/20",
-    warning: "from-white to-amber-100/50 dark:from-card dark:to-amber-950/20",
-    destructive: "from-white to-rose-100/50 dark:from-card dark:to-rose-950/20",
-    info: "from-white to-indigo-100/50 dark:from-card dark:to-indigo-950/20",
+    primary: "from-card to-blue-500/10",
+    success: "from-card to-emerald-500/10",
+    warning: "from-card to-amber-500/10",
+    destructive: "from-card to-rose-500/10",
+    info: "from-card to-teal-500/10",
   }
 
   const cardHoverBorders = {
@@ -497,7 +497,7 @@ export default function DashboardPage() {
       {/* Main Content */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Recent Activity */}
-        <Card className="xl:col-span-2 border border-border/60 bg-gradient-to-b from-white to-slate-50/30 dark:from-card dark:to-card/85 backdrop-blur-md shadow-sm rounded-2xl relative overflow-hidden">
+        <Card className="xl:col-span-2 border border-border/60 bg-card backdrop-blur-md shadow-sm rounded-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
@@ -572,7 +572,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Quick Actions */}
-        <Card className="border border-border/60 bg-gradient-to-b from-white to-slate-50/30 dark:from-card dark:to-card/85 backdrop-blur-md shadow-sm rounded-2xl relative overflow-hidden">
+        <Card className="border border-border/60 bg-card backdrop-blur-md shadow-sm rounded-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
           <CardHeader className="pb-4">
             <CardTitle className="text-lg font-bold font-display text-foreground">Ações Rápidas</CardTitle>
