@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +22,7 @@ import {
   Plus,
   Search,
   Eye,
+  EyeOff,
   XCircle,
   CheckCircle2,
   Clock,
@@ -41,7 +42,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, cn } from "@/lib/utils"
 import { EmitirNfseDialog } from "@/components/nfse/emitir-nfse-dialog"
 import { DetalheNfseDialog } from "@/components/nfse/detalhe-nfse-dialog"
 import { ImprimirNfseDialog } from "@/components/nfse/imprimir-nfse-dialog"
@@ -104,6 +105,7 @@ export default function NotaFiscalPage() {
   const [tipoFilter, setTipoFilter] = useState("todos")
   const [periodoFilter, setPeriodoFilter] = useState("todos")
   const [exportando, setExportando] = useState(false)
+  const [showValues, setShowValues] = useState(true)
 
   // NFS-e states
   const [emitirNfseOpen, setEmitirNfseOpen] = useState(false)
@@ -149,6 +151,10 @@ export default function NotaFiscalPage() {
   })
 
   useEffect(() => {
+    const savedShowValues = localStorage.getItem("notas-show-values")
+    if (savedShowValues !== null) {
+      setShowValues(savedShowValues === "true")
+    }
     fetchTodasNotas()
     loadLogoMenu()
   }, [])
@@ -157,13 +163,21 @@ export default function NotaFiscalPage() {
     calcularStats()
   }, [notas])
 
+  const toggleShowValues = () => {
+    const newValue = !showValues
+    setShowValues(newValue)
+    localStorage.setItem("notas-show-values", String(newValue))
+  }
+
   const loadLogoMenu = async () => {
     try {
       const response = await fetch("/api/configuracoes/logos")
       const result = await response.json()
       if (result.success && result.data?.length > 0) {
         const menuLogo = result.data.find((logo: any) => logo.tipo === "menu")
-        if (menuLogo?.arquivo_base64) {
+        if (menuLogo?.caminho) {
+          setLogoMenu(menuLogo.caminho)
+        } else if (menuLogo?.arquivo_base64) {
           setLogoMenu(menuLogo.arquivo_base64)
         }
       }
@@ -410,28 +424,28 @@ export default function NotaFiscalPage() {
       case "emitida":
       case "autorizada":
         return (
-          <Badge className="bg-green-100 text-green-700 border-green-300 gap-1">
+          <Badge className="bg-green-50 text-green-700 border-green-200 gap-1 font-semibold py-0.5">
             <CheckCircle2 className="h-3 w-3" />
             {status === "autorizada" ? "Autorizada" : "Emitida"}
           </Badge>
         )
       case "processando":
         return (
-          <Badge className="bg-blue-100 text-blue-700 border-blue-300 gap-1">
+          <Badge className="bg-blue-50 text-blue-700 border-blue-200 gap-1 font-semibold py-0.5">
             <Loader2 className="h-3 w-3 animate-spin" />
             Processando
           </Badge>
         )
       case "pendente":
         return (
-          <Badge className="bg-amber-100 text-amber-700 border-amber-300 gap-1">
+          <Badge className="bg-amber-50 text-amber-700 border-amber-200 gap-1 font-semibold py-0.5">
             <Clock className="h-3 w-3" />
             Pendente
           </Badge>
         )
       case "cancelada":
         return (
-          <Badge className="bg-red-100 text-red-700 border-red-300 gap-1">
+          <Badge className="bg-red-50 text-red-700 border-red-200 gap-1 font-semibold py-0.5">
             <XCircle className="h-3 w-3" />
             Cancelada
           </Badge>
@@ -439,7 +453,7 @@ export default function NotaFiscalPage() {
       case "erro":
       case "rejeitada":
         return (
-          <Badge className="bg-red-100 text-red-700 border-red-300 gap-1">
+          <Badge className="bg-red-50 text-red-700 border-red-200 gap-1 font-semibold py-0.5">
             <AlertCircle className="h-3 w-3" />
             {status === "rejeitada" ? "Rejeitada" : "Erro"}
           </Badge>
@@ -452,14 +466,14 @@ export default function NotaFiscalPage() {
   const getTipoBadge = (tipo: "nfse" | "nfe") => {
     if (tipo === "nfse") {
       return (
-        <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 gap-1 text-[10px]">
+        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1 text-[10px] font-bold">
           <Wrench className="h-3 w-3" />
           NFS-e
         </Badge>
       )
     }
     return (
-      <Badge className="bg-blue-100 text-blue-700 border-blue-300 gap-1 text-[10px]">
+      <Badge className="bg-blue-50 text-blue-700 border-blue-200 gap-1 text-[10px] font-bold">
         <Package className="h-3 w-3" />
         NF-e
       </Badge>
@@ -468,7 +482,7 @@ export default function NotaFiscalPage() {
 
   const getOrigemLabel = (origem: string) => {
     switch (origem) {
-      case "orcamento": return "Orcamento"
+      case "orcamento": return "Orçamento"
       case "ordem_servico": return "O.S."
       case "boleto": return "Boleto"
       case "avulsa": return "Avulsa"
@@ -614,7 +628,6 @@ export default function NotaFiscalPage() {
             
             // PADRAO SEFAZ: Cada NF-e deve ser um arquivo XML individual
             // Formato: NFe + chave de acesso (44 digitos) + .xml
-            // Ex: NFe35260349895742000111550010000001651009568690.xml
             
             if (nfesOrdenadas.length === 1) {
               // Apenas uma nota: baixar diretamente o XML individual
@@ -624,7 +637,6 @@ export default function NotaFiscalPage() {
                 const url = URL.createObjectURL(blob)
                 const link = document.createElement("a")
                 link.href = url
-                // Nome do arquivo no padrao SEFAZ: NFe + chave de acesso
                 link.download = nfe.nomeArquivo || `NFe${nfe.chaveAcesso}.xml`
                 link.click()
                 URL.revokeObjectURL(url)
@@ -632,20 +644,17 @@ export default function NotaFiscalPage() {
               }
             } else {
               // Multiplas notas: criar um ZIP com arquivos individuais
-              // Usar JSZip para criar o arquivo ZIP
               const JSZip = (await import("jszip")).default
               const zip = new JSZip()
               
               for (const nfe of nfesOrdenadas) {
                 if (nfe.xml) {
-                  // Adicionar cada XML individual ao ZIP com nome padrao SEFAZ
                   const nomeArquivo = nfe.nomeArquivo || `NFe${nfe.chaveAcesso}.xml`
                   zip.file(nomeArquivo, nfe.xml)
                   xmlsExportados++
                 }
               }
               
-              // Gerar e baixar o ZIP
               const zipContent = await zip.generateAsync({ type: "blob" })
               const url = URL.createObjectURL(zipContent)
               const link = document.createElement("a")
@@ -762,135 +771,145 @@ export default function NotaFiscalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="container mx-auto p-6 space-y-6 pb-32 md:pb-6">
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 bg-gradient-to-br from-slate-50 to-orange-50/30 min-h-screen animate-in fade-in duration-300">
+      <div className="container mx-auto space-y-6 pb-32 md:pb-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
             {logoMenu && (
               <img
                 src={logoMenu || "/placeholder.svg"}
                 alt="Logo"
-                className="h-12 w-12 object-contain rounded-lg shadow-md bg-white p-1"
+                className="h-6 w-6 md:h-8 md:w-8 object-contain rounded"
               />
             )}
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+              <h2 className="text-2xl md:text-3xl font-bold tracking-tight bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
                 Notas Fiscais
-              </h1>
-              <p className="text-gray-600 mt-1">NFS-e (Servico) e NF-e (Material)</p>
+              </h2>
+              <p className="text-xs md:text-sm text-muted-foreground">
+                Gerenciamento de NFS-e (Serviço) e NF-e (Material)
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleShowValues}
+              className="flex items-center justify-center gap-2 h-9 rounded-lg border-2 bg-transparent hover:bg-slate-50"
+            >
+              {showValues ? (
+                <>
+                  <EyeOff className="h-4 w-4" />
+                  <span className="text-xs font-semibold">Ocultar Valores</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="h-4 w-4" />
+                  <span className="text-xs font-semibold">Mostrar Valores</span>
+                </>
+              )}
+            </Button>
             <Button
               onClick={() => setEmitirNfseOpen(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 rounded-lg px-4"
             >
               <Plus className="h-4 w-4 mr-2" />
-              <span className="hidden md:inline">Emitir NFS-e</span>
-              <span className="md:hidden">NFS-e</span>
+              <span>Emitir NFS-e</span>
             </Button>
             <Button
               onClick={() => setEmitirNfeOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs h-9 rounded-lg px-4"
             >
               <Plus className="h-4 w-4 mr-2" />
-              <span className="hidden md:inline">Emitir NF-e</span>
-              <span className="md:hidden">NF-e</span>
+              <span>Emitir NF-e</span>
             </Button>
           </div>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          <Card className="border-0 shadow-md bg-white">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <FileText className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
-                  <p className="text-xs text-gray-500">Total</p>
-                </div>
+          {/* Card Total */}
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 dark:from-slate-900/60 dark:to-blue-950/30 border-2 rounded-xl overflow-hidden shadow-xs hover:shadow-md hover:scale-105 transition-all">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">Total</p>
+                <h3 className="text-xl md:text-2xl font-black text-blue-950 mt-1">{stats.total}</h3>
               </div>
+              <FileText className="h-8 w-8 text-blue-600/30 shrink-0" />
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-md bg-white">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <Wrench className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-emerald-700">{stats.totalNfse}</p>
-                  <p className="text-xs text-gray-500">NFS-e</p>
-                </div>
+
+          {/* Card NFS-e */}
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 dark:from-slate-900/60 dark:to-emerald-950/30 border-2 rounded-xl overflow-hidden shadow-xs hover:shadow-md hover:scale-105 transition-all">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">NFS-e</p>
+                <h3 className="text-xl md:text-2xl font-black text-emerald-950 mt-1">{stats.totalNfse}</h3>
               </div>
+              <Wrench className="h-8 w-8 text-emerald-600/30 shrink-0" />
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-md bg-white">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Package className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-blue-700">{stats.totalNfe}</p>
-                  <p className="text-xs text-gray-500">NF-e</p>
-                </div>
+
+          {/* Card NF-e */}
+          <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200 dark:from-slate-900/60 dark:to-cyan-950/30 border-2 rounded-xl overflow-hidden shadow-xs hover:shadow-md hover:scale-105 transition-all">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-cyan-500 uppercase tracking-wider">NF-e</p>
+                <h3 className="text-xl md:text-2xl font-black text-cyan-955 mt-1">{stats.totalNfe}</h3>
               </div>
+              <Package className="h-8 w-8 text-cyan-600/30 shrink-0" />
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-md bg-white">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-green-700">{stats.emitidas}</p>
-                  <p className="text-xs text-gray-500">Emitidas</p>
-                </div>
+
+          {/* Card Emitidas */}
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 dark:from-slate-900/60 dark:to-green-950/30 border-2 rounded-xl overflow-hidden shadow-xs hover:shadow-md hover:scale-105 transition-all">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-green-500 uppercase tracking-wider">Emitidas</p>
+                <h3 className="text-xl md:text-2xl font-black text-green-950 mt-1">{stats.emitidas}</h3>
               </div>
+              <CheckCircle2 className="h-8 w-8 text-green-600/30 shrink-0" />
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-md bg-white">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-100 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-amber-700">{stats.erros}</p>
-                  <p className="text-xs text-gray-500">Erros</p>
-                </div>
+
+          {/* Card Erros */}
+          <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200 dark:from-slate-900/60 dark:to-red-950/30 border-2 rounded-xl overflow-hidden shadow-xs hover:shadow-md hover:scale-105 transition-all">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Erros</p>
+                <h3 className="text-xl md:text-2xl font-black text-red-955 mt-1">{stats.erros}</h3>
               </div>
+              <AlertCircle className="h-8 w-8 text-red-600/30 shrink-0" />
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-md bg-white">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <DollarSign className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-lg font-bold text-emerald-700">{formatCurrency(stats.valorTotal)}</p>
-                  <p className="text-xs text-gray-500">Valor Total</p>
-                </div>
+
+          {/* Card Valor Total */}
+          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200 dark:from-slate-900/60 dark:to-amber-950/30 border-2 rounded-xl overflow-hidden shadow-xs hover:shadow-md hover:scale-105 transition-all">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Valor Total</p>
+                <h3 className="text-sm md:text-base lg:text-lg font-black text-amber-950 mt-1 truncate">
+                  {showValues ? formatCurrency(stats.valorTotal) : "R$ ****"}
+                </h3>
               </div>
+              <DollarSign className="h-8 w-8 text-amber-600/30 shrink-0" />
             </CardContent>
           </Card>
         </div>
 
         {/* Filtros e Tabela */}
-        <Card className="border-0 shadow-lg bg-white">
-          <CardHeader>
+        <Card className="bg-white/60 backdrop-blur-sm border-white/20 shadow-xl rounded-2xl overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-4 lg:p-6 rounded-t-2xl">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <FileCheck className="h-5 w-5 text-emerald-600" />
-                Notas Fiscais Emitidas
-              </CardTitle>
+              <div>
+                <CardTitle className="text-base md:text-lg text-white flex items-center gap-2">
+                  <FileCheck className="h-5 w-5" />
+                  Notas Fiscais Emitidas
+                </CardTitle>
+                <CardDescription className="text-emerald-100 text-xs md:text-sm">Consulte, imprima e gerencie suas notas fiscais de serviço e material</CardDescription>
+              </div>
               <div className="flex items-center gap-2">
                 {stats.pendentes > 0 && (
                   <Button
@@ -898,7 +917,7 @@ export default function NotaFiscalPage() {
                     size="sm"
                     onClick={handleConsultarTodas}
                     disabled={consultandoId !== null}
-                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                    className="text-white border-white/30 bg-white/10 hover:bg-white/20"
                   >
                     {consultandoId !== null ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -908,14 +927,14 @@ export default function NotaFiscalPage() {
                     Consultar Pendentes ({stats.pendentes})
                   </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchTodasNotas() }}>
+                <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchTodasNotas() }} className="text-white border-white/30 bg-white/10 hover:bg-white/20">
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Atualizar
                 </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 md:p-6">
             {/* Filtros */}
             <div className="flex flex-col md:flex-row gap-3 mb-6">
               <div className="relative flex-1">
@@ -924,11 +943,11 @@ export default function NotaFiscalPage() {
                   placeholder="Buscar por numero, nome, CNPJ, chave de acesso..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-10 border-2 rounded-lg"
                 />
               </div>
               <Select value={tipoFilter} onValueChange={setTipoFilter}>
-                <SelectTrigger className="w-full md:w-36">
+                <SelectTrigger className="w-full md:w-36 h-10 border-2 rounded-lg">
                   <SelectValue placeholder="Tipo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -938,7 +957,7 @@ export default function NotaFiscalPage() {
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-40">
+                <SelectTrigger className="w-full md:w-40 h-10 border-2 rounded-lg">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -951,47 +970,47 @@ export default function NotaFiscalPage() {
                 </SelectContent>
               </Select>
               <Select value={origemFilter} onValueChange={setOrigemFilter}>
-                <SelectTrigger className="w-full md:w-40">
+                <SelectTrigger className="w-full md:w-40 h-10 border-2 rounded-lg">
                   <SelectValue placeholder="Origem" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todas Origens</SelectItem>
-                  <SelectItem value="orcamento">Orcamento</SelectItem>
+                  <SelectItem value="orcamento">Orçamento</SelectItem>
                   <SelectItem value="ordem_servico">O.S.</SelectItem>
                   <SelectItem value="avulsa">Avulsa</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={periodoFilter} onValueChange={setPeriodoFilter}>
-                <SelectTrigger className="w-full md:w-44">
+                <SelectTrigger className="w-full md:w-44 h-10 border-2 rounded-lg">
                   <Calendar className="h-4 w-4 mr-2 text-gray-400" />
                   <SelectValue placeholder="Periodo" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os Meses</SelectItem>
-                  <SelectItem value="mes_atual">Mes Atual</SelectItem>
-                  <SelectItem value="mes_anterior">Mes Anterior</SelectItem>
+                  <SelectItem value="mes_atual">Mês Atual</SelectItem>
+                  <SelectItem value="mes_anterior">Mês Anterior</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             
             {/* Barra de exportacao */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <FileCheck className="h-4 w-4" />
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4 p-3 bg-slate-50/80 rounded-lg border border-slate-200">
+              <div className="flex items-center gap-2 text-sm text-slate-600 font-semibold">
+                <FileCheck className="h-4 w-4 text-emerald-600" />
                 <span>
                   <strong>{notasFiltradas.length}</strong> nota(s) encontrada(s)
                   {tipoFilter !== "todos" && ` | Tipo: ${tipoFilter.toUpperCase()}`}
-                  {periodoFilter !== "todos" && ` | Periodo: ${periodoFilter === "mes_atual" ? "Mes Atual" : "Mes Anterior"}`}
+                  {periodoFilter !== "todos" && ` | Periodo: ${periodoFilter === "mes_atual" ? "Mês Atual" : "Mês Anterior"}`}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500">Exportar para:</span>
+                <span className="text-xs text-slate-500 font-semibold">Exportar para:</span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleExportar("csv")}
                   disabled={exportando || notasFiltradas.length === 0}
-                  className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                  className="text-emerald-600 border-2 border-emerald-200 hover:border-emerald-300 hover:bg-emerald-50 h-8 font-semibold text-xs rounded-lg"
                 >
                   {exportando ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1005,7 +1024,7 @@ export default function NotaFiscalPage() {
                   size="sm"
                   onClick={() => handleExportar("xml")}
                   disabled={exportando || notasFiltradas.length === 0}
-                  className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                  className="text-blue-600 border-2 border-blue-200 hover:border-blue-300 hover:bg-blue-50 h-8 font-semibold text-xs rounded-lg"
                 >
                   {exportando ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1021,27 +1040,27 @@ export default function NotaFiscalPage() {
             {loading ? (
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
+                  <Skeleton key={i} className="h-12 w-full rounded-lg" />
                 ))}
               </div>
             ) : notasFiltradas.length === 0 ? (
               <div className="text-center py-12">
-                <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-600">Nenhuma nota fiscal encontrada</h3>
-                <p className="text-gray-500 mt-1">
-                  Emita notas a partir de orcamentos aprovados ou clique nos botoes abaixo para uma nota avulsa.
+                <FileText className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-slate-700">Nenhuma nota fiscal encontrada</h3>
+                <p className="text-slate-500 text-sm mt-1 max-w-md mx-auto">
+                  Emita notas a partir de orçamentos aprovados ou clique nos botões abaixo para gerar uma nota avulsa.
                 </p>
-                <div className="flex items-center gap-2 justify-center mt-4">
+                <div className="flex items-center gap-2 justify-center mt-6">
                   <Button
                     onClick={() => setEmitirNfseOpen(true)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9 rounded-lg"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Emitir NFS-e
                   </Button>
                   <Button
                     onClick={() => setEmitirNfeOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs h-9 rounded-lg"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Emitir NF-e
@@ -1049,23 +1068,23 @@ export default function NotaFiscalPage() {
                 </div>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto border-2 rounded-xl">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="bg-slate-50">
                     <TableRow>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Numero</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Origem</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Data</TableHead>
-                      <TableHead className="text-right">Acoes</TableHead>
+                      <TableHead className="font-bold text-slate-700">Tipo</TableHead>
+                      <TableHead className="font-bold text-slate-700">Número</TableHead>
+                      <TableHead className="font-bold text-slate-700">Cliente</TableHead>
+                      <TableHead className="font-bold text-slate-700">Origem</TableHead>
+                      <TableHead className="text-right font-bold text-slate-700">Valor</TableHead>
+                      <TableHead className="font-bold text-slate-700">Status</TableHead>
+                      <TableHead className="font-bold text-slate-700">Data</TableHead>
+                      <TableHead className="text-right font-bold text-slate-700">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {notasFiltradas.map((nota) => (
-                      <TableRow key={`${nota.tipo}-${nota.id}`} className="hover:bg-gray-50">
+                      <TableRow key={`${nota.tipo}-${nota.id}`} className="hover:bg-slate-50/50 transition-colors">
                         <TableCell>
                           {getTipoBadge(nota.tipo)}
                         </TableCell>
@@ -1074,12 +1093,12 @@ export default function NotaFiscalPage() {
                             {nota.tipo === "nfse" ? (
                               <>
                                 {nota.numero_nfse ? (
-                                  <span className="font-semibold text-emerald-700">
+                                  <span className="font-bold text-emerald-700">
                                     {String(nota.numero_nfse).padStart(8, "0")}
                                   </span>
                                 ) : (nota.status === "processando" || nota.status === "erro") ? (
                                   <button
-                                    className="text-blue-600 text-xs font-medium hover:underline flex items-center gap-1"
+                                    className="text-blue-600 text-xs font-semibold hover:underline flex items-center gap-1"
                                     onClick={() => handleConsultarNfse(nota.id)}
                                     disabled={consultandoId === nota.id}
                                   >
@@ -1093,19 +1112,19 @@ export default function NotaFiscalPage() {
                                 ) : (
                                   <span className="text-gray-400 text-xs italic">-</span>
                                 )}
-                                <p className="text-xs text-gray-400">RPS: {nota.serie_rps || "11"}.{String(nota.numero_rps || 0).padStart(8, "0")}</p>
+                                <p className="text-[10px] text-gray-400 font-medium">RPS: {nota.serie_rps || "11"}.{String(nota.numero_rps || 0).padStart(8, "0")}</p>
                               </>
                             ) : (
                               <>
                                 {nota.numero_nfe ? (
-                                  <span className="font-semibold text-blue-700">
+                                  <span className="font-bold text-blue-700">
                                     {String(nota.numero_nfe).padStart(9, "0")}
                                   </span>
                                 ) : (
                                   <span className="text-gray-400 text-xs italic">-</span>
                                 )}
                                 {nota.serie && (
-                                  <p className="text-xs text-gray-400">Serie: {nota.serie}</p>
+                                  <p className="text-[10px] text-gray-400 font-medium">Série: {nota.serie}</p>
                                 )}
                               </>
                             )}
@@ -1113,25 +1132,25 @@ export default function NotaFiscalPage() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium text-sm truncate max-w-[200px]">
+                            <p className="font-bold text-sm truncate max-w-[200px] text-slate-800">
                               {nota.tomador_razao_social || nota.cliente_nome || "-"}
                             </p>
                             {nota.tomador_cpf_cnpj && (
-                              <p className="text-xs text-gray-400">{nota.tomador_cpf_cnpj}</p>
+                              <p className="text-[10px] text-gray-400 font-medium">{nota.tomador_cpf_cnpj}</p>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs font-semibold bg-white border border-slate-200">
                             {getOrigemLabel(nota.origem)}
                             {nota.origem_numero && ` #${nota.origem_numero}`}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatCurrency(nota.valor_total)}
+                        <TableCell className="text-right font-black text-slate-800 text-sm">
+                          {showValues ? formatCurrency(nota.valor_total) : "R$ ****"}
                         </TableCell>
                         <TableCell>{getStatusBadge(nota.status)}</TableCell>
-                        <TableCell className="text-sm text-gray-600">
+                        <TableCell className="text-xs text-slate-600 font-semibold">
                           {formatDateBR(nota.data_emissao || nota.created_at)}
                         </TableCell>
                         <TableCell>
@@ -1141,7 +1160,7 @@ export default function NotaFiscalPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                className="h-8 w-8 text-blue-600 hover:text-blue-750 hover:bg-blue-50 border border-transparent hover:border-blue-200"
                                 onClick={() => handleConsultarNfse(nota.id)}
                                 disabled={consultandoId === nota.id}
                                 title="Consultar status na prefeitura"
@@ -1158,7 +1177,7 @@ export default function NotaFiscalPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                className="h-8 w-8 text-blue-600 hover:text-blue-750 hover:bg-blue-50 border border-transparent hover:border-blue-200"
                                 onClick={() => handleConsultarNfe(nota.id)}
                                 disabled={consultandoId === nota.id}
                                 title="Consultar status na SEFAZ"
@@ -1174,7 +1193,7 @@ export default function NotaFiscalPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-8 w-8 text-slate-600 hover:text-slate-800 hover:bg-slate-100 border border-transparent hover:border-slate-200"
                               onClick={() => handleVerDetalhes(nota)}
                               title="Ver detalhes"
                             >
@@ -1186,7 +1205,7 @@ export default function NotaFiscalPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                className="h-8 w-8 text-emerald-600 hover:text-emerald-750 hover:bg-emerald-50 border border-transparent hover:border-emerald-200"
                                 onClick={() => handleImprimir(nota)}
                                 title={nota.tipo === "nfse" ? "Imprimir NFS-e" : "Imprimir DANFE"}
                               >
@@ -1203,7 +1222,7 @@ export default function NotaFiscalPage() {
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                                    className="h-8 w-8 text-teal-600 hover:text-teal-750 hover:bg-teal-50 border border-transparent hover:border-teal-200"
                                     onClick={() => {
                                       setVisualizarBoletosNumero(notaNum)
                                       setVisualizarBoletosOpen(true)
@@ -1221,7 +1240,7 @@ export default function NotaFiscalPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                  className="h-8 w-8 text-blue-600 hover:text-blue-750 hover:bg-blue-50 border border-transparent hover:border-blue-200"
                                   onClick={() => {
                                     setNotaParaBoleto(nota)
                                     setBoletoOpen(true)
@@ -1238,7 +1257,7 @@ export default function NotaFiscalPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="h-8 w-8 text-red-600 hover:text-red-755 hover:bg-red-50 border border-transparent hover:border-red-200"
                                 onClick={() => {
                                   setNotaCancelar(nota)
                                   setCancelarOpen(true)
@@ -1260,17 +1279,17 @@ export default function NotaFiscalPage() {
         </Card>
 
         {/* Info sobre credenciamento */}
-        <Card className="border-0 shadow-md bg-blue-50 border-blue-200">
-          <CardContent className="p-4">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200 border-2 rounded-2xl shadow-sm">
+          <CardContent className="p-4 lg:p-6">
             <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
               <div>
-                <h4 className="font-medium text-blue-800">Sobre as Notas Fiscais</h4>
-                <p className="text-sm text-blue-700 mt-1">
-                  <strong>NFS-e (Servico)</strong>: emitida via Prefeitura de SP para mao de obra. <strong>NF-e (Material)</strong>: emitida via SEFAZ para materiais.
+                <h4 className="font-bold text-blue-800">Sobre as Notas Fiscais</h4>
+                <p className="text-xs md:text-sm text-blue-700 mt-1">
+                  <strong>NFS-e (Serviço)</strong>: emitida via Prefeitura para mão de obra. <strong>NF-e (Material)</strong>: emitida via SEFAZ para materiais.
                   Configure certificados e dados fiscais em{" "}
-                  <Link href="/configuracoes" className="underline font-medium">
-                    Configuracoes
+                  <Link href="/configuracoes" className="underline font-bold text-blue-800 hover:text-blue-900">
+                    Configurações
                   </Link>
                   .
                 </p>
