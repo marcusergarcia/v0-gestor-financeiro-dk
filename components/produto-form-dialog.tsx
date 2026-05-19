@@ -446,11 +446,15 @@ export function ProdutoFormDialog({ open, onOpenChange, produto, onSuccess }: Pr
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categorias.map((categoria) => (
-                    <SelectItem key={categoria.id} value={categoria.id.toString()}>
-                      {categoria.nome} ({categoria.codigo})
-                    </SelectItem>
-                  ))}
+                  {categorias.map((categoria) => {
+                    const val = categoria.id ? categoria.id.toString().trim() : ""
+                    if (!val) return null
+                    return (
+                      <SelectItem key={val} value={val}>
+                        {categoria.nome} ({categoria.codigo})
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             </div>
