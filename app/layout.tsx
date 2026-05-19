@@ -1,12 +1,20 @@
 import type React from "react"
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
+import { Inter, Plus_Jakarta_Sans } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import { Toaster } from "sonner"
 import { LayoutContent } from "@/components/layout-content"
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ 
+  subsets: ["latin"],
+  variable: "--font-inter",
+})
+
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-plus-jakarta",
+})
 
 export const metadata: Metadata = {
   title: "Gestor Financeiro",
@@ -50,7 +58,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192.jpg" />
         <meta name="theme-color" content="#10b981" />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${plusJakarta.variable} font-sans`}>
         <AuthProvider>
           <LayoutContent>{children}</LayoutContent>
           <Toaster position="top-right" />
