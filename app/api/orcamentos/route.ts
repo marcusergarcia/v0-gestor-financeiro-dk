@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       LIMIT 1
     `
 
-    const ultimosOrcamentos = await query(ultimoOrcamentoQuery)
+    const ultimosOrcamentos = await query(ultimoOrcamentoQuery) as any[]
     let sequencial = 1
 
     if (ultimosOrcamentos && ultimosOrcamentos.length > 0) {
