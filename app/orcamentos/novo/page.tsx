@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -273,18 +273,18 @@ export default function NovoOrcamentoPage() {
     setItens(itens.filter((_, i) => i !== index))
   }
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
     setDraggedIndex(index)
     e.dataTransfer.effectAllowed = "move"
   }
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>, index: number) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = "move"
     setDragOverIndex(index)
   }
 
-  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+  const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, targetIndex: number) => {
     e.preventDefault()
     if (draggedIndex === null || draggedIndex === targetIndex) {
       setDraggedIndex(null)
