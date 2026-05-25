@@ -34,7 +34,7 @@ async function getOrcamento(numero: string) {
       WHERE o.numero = ?
     `
 
-    const orcamentos = await query(orcamentoQuery, [numero])
+    const orcamentos = await query(orcamentoQuery, [numero]) as any[]
 
     if (!orcamentos || orcamentos.length === 0) {
       redirect("/orcamentos")
@@ -54,10 +54,10 @@ async function getOrcamento(numero: string) {
       FROM orcamentos_itens oi
       LEFT JOIN produtos p ON oi.produto_id = p.id
       WHERE oi.orcamento_numero = ?
-      ORDER BY oi.id
+      ORDER BY oi.ordem ASC, oi.created_at ASC
     `
 
-    const itens = await query(itensQuery, [numero])
+    const itens = await query(itensQuery, [numero]) as any[]
 
     // Montar resposta
     return {
