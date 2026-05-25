@@ -207,8 +207,8 @@ export function ProdutoFormDialog({ open, onOpenChange, produto, onSuccess }: Pr
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          categoria_id: Number.parseInt(categoriaId),
-          marca_nome: marca !== "Nenhuma marca" ? marca : null,
+          categoria: categorias.find((c) => c.id.toString() === categoriaId)?.nome || "", // busca por nome (sem depender do ID)
+          marca: marca !== "Nenhuma marca" ? marca : null,
         }),
       })
 
