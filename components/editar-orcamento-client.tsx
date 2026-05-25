@@ -18,7 +18,6 @@ import {
   MapPin,
   Calendar,
   Edit2,
-  DollarSign,
   Building2,
   ArrowLeft,
   Printer,
@@ -101,7 +100,6 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
   const [dataOrcamento, setDataOrcamento] = useState(
     orcamento.data_orcamento ? orcamento.data_orcamento.split("T")[0] : new Date().toISOString().split("T")[0],
   )
-  const [mostrarValoresAjustados, setMostrarValoresAjustados] = useState(false)
 
   // Estado para controlar o modal de impressão
   const [showPrintModal, setShowPrintModal] = useState(false)
@@ -576,29 +574,6 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
     })
   }
 
-  const obterValorUnitario = (item: OrcamentoItem) => {
-    if (!mostrarValoresAjustados) return item.valor_unitario
-
-    const valorMaterialBruto = calcularValorMaterial()
-    const subtotalMaterial = calcularSubtotalMaterial()
-
-    if (valorMaterialBruto === 0 || subtotalMaterial === 0) return item.valor_unitario
-
-    const fatorAjuste = subtotalMaterial / valorMaterialBruto
-    return item.valor_unitario * fatorAjuste
-  }
-
-  const obterValorTotalMaterial = (item: OrcamentoItem) => {
-    if (!mostrarValoresAjustados) return item.quantidade * item.valor_unitario
-
-    const valorMaterialBruto = calcularValorMaterial()
-    const subtotalMaterial = calcularSubtotalMaterial()
-
-    if (valorMaterialBruto === 0 || subtotalMaterial === 0) return item.quantidade * item.valor_unitario
-
-    const fatorAjuste = subtotalMaterial / valorMaterialBruto
-    return item.quantidade * (item.valor_unitario * fatorAjuste)
-  }
 
   // Added function to duplicate the quote
   const handleDuplicar = async () => {
@@ -1161,25 +1136,7 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
                   </div>
                 </div>
 
-                {itens.length > 0 && calcularSubtotalMaterial() > 0 && (
-                  <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <DollarSign className="h-4 w-4 text-yellow-600" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-yellow-800">Valores Ajustados para Nota Fiscal</p>
-                      <p className="text-xs text-yellow-600">
-                        Distribui proporcionalmente impostos, juros e taxas nos valores unitários
-                      </p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant={mostrarValoresAjustados ? "default" : "outline"}
-                      onClick={() => setMostrarValoresAjustados(!mostrarValoresAjustados)}
-                      className="text-xs"
-                    >
-                      {mostrarValoresAjustados ? "Valores Originais" : "Valores Ajustados"}
-                    </Button>
-                  </div>
-                )}
+
 
                 {itens.length > 0 && (
                   <div className="border rounded-lg overflow-hidden">
@@ -1189,14 +1146,9 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
                           <TableHead className="w-8 px-2"></TableHead>
                           <TableHead className="font-semibold">Produto</TableHead>
                           <TableHead className="font-semibold w-32">Quantidade</TableHead>
-                          <TableHead className="font-semibold w-28">
-                            Valor Unit.
-                            {mostrarValoresAjustados && <span className="text-xs text-blue-600"> (Ajust.)</span>}
-                          </TableHead>
+                          <TableHead className="font-semibold w-28">Valor Unit.</TableHead>
                           <TableHead className="font-semibold w-28">Mão de Obra</TableHead>
-                          <TableHead className="font-semibold w-28">
-                            Total{mostrarValoresAjustados && <span className="text-xs text-blue-600"> (Mat.)</span>}
-                          </TableHead>
+                          <TableHead className="font-semibold w-28">Total</TableHead>
                           <TableHead className="font-semibold w-20">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1273,35 +1225,17 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
                               />
                             </TableCell>
                             <TableCell>
-                              <div className="text-sm">
-                                <span className={`font-medium ${mostrarValoresAjustados ? "text-blue-600" : ""}`}>
-                                  {formatCurrency(obterValorUnitario(item))}
-                                </span>
-                                {mostrarValoresAjustados && item.valor_unitario_ajustado && (
-                                  <div className="text-xs text-gray-500">
-                                    Orig: {formatCurrency(item.valor_unitario)}
-                                  </div>
-                                )}
-                              </div>
+                              <span className="text-sm font-medium">
+                                {formatCurrency(item.valor_unitario)}
+                              </span>
                             </TableCell>
                             <TableCell>
                               <span className="text-sm font-medium">{formatCurrency(item.valor_mao_obra)}</span>
                             </TableCell>
                             <TableCell>
-                              <div className="text-sm">
-                                <div
-                                  className={`font-semibold ${mostrarValoresAjustados ? "text-blue-600" : "text-green-600"}`}
-                                >
-                                  {mostrarValoresAjustados
-                                    ? formatCurrency(obterValorTotalMaterial(item))
-                                    : formatCurrency(item.valor_total)}
-                                </div>
-                                {mostrarValoresAjustados && (
-                                  <div className="text-xs text-gray-500">
-                                    + MDO: {formatCurrency(item.quantidade * item.valor_mao_obra)}
-                                  </div>
-                                )}
-                              </div>
+                              <span className="text-sm font-semibold text-green-600">
+                                {formatCurrency(item.valor_total)}
+                              </span>
                             </TableCell>
                             <TableCell>
                               <Button
@@ -1523,19 +1457,6 @@ export function EditarOrcamentoClient({ orcamento, itensIniciais }: EditarOrcame
                     </div>
                   </div>
 
-                  {mostrarValoresAjustados && calcularSubtotalMaterial() > 0 && (
-                    <div className="bg-blue-50 p-2 rounded border border-blue-200">
-                      <div className="text-xs font-medium text-blue-800 mb-1">Distribuição Proporcional:</div>
-                      <div className="flex justify-between text-xs text-blue-700">
-                        <span>Fator de Ajuste:</span>
-                        <span>{((calcularSubtotalMaterial() / calcularValorMaterial()) * 100).toFixed(2)}%</span>
-                      </div>
-                      <div className="flex justify-between text-xs text-blue-700">
-                        <span>Diferença Distribuída:</span>
-                        <span>{formatCurrency(calcularSubtotalMaterial() - calcularValorMaterial())}</span>
-                      </div>
-                    </div>
-                  )}
 
                   {desconto > 0 && (
                     <div className="flex justify-between items-center text-red-600">
