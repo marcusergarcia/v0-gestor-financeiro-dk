@@ -47,7 +47,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       FROM orcamentos_itens oi
       LEFT JOIN produtos p ON oi.produto_id = p.id
       WHERE oi.orcamento_numero = ?
-      ORDER BY oi.created_at
+      ORDER BY oi.ordem ASC, oi.created_at ASC
     `
 
     const itens = await query(itensQuery, [numero])
@@ -185,13 +185,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           descricao_personalizada,
           valor_unitario_ajustado,
           valor_total_ajustado,
+          ordem,
           created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
       `
 
       const { generateUUID } = await import("@/lib/utils")
 
-      for (const item of data.itens) {
+      for (let i = 0; i < data.itens.length; i++) {
+        const item = data.itens[i]
         const itemId = item.id || generateUUID()
         await query(insertItensQuery, [
           itemId,
@@ -206,9 +208,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           item.descricao_personalizada || null,
           item.valor_unitario_ajustado || null,
           item.valor_total_ajustado || null,
+          i, // ordem = posição no array (preserva drag-and-drop)
         ])
       }
     }
+
 
     return NextResponse.json({
       success: true,
