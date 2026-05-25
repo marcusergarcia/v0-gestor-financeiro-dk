@@ -102,9 +102,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       orcamentoOriginal.material_a_vista,
     ])
 
-    // Buscar itens do orçamento original
+    // Buscar itens do orçamento original (na ordem correta)
     const itensQuery = `
       SELECT * FROM orcamentos_itens WHERE orcamento_numero = ?
+      ORDER BY ordem ASC, created_at ASC
     `
     const itens = await query(itensQuery, [numero])
 
@@ -124,11 +125,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           descricao_personalizada,
           valor_unitario_ajustado,
           valor_total_ajustado,
+          ordem,
           created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
       `
 
-      for (const item of itens) {
+      for (let i = 0; i < itens.length; i++) {
+        const item = itens[i]
         const itemId = generateUUID()
         await query(insertItensQuery, [
           itemId,
@@ -143,6 +146,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           item.descricao_personalizada,
           item.valor_unitario_ajustado,
           item.valor_total_ajustado,
+          i, // preserva a ordem do orçamento original
         ])
       }
     }
