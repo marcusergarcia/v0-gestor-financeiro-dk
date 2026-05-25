@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       WHERE o.numero = ?
     `
 
-    const orcamentos = await query(orcamentoQuery, [numero])
+    const orcamentos = await query(orcamentoQuery, [numero]) as any[]
 
     if (!orcamentos || orcamentos.length === 0) {
       return NextResponse.json({ success: false, message: "Orçamento não encontrado" }, { status: 404 })
@@ -48,10 +48,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       FROM orcamentos_itens oi
       LEFT JOIN produtos p ON oi.produto_id = p.id
       WHERE oi.orcamento_numero = ?
-      ORDER BY oi.id
+      ORDER BY oi.ordem ASC, oi.created_at ASC
     `
 
-    const itens = await query(itensQuery, [numero])
+    const itens = await query(itensQuery, [numero]) as any[]
 
     // Montar resposta
     const response = {
