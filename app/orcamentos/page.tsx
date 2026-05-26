@@ -733,6 +733,8 @@ export default function OrcamentosPage() {
             </div>
           ) : (
             <>
+              {/* Desktop — tabela redimensionável */}
+              <div className="hidden md:block">
               <ResizableTable
                 storageKey="orcamentos"
                 columns={[
@@ -833,7 +835,9 @@ export default function OrcamentosPage() {
                   }
                 }}
               />
+              </div>
 
+              {/* Mobile — cards compactos */}
               <div className="md:hidden p-3 space-y-4">
                 {filteredOrcamentos.map((orcamento) => (
                   <Card
