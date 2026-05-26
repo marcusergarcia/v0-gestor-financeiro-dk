@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ResizableTable } from "@/components/ui/resizable-table"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -733,143 +733,106 @@ export default function OrcamentosPage() {
             </div>
           ) : (
             <>
-              <div className="hidden md:block overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="font-semibold whitespace-nowrap">Número</TableHead>
-                      <TableHead className="font-semibold whitespace-nowrap">Cliente</TableHead>
-                      <TableHead className="font-semibold whitespace-nowrap">Tipo de Serviço</TableHead>
-                      <TableHead className="font-semibold whitespace-nowrap">Data</TableHead>
-                      <TableHead className="font-semibold whitespace-nowrap">Valor Total</TableHead>
-                      <TableHead className="font-semibold whitespace-nowrap">Status</TableHead>
-                      <TableHead className="font-semibold whitespace-nowrap">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredOrcamentos.map((orcamento) => (
-                      <TableRow key={orcamento.id} className="hover:bg-gray-50 transition-colors">
-                        <TableCell className="font-medium whitespace-nowrap">
-                          <Badge variant="outline" className="font-mono text-xs">
-                            {orcamento.numero}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="min-w-[200px]">
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <span className="font-medium block">{orcamento.cliente_nome}</span>
-                              {orcamento.cliente_codigo && (
-                                <div className="text-xs text-gray-500">{orcamento.cliente_codigo}</div>
-                              )}
-                            </div>
+              <ResizableTable
+                storageKey="orcamentos"
+                columns={[
+                  { key: "numero",         label: "Número",         width: 110, sortable: true },
+                  { key: "cliente_nome",   label: "Cliente",         width: 200, sortable: true },
+                  { key: "tipo_servico",   label: "Tipo de Serviço", width: 150, sortable: true },
+                  { key: "data_orcamento", label: "Data",            width: 110, sortable: true },
+                  { key: "valor_total",    label: "Valor Total",     width: 130, sortable: true },
+                  { key: "situacao",       label: "Status",          width: 130, sortable: true },
+                  { key: "acoes",          label: "Ações",          width: 150, sortable: false, noResize: true },
+                ]}
+                data={filteredOrcamentos}
+                rowKey={(row) => row.id}
+                renderCell={(orcamento, col) => {
+                  switch (col) {
+                    case "numero":
+                      return <Badge variant="outline" className="font-mono text-xs">{orcamento.numero}</Badge>
+                    case "cliente_nome":
+                      return (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <span className="font-medium block truncate">{orcamento.cliente_nome}</span>
+                            {orcamento.cliente_codigo && <div className="text-xs text-gray-500">{orcamento.cliente_codigo}</div>}
                           </div>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <div className="flex items-center gap-1" title={getTipoServicoLabel(orcamento.tipo_servico)}>
-                            <Wrench className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                            <span className="text-sm">{truncateText(getTipoServicoLabel(orcamento.tipo_servico))}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                            <span className="text-sm">{formatDate(orcamento.data_orcamento)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <div className="flex items-center gap-1">
-                            <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
-                            <span className="font-semibold text-green-600 text-sm">
-                              {formatCurrency(Number(orcamento.valor_total))}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">{getStatusBadge(orcamento.situacao)}</TableCell>
-                        <TableCell className="min-w-[120px]">
-                          <div className="flex flex-wrap gap-1">
-                            <Link href={`/orcamentos/${orcamento.numero}`}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-8 w-8 p-0 flex-shrink-0"
-                                title="Visualizar orçamento"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            <Link href={`/orcamentos/${orcamento.numero}/editar`}>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-8 w-8 p-0 flex-shrink-0"
-                                title="Editar orçamento"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            {(orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida") && (() => {
-                              const notaInfo = notasEmitidas[orcamento.numero]
-                              const nfseJaEmitida = notaInfo?.temNfse || false
-                              const parcelamentoMdo = safeNumber(orcamento.parcelamento_mdo)
-                              const subtotalMdo = calcularSubtotalMdoOrcamento(orcamento)
-                              const precisaNfse = parcelamentoMdo !== 0 && subtotalMdo > 0
-                              const desabilitado = !precisaNfse || nfseJaEmitida
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => !desabilitado && handleEmitirNfse(orcamento)}
-                                  disabled={desabilitado}
-                                  className={`h-8 w-8 p-0 flex-shrink-0 ${desabilitado
-                                    ? "text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed opacity-50"
-                                    : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 bg-transparent"
-                                  }`}
-                                  title={!precisaNfse ? "Sem cobrança de serviço" : nfseJaEmitida ? "NFS-e já emitida" : "Emitir NFS-e (Serviço)"}
-                                >
-                                  <FileCheck className="h-4 w-4" />
-                                </Button>
-                              )
-                            })()}
-                            {(orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida") && (() => {
-                              const notaInfo = notasEmitidas[orcamento.numero]
-                              const nfeJaEmitida = notaInfo?.temNfe || false
-                              const parcelamentoMaterial = safeNumber(orcamento.parcelamento_material)
-                              const subtotalMaterial = calcularSubtotalMaterialOrcamento(orcamento)
-                              const precisaNfe = parcelamentoMaterial !== 0 && subtotalMaterial > 0
-                              const desabilitado = !precisaNfe || nfeJaEmitida
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => !desabilitado && handleEmitirNfe(orcamento)}
-                                  disabled={desabilitado}
-                                  className={`h-8 w-8 p-0 flex-shrink-0 ${desabilitado
-                                    ? "text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed opacity-50"
-                                    : "text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent"
-                                  }`}
-                                  title={!precisaNfe ? "Sem cobrança de material" : nfeJaEmitida ? "NF-e já emitida" : "Emitir NF-e (Material)"}
-                                >
-                                  <Package className="h-4 w-4" />
-                                </Button>
-                              )
-                            })()}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDelete(orcamento.numero)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 bg-transparent h-8 w-8 p-0 flex-shrink-0"
-                              title="Excluir orçamento"
-                            >
-                              <Trash2 className="h-4 w-4" />
+                        </div>
+                      )
+                    case "tipo_servico":
+                      return (
+                        <div className="flex items-center gap-1">
+                          <Wrench className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                          <span className="text-sm truncate">{getTipoServicoLabel(orcamento.tipo_servico)}</span>
+                        </div>
+                      )
+                    case "data_orcamento":
+                      return (
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                          <span className="text-sm">{formatDate(orcamento.data_orcamento)}</span>
+                        </div>
+                      )
+                    case "valor_total":
+                      return (
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-3 w-3 text-green-600 flex-shrink-0" />
+                          <span className="font-semibold text-green-600 text-sm">{formatCurrency(Number(orcamento.valor_total))}</span>
+                        </div>
+                      )
+                    case "situacao":
+                      return getStatusBadge(orcamento.situacao)
+                    case "acoes": {
+                      const notaInfo = notasEmitidas[orcamento.numero]
+                      const nfseJaEmitida = notaInfo?.temNfse || false
+                      const nfeJaEmitida = notaInfo?.temNfe || false
+                      const parcelamentoMdo = safeNumber(orcamento.parcelamento_mdo)
+                      const subtotalMdo = calcularSubtotalMdoOrcamento(orcamento)
+                      const precisaNfse = parcelamentoMdo !== 0 && subtotalMdo > 0
+                      const parcelamentoMaterial = safeNumber(orcamento.parcelamento_material)
+                      const subtotalMaterial = calcularSubtotalMaterialOrcamento(orcamento)
+                      const precisaNfe = parcelamentoMaterial !== 0 && subtotalMaterial > 0
+                      const mostraNfBtns = orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida"
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          <Link href={`/orcamentos/${orcamento.numero}`}>
+                            <Button size="sm" variant="outline" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 bg-transparent h-8 w-8 p-0" title="Visualizar">
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                          </Link>
+                          <Link href={`/orcamentos/${orcamento.numero}/editar`}>
+                            <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 bg-transparent h-8 w-8 p-0" title="Editar">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          {mostraNfBtns && (
+                            <Button size="sm" variant="outline" disabled={!precisaNfse || nfseJaEmitida}
+                              onClick={() => (!(!precisaNfse || nfseJaEmitida)) && handleEmitirNfse(orcamento)}
+                              className={`h-8 w-8 p-0 ${(!precisaNfse || nfseJaEmitida) ? "text-gray-400 border-gray-200 bg-gray-50 opacity-50" : "text-emerald-600 hover:bg-emerald-50 border-emerald-200 bg-transparent"}`}
+                              title={!precisaNfse ? "Sem cobrança" : nfseJaEmitida ? "Já emitida" : "NFS-e"}>
+                              <FileCheck className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {mostraNfBtns && (
+                            <Button size="sm" variant="outline" disabled={!precisaNfe || nfeJaEmitida}
+                              onClick={() => (!(!precisaNfe || nfeJaEmitida)) && handleEmitirNfe(orcamento)}
+                              className={`h-8 w-8 p-0 ${(!precisaNfe || nfeJaEmitida) ? "text-gray-400 border-gray-200 bg-gray-50 opacity-50" : "text-blue-600 hover:bg-blue-50 border-blue-200 bg-transparent"}`}
+                              title={!precisaNfe ? "Sem material" : nfeJaEmitida ? "Já emitida" : "NF-e"}>
+                              <Package className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" onClick={() => handleDelete(orcamento.numero)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 bg-transparent h-8 w-8 p-0" title="Excluir">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )
+                    }
+                    default: return null
+                  }
+                }}
+              />
 
               <div className="md:hidden p-3 space-y-4">
                 {filteredOrcamentos.map((orcamento) => (
