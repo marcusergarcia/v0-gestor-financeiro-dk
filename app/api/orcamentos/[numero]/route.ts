@@ -1,129 +1,268 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
-import { generateUUID } from "@/lib/utils"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ numero: string }> }) {
   try {
     const { numero } = await params
 
-    const rows = await query(
-      `
+    const orcamentoQuery = `
+      SELECT 
+        o.*,
+        c.nome as cliente_nome,
+        c.codigo as cliente_codigo,
+        c.cnpj as cliente_cnpj,
+        c.cpf as cliente_cpf,
+        c.endereco as cliente_endereco,
+        c.bairro as cliente_bairro,
+        c.cidade as cliente_cidade,
+        c.estado as cliente_estado,
+        c.cep as cliente_cep,
+        c.email as cliente_email,
+        c.telefone as cliente_telefone,
+        c.distancia_km,
+        c.nome_adm,
+        c.contato_adm,
+        c.telefone_adm,
+        c.email_adm
+      FROM orcamentos o
+      LEFT JOIN clientes c ON o.cliente_id = c.id
+      WHERE o.numero = ?
+    `
+
+    const orcamentos = await query(orcamentoQuery, [numero])
+
+    if (!orcamentos || orcamentos.length === 0) {
+      return NextResponse.json({ success: false, message: "Orçamento não encontrado" }, { status: 404 })
+    }
+
+    const orcamento = orcamentos[0]
+
+    const itensQuery = `
       SELECT 
         oi.*,
-        p.descricao as produto_descricao,
         p.codigo as produto_codigo,
+        p.descricao as produto_descricao,
         p.unidade as produto_unidade,
-        p.valor_unitario as produto_valor_unitario,
-        p.valor_mao_obra as produto_valor_mao_obra,
-        p.valor_custo as produto_valor_custo,
-        p.margem_lucro as produto_margem_lucro,
-        p.estoque as produto_estoque,
-        p.estoque_minimo as produto_estoque_minimo,
-        p.observacoes as produto_observacoes,
-        p.tipo as categoria_nome,
-        p.marca as produto_marca,
-        COALESCE(oi.marca_nome, p.marca) as marca_nome
+        p.ncm as produto_ncm
       FROM orcamentos_itens oi
       LEFT JOIN produtos p ON oi.produto_id = p.id
       WHERE oi.orcamento_numero = ?
       ORDER BY oi.ordem ASC, oi.created_at ASC
-      `,
-      [numero],
-    ) as any[]
+    `
+
+    const itens = await query(itensQuery, [numero])
 
     return NextResponse.json({
       success: true,
-      data: Array.isArray(rows) ? rows : [],
+      data: {
+        ...orcamento,
+        itens: itens || [],
+      },
     })
   } catch (error) {
-    console.error("Erro ao buscar itens do orçamento:", error)
-    return NextResponse.json({ success: false, message: "Erro ao buscar itens" }, { status: 500 })
+    console.error("Erro ao buscar orçamento:", error)
+    return NextResponse.json({ success: false, message: "Erro interno do servidor" }, { status: 500 })
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ numero: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ numero: string }> }) {
   try {
     const { numero } = await params
     const data = await request.json()
 
-    // Verificar se o orçamento existe
-    const orcamentoRows = await query("SELECT id FROM orcamentos WHERE numero = ?", [numero]) as any[]
+    // Formatar data para MySQL (YYYY-MM-DD)
+    const formatDateForMySQL = (dateString: string | null | undefined): string | null => {
+      if (!dateString) return null
 
-    if (!orcamentoRows || orcamentoRows.length === 0) {
-      return NextResponse.json({ success: false, message: "Orçamento não encontrado" }, { status: 404 })
+      try {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+          return dateString
+        }
+
+        const dateOnly = dateString.split("T")[0]
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+          return dateOnly
+        }
+
+        return null
+      } catch {
+        return null
+      }
     }
 
-    // Buscar informações do produto incluindo a marca
-    const produtoRows = await query(
-      `SELECT p.* FROM produtos p WHERE p.id = ?`,
-      [data.produto_id],
-    ) as any[]
+    const dataOrcamentoFormatada = formatDateForMySQL(data.data_orcamento)
+    const dataInicioFormatada = formatDateForMySQL(data.data_inicio)
 
-    if (!produtoRows || produtoRows.length === 0) {
-      return NextResponse.json({ success: false, message: "Produto não encontrado" }, { status: 404 })
+    // Atualizar orçamento
+    const updateQuery = `
+      UPDATE orcamentos SET
+        cliente_id = ?,
+        tipo_servico = ?,
+        detalhes_servico = ?,
+        valor_material = ?,
+        valor_mao_obra = ?,
+        desconto = ?,
+        valor_total = ?,
+        validade = ?,
+        observacoes = ?,
+        situacao = ?,
+        data_orcamento = ?,
+        data_inicio = ?,
+        distancia_km = ?,
+        valor_boleto = ?,
+        prazo_dias = ?,
+        juros_am = ?,
+        imposto_servico = ?,
+        imposto_material = ?,
+        desconto_mdo_percent = ?,
+        desconto_mdo_valor = ?,
+        parcelamento_mdo = ?,
+        parcelamento_material = ?,
+        material_a_vista = ?,
+        custo_deslocamento = ?,
+        valor_juros = ?,
+        taxa_boleto_mdo = ?,
+        taxa_boleto_material = ?,
+        valor_imposto_servico = ?,
+        valor_imposto_material = ?,
+        subtotal_mdo = ?,
+        subtotal_material = ?,
+        updated_at = NOW()
+      WHERE numero = ?
+    `
+
+    await query(updateQuery, [
+      data.cliente_id,
+      data.tipo_servico,
+      data.detalhes_servico || null,
+      data.valor_material || 0,
+      data.valor_mao_obra || 0,
+      data.desconto || 0,
+      data.valor_total || 0,
+      data.validade || 30,
+      data.observacoes || null,
+      data.situacao || "pendente",
+      dataOrcamentoFormatada,
+      dataInicioFormatada,
+      data.distancia_km || 0,
+      data.valor_boleto || 0,
+      data.prazo_dias || 0,
+      data.juros_am || 0,
+      data.imposto_servico || 0,
+      data.imposto_material || 0,
+      data.desconto_mdo_percent || 0,
+      data.desconto_mdo_valor || 0,
+      data.parcelamento_mdo ?? 1,
+      data.parcelamento_material ?? 1,
+      data.material_a_vista ? 1 : 0,
+      data.custo_deslocamento || 0,
+      data.valor_juros || 0,
+      data.taxa_boleto_mdo || 0,
+      data.taxa_boleto_material || 0,
+      data.valor_imposto_servico || 0,
+      data.valor_imposto_material || 0,
+      data.subtotal_mdo || 0,
+      data.subtotal_material || 0,
+      numero,
+    ])
+
+    // Deletar itens existentes
+    await query("DELETE FROM orcamentos_itens WHERE orcamento_numero = ?", [numero])
+
+    // Inserir novos itens
+    if (data.itens && data.itens.length > 0) {
+      const insertItensQuery = `
+        INSERT INTO orcamentos_itens (
+          id,
+          orcamento_numero,
+          produto_id,
+          quantidade,
+          valor_unitario,
+          valor_mao_obra,
+          valor_total,
+          marca_nome,
+          produto_ncm,
+          descricao_personalizada,
+          valor_unitario_ajustado,
+          valor_total_ajustado,
+          ordem,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      `
+
+      const { generateUUID } = await import("@/lib/utils")
+
+      for (let i = 0; i < data.itens.length; i++) {
+        const item = data.itens[i]
+        const itemId = item.id || generateUUID()
+        await query(insertItensQuery, [
+          itemId,
+          numero,
+          item.produto_id,
+          item.quantidade,
+          item.valor_unitario,
+          item.valor_mao_obra || 0,
+          item.valor_total,
+          item.marca_nome || null,
+          item.produto_ncm || null,
+          item.descricao_personalizada || null,
+          item.valor_unitario_ajustado || null,
+          item.valor_total_ajustado || null,
+          i, // ordem = posição no array (preserva drag-and-drop)
+        ])
+      }
     }
 
-    const produto = produtoRows[0]
-    const itemId = generateUUID()
-
-    // Buscar a maior ordem atual para posicionar o novo item no final
-    const ordemRows = await query(
-      `SELECT COALESCE(MAX(ordem), -1) as max_ordem FROM orcamentos_itens WHERE orcamento_numero = ?`,
-      [numero]
-    ) as any[]
-    const novaOrdem = (ordemRows[0]?.max_ordem ?? -1) + 1
-
-    // Inserir item com a marca do produto e ordem correta
-    await query(
-      `INSERT INTO orcamentos_itens (
-        id, orcamento_numero, produto_id, quantidade,
-        valor_unitario, valor_mao_obra, valor_total, marca_nome, ordem
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        itemId,
-        numero,
-        data.produto_id,
-        data.quantidade,
-        data.valor_unitario || produto.valor_unitario,
-        data.valor_mao_obra || produto.valor_mao_obra,
-        data.valor_total ||
-          ((data.valor_unitario || produto.valor_unitario) + (data.valor_mao_obra || produto.valor_mao_obra)) *
-            data.quantidade,
-        produto.marca || null,
-        novaOrdem,
-      ],
-    )
-
-    // Recalcular total do orçamento (material + mão de obra)
-    const totalRows = await query(
-      `SELECT 
-        SUM(quantidade * valor_unitario) as total_material,
-        SUM(quantidade * valor_mao_obra) as total_mao_obra
-       FROM orcamentos_itens 
-       WHERE orcamento_numero = ?`,
-      [numero],
-    ) as any[]
-
-    const totals = totalRows && totalRows.length > 0
-      ? totalRows[0]
-      : { total_material: 0, total_mao_obra: 0 }
-
-    const valorMaterial = totals.total_material || 0
-    const valorMaoObra = totals.total_mao_obra || 0
-    const valorTotal = valorMaterial + valorMaoObra
-
-    await query(
-      "UPDATE orcamentos SET valor_material = ?, valor_mao_obra = ?, valor_total = ? WHERE numero = ?",
-      [valorMaterial, valorMaoObra, valorTotal, numero],
-    )
 
     return NextResponse.json({
       success: true,
-      message: "Item adicionado com sucesso",
-      data: { id: itemId },
+      message: "Orçamento atualizado com sucesso",
+      data: { numero },
     })
   } catch (error) {
-    console.error("Erro ao adicionar item:", error)
-    return NextResponse.json({ success: false, message: "Erro ao adicionar item" }, { status: 500 })
+    console.error("Erro ao atualizar orçamento:", error)
+    return NextResponse.json({ success: false, message: "Erro interno do servidor" }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ numero: string }> }) {
+  try {
+    const { numero } = await params
+    const data = await request.json()
+
+    if (!data.situacao) {
+      return NextResponse.json({ success: false, message: "Campo 'situacao' é obrigatório" }, { status: 400 })
+    }
+
+    await query("UPDATE orcamentos SET situacao = ?, updated_at = NOW() WHERE numero = ?", [data.situacao, numero])
+
+    return NextResponse.json({
+      success: true,
+      message: "Situação atualizada com sucesso",
+      data: { numero, situacao: data.situacao },
+    })
+  } catch (error) {
+    console.error("Erro ao atualizar situação:", error)
+    return NextResponse.json({ success: false, message: "Erro interno do servidor" }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ numero: string }> }) {
+  try {
+    const { numero } = await params
+
+    // Deletar itens primeiro (por causa da foreign key)
+    await query("DELETE FROM orcamentos_itens WHERE orcamento_numero = ?", [numero])
+
+    // Deletar orçamento
+    await query("DELETE FROM orcamentos WHERE numero = ?", [numero])
+
+    return NextResponse.json({
+      success: true,
+      message: "Orçamento excluído com sucesso",
+    })
+  } catch (error) {
+    console.error("Erro ao excluir orçamento:", error)
+    return NextResponse.json({ success: false, message: "Erro interno do servidor" }, { status: 500 })
   }
 }
