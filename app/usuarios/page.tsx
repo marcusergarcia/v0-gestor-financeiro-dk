@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ResizableTable, type ColumnDef } from "@/components/ui/resizable-table"
 import { UserCog, Search, Shield, User, Users, CheckCircle, XCircle, Crown, RefreshCw } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
@@ -337,80 +337,55 @@ export default function UsuariosPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 overflow-hidden">
-            <Table>
-              <TableHeader className="bg-slate-50">
-                <TableRow>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Permissões</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Último Acesso</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {usuariosFiltrados.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      {busca ? "Nenhum usuário encontrado" : "Nenhum usuário cadastrado"}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  usuariosFiltrados.map((usuario) => (
-                    <TableRow key={usuario.id} className="hover:bg-slate-50/50 transition-colors">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src="/placeholder.svg" alt={usuario.nome} />
-                            <AvatarFallback>
-                              {usuario.nome
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <span className="font-medium">{usuario.nome}</span>
-                            {usuario.telefone && <p className="text-xs text-muted-foreground">{usuario.telefone}</p>}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{usuario.email}</TableCell>
-                      <TableCell>{getTipoBadge(usuario.tipo)}</TableCell>
-                      <TableCell>{getPermissoesBadges(usuario.permissoes)}</TableCell>
-                      <TableCell>{getStatusBadge(usuario.ativo)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatarData(usuario.ultimo_acesso)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="hover:bg-blue-50 bg-transparent"
-                            onClick={() => handleEditar(usuario)}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="hover:bg-red-50 text-red-600 bg-transparent"
-                            onClick={() => handleExcluir(usuario)}
-                          >
-                            Excluir
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <ResizableTable
+            storageKey="usuarios"
+            columns={[
+              { key: "nome",          label: "Usuário",       width: 200, sortable: true },
+              { key: "email",         label: "Email",         width: 200, sortable: true },
+              { key: "tipo",          label: "Tipo",          width: 110, sortable: true },
+              { key: "permissoes",    label: "Permissões",    width: 200, sortable: false },
+              { key: "ativo",         label: "Status",        width: 100, sortable: true },
+              { key: "ultimo_acesso", label: "Último Acesso", width: 160, sortable: true },
+              { key: "acoes",         label: "Ações",         width: 120, sortable: false, noResize: true },
+            ]}
+            data={usuariosFiltrados}
+            rowKey={(row) => row.id}
+            emptyState={
+              <div className="text-center py-8 text-muted-foreground">
+                {busca ? "Nenhum usuário encontrado" : "Nenhum usuário cadastrado"}
+              </div>
+            }
+            renderCell={(usuario, col) => {
+              switch (col) {
+                case "nome":
+                  return (
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarImage src="/placeholder.svg" alt={usuario.nome} />
+                        <AvatarFallback>{usuario.nome.split(" ").map((n) => n[0]).join("").toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <span className="font-medium">{usuario.nome}</span>
+                        {usuario.telefone && <p className="text-xs text-muted-foreground">{usuario.telefone}</p>}
+                      </div>
+                    </div>
+                  )
+                case "email": return <span className="truncate">{usuario.email}</span>
+                case "tipo": return getTipoBadge(usuario.tipo)
+                case "permissoes": return getPermissoesBadges(usuario.permissoes)
+                case "ativo": return getStatusBadge(usuario.ativo)
+                case "ultimo_acesso": return <span className="text-sm text-muted-foreground">{formatarData(usuario.ultimo_acesso)}</span>
+                case "acoes":
+                  return (
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="hover:bg-blue-50 bg-transparent" onClick={() => handleEditar(usuario)}>Editar</Button>
+                      <Button variant="outline" size="sm" className="hover:bg-red-50 text-red-600 bg-transparent" onClick={() => handleExcluir(usuario)}>Excluir</Button>
+                    </div>
+                  )
+                default: return null
+              }
+            }}
+          />
         </CardContent>
       </Card>
 
