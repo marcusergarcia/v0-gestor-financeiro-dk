@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ResizableTable } from "@/components/ui/resizable-table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Wrench,
@@ -552,65 +552,55 @@ export default function OrdemServicoPage() {
           </div>
 
           <div className="hidden md:block rounded-lg border border-slate-200 overflow-hidden">
-            <Table>
-              <TableHeader className="bg-slate-50">
-                <TableRow>
-                  <TableHead>Número</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo de Serviço</TableHead>
-                  <TableHead>Técnico</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Situação</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ordensFiltered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                      Nenhuma ordem de serviço encontrada
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  ordensFiltered.map((os) => (
-                    <TableRow key={os.id} className="hover:bg-slate-50/50 transition-colors">
-                      <TableCell className="font-medium">{os.numero}</TableCell>
-                      <TableCell>{os.cliente_nome}</TableCell>
-                      <TableCell>{getTipoServicoLabel(os.tipo_servico)}</TableCell>
-                      <TableCell>{os.tecnico_name}</TableCell>
-                      <TableCell>
-                        {os.data_atual
-                          ? new Date(os.data_atual.split("T")[0] + "T12:00:00").toLocaleDateString("pt-BR")
-                          : "Não informada"}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(os.situacao)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Link href={`/ordem-servico/${os.id}`}>
-                            <Button variant="outline" size="sm" className="hover:bg-blue-50 bg-transparent">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          <Link href={`/ordem-servico/${os.id}/editar`}>
-                            <Button variant="outline" size="sm" className="hover:bg-green-50 bg-transparent">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="hover:bg-red-50 text-red-600 bg-transparent"
-                            onClick={() => handleDelete(os.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
+            <ResizableTable<OrdemServico>
+              storageKey="ordem-servico-lista"
+              columns={[
+                { key: "numero",      label: "Número",          width: 100, sortable: true },
+                { key: "cliente",     label: "Cliente",           width: 200, sortable: true },
+                { key: "tipo_servico",label: "Tipo de Serviço",   width: 170, sortable: true },
+                { key: "tecnico",     label: "Técnico",           width: 160, sortable: true },
+                { key: "data",        label: "Data",              width: 110, sortable: true },
+                { key: "situacao",    label: "Situação",         width: 130, sortable: true },
+                { key: "acoes",       label: "Ações",            width: 120, sortable: false, noResize: true },
+              ]}
+              data={ordensFiltered}
+              rowKey={(row) => row.id}
+              emptyState={
+                <div className="text-center py-8 text-gray-500">Nenhuma ordem de serviço encontrada</div>
+              }
+              renderCell={(os, col) => {
+                switch (col) {
+                  case "numero":      return <span className="font-medium">{os.numero}</span>
+                  case "cliente":     return <span>{os.cliente_nome}</span>
+                  case "tipo_servico":return <span>{getTipoServicoLabel(os.tipo_servico)}</span>
+                  case "tecnico":     return <span>{os.tecnico_name}</span>
+                  case "data":
+                    return (
+                      <span>{os.data_atual ? new Date(os.data_atual.split("T")[0] + "T12:00:00").toLocaleDateString("pt-BR") : "Não informada"}</span>
+                    )
+                  case "situacao":    return getStatusBadge(os.situacao)
+                  case "acoes":
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Link href={`/ordem-servico/${os.id}`}>
+                          <Button variant="outline" size="sm" className="hover:bg-blue-50 bg-transparent">
+                            <Eye className="h-4 w-4" />
                           </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                        </Link>
+                        <Link href={`/ordem-servico/${os.id}/editar`}>
+                          <Button variant="outline" size="sm" className="hover:bg-green-50 bg-transparent">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button variant="outline" size="sm" className="hover:bg-red-50 text-red-600 bg-transparent" onClick={() => handleDelete(os.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )
+                  default: return null
+                }
+              }}
+            />
           </div>
 
           <div className="md:hidden space-y-4">
