@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ResizableTable } from "@/components/ui/resizable-table"
 import {
   Dialog,
   DialogContent,
@@ -290,62 +290,56 @@ export function VisitasTab() {
 
       <Card>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Quantidade de Visitas</TableHead>
-                <TableHead>Percentual de Desconto</TableHead>
-                <TableHead className="text-center">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {configs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                    Nenhuma configuração encontrada
-                    <br />
-                    <span className="text-sm">Clique em "Adicionar" para criar sua primeira configuração</span>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                configs.map((config, index) => (
-                  <TableRow key={`${config.quantidade_visitas}-${index}`}>
-                    <TableCell className="font-medium">
-                      {config.quantidade_visitas} {config.quantidade_visitas === 1 ? "visita" : "visitas"}
-                    </TableCell>
-                    <TableCell className="text-blue-600 font-medium">{config.percentual_desconto}%</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => handleEditar(index)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Tem certeza que deseja remover a configuração para {config.quantidade_visitas}{" "}
-                                {config.quantidade_visitas === 1 ? "visita" : "visitas"}?
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleRemover(index)}>Remover</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+          <ResizableTable<VisitaConfig>
+            storageKey="config-visitas"
+            columns={[
+              { key: "quantidade_visitas",  label: "Quantidade de Visitas",   width: 200, sortable: true },
+              { key: "percentual_desconto", label: "Percentual de Desconto",  width: 180, sortable: true },
+              { key: "acoes",              label: "Ações",                  width: 100, sortable: false, noResize: true, align: "center" },
+            ]}
+            data={configs}
+            rowKey={(row, idx) => `${row.quantidade_visitas}-${idx}`}
+            emptyState={
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhuma configuração encontrada<br />
+                <span className="text-sm">Clique em "Adicionar" para criar sua primeira configuração</span>
+              </div>
+            }
+            renderCell={(config, col, idx) => {
+              switch (col) {
+                case "quantidade_visitas":
+                  return <span className="font-medium">{config.quantidade_visitas} {config.quantidade_visitas === 1 ? "visita" : "visitas"}</span>
+                case "percentual_desconto":
+                  return <span className="text-blue-600 font-medium">{config.percentual_desconto}%</span>
+                case "acoes":
+                  return (
+                    <div className="flex items-center justify-center gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => handleEditar(idx)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm"><Trash2 className="h-4 w-4" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Tem certeza que deseja remover a configuração para {config.quantidade_visitas} {config.quantidade_visitas === 1 ? "visita" : "visitas"}?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleRemover(idx)}>Remover</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  )
+                default: return null
+              }
+            }}
+          />
         </CardContent>
       </Card>
 
