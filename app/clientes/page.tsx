@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Users, Building2, Phone, Mail, Edit, Trash2, Filter, Plus } from "lucide-react"
+import { Search, Users, Building2, Phone, Mail, Edit, Trash2, Filter, Plus, MapPin, FileText, ChevronRight } from "lucide-react"
 import { ResizableTable, type ColumnDef } from "@/components/ui/resizable-table"
 import { formatCNPJ, formatCPF, formatPhone } from "@/lib/utils"
 import type { Cliente } from "@/types/database"
@@ -30,6 +30,7 @@ export default function ClientesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [distanceFilter, setDistanceFilter] = useState("all")
   const [logoMenu, setLogoMenu] = useState<string>("")
+  const [expandedClientId, setExpandedClientId] = useState<string | null>(null)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -245,6 +246,10 @@ export default function ClientesPage() {
     router.push("/clientes/novo")
   }
 
+  const toggleExpandClient = (id: string) => {
+    setExpandedClientId(prev => prev === id ? null : id)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -262,7 +267,7 @@ export default function ClientesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
@@ -330,14 +335,14 @@ export default function ClientesPage() {
 
         {/* Search and Filters */}
         <Card className="border-0 shadow-lg bg-gradient-to-r from-white to-gray-50">
-          <CardHeader>
-            <CardTitle className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Buscar e Filtrar Clientes
+          <CardHeader className="p-3 md:p-6 pb-2 md:pb-3">
+            <CardTitle className="text-base md:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Buscar e Filtrar
             </CardTitle>
-            <CardDescription>Pesquise por nome, código, documento, email, telefone ou cidade</CardDescription>
+            <CardDescription className="text-xs md:text-sm">Pesquise por nome, código, documento, email, telefone ou cidade</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
+          <CardContent className="p-3 md:p-6 pt-0">
+            <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
               {/* Search Input */}
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -353,7 +358,7 @@ export default function ClientesPage() {
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-gray-400" />
                 <Select value={distanceFilter} onValueChange={setDistanceFilter}>
-                  <SelectTrigger className="w-48 border-gray-200 focus:border-blue-500">
+                  <SelectTrigger className="w-full sm:w-48 border-gray-200 focus:border-blue-500">
                     <SelectValue placeholder="Filtrar por distância" />
                   </SelectTrigger>
                   <SelectContent>
@@ -368,13 +373,13 @@ export default function ClientesPage() {
             </div>
 
             {(searchTerm || distanceFilter !== "all") && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                <p className="text-sm text-gray-600">
+              <div className="mt-3 md:mt-4 flex flex-wrap gap-2">
+                <p className="text-xs md:text-sm text-gray-600">
                   Mostrando {filteredClientes.length} de {clientes.length} clientes
                 </p>
                 {searchTerm && (
                   <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
-                    Busca: "{searchTerm}"
+                    Busca: &quot;{searchTerm}&quot;
                   </Badge>
                 )}
                 {distanceFilter !== "all" && (
@@ -387,8 +392,265 @@ export default function ClientesPage() {
           </CardContent>
         </Card>
 
-        {/* Clientes Table */}
-        <Card className="border-0 shadow-lg bg-white">
+        {/* ════════════════════════════════════════════════════════════════════
+            MOBILE VIEW — Card-based layout (visible only on small screens)
+           ════════════════════════════════════════════════════════════════════ */}
+        <div className="md:hidden space-y-3">
+          {/* Header count */}
+          <div className="flex items-center justify-between px-1">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+              {filteredClientes.length} cliente{filteredClientes.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+
+          {filteredClientes.length === 0 ? (
+            <div className="text-center py-12">
+              <Users className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              <h3 className="text-base font-medium text-gray-900 mb-1">
+                {searchTerm || distanceFilter !== "all" ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                {searchTerm || distanceFilter !== "all"
+                  ? "Tente ajustar os filtros"
+                  : "Comece cadastrando seu primeiro cliente"}
+              </p>
+              {!searchTerm && distanceFilter === "all" && (
+                <Button size="sm" onClick={handleNovoCliente}>
+                  <Plus className="mr-1.5 h-3.5 w-3.5" />
+                  Novo Cliente
+                </Button>
+              )}
+            </div>
+          ) : (
+            filteredClientes.map((cliente) => {
+              const isExpanded = expandedClientId === cliente.id
+
+              return (
+                <div
+                  key={cliente.id}
+                  className={`rounded-xl border transition-all duration-200 overflow-hidden ${
+                    cliente.tem_contrato
+                      ? "border-green-200 bg-gradient-to-r from-green-50/80 to-white"
+                      : "border-gray-200 bg-white"
+                  } ${isExpanded ? "shadow-lg ring-1 ring-blue-200" : "shadow-sm hover:shadow-md"}`}
+                >
+                  {/* Card principal — sempre visível */}
+                  <button
+                    type="button"
+                    onClick={() => toggleExpandClient(cliente.id)}
+                    className="w-full text-left p-3.5 flex items-center gap-3"
+                  >
+                    {/* Avatar / Iniciais */}
+                    <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+                      cliente.tem_contrato
+                        ? "bg-green-100 text-green-700"
+                        : cliente.cnpj
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-600"
+                    }`}>
+                      {(cliente.nome || "?").substring(0, 2).toUpperCase()}
+                    </div>
+
+                    {/* Info principal */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-gray-900 truncate">
+                          {cliente.nome}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[11px] text-gray-500 font-mono">
+                          {cliente.codigo}
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className={`text-[10px] px-1.5 py-0 h-4 ${
+                            cliente.cnpj ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {getClienteType(cliente.cnpj, cliente.cpf)}
+                        </Badge>
+                        {cliente.tem_contrato && (
+                          <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-100 text-green-700 border-0">
+                            Contrato
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Chevron */}
+                    <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${
+                      isExpanded ? "rotate-90" : ""
+                    }`} />
+                  </button>
+
+                  {/* Conteúdo expandido — mini cards */}
+                  {isExpanded && (
+                    <div className="px-3.5 pb-3.5 pt-0 animate-in slide-in-from-top-2 duration-200">
+                      <div className="border-t border-gray-100 pt-3 space-y-2">
+                        {/* Grid de mini cards */}
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* Documento */}
+                          <div className="bg-gray-50 rounded-lg p-2.5">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <FileText className="h-3 w-3 text-gray-400" />
+                              <span className="text-[10px] font-medium text-gray-500 uppercase">Documento</span>
+                            </div>
+                            <p className="text-xs font-mono text-gray-800 truncate">
+                              {formatDocument(cliente.cnpj, cliente.cpf)}
+                            </p>
+                          </div>
+
+                          {/* Distância */}
+                          <div className="bg-gray-50 rounded-lg p-2.5">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <MapPin className="h-3 w-3 text-gray-400" />
+                              <span className="text-[10px] font-medium text-gray-500 uppercase">Distância</span>
+                            </div>
+                            <p className="text-xs font-semibold text-gray-800">
+                              {getDistanceLabel(cliente.distancia_km)}
+                            </p>
+                          </div>
+
+                          {/* Telefone */}
+                          {cliente.telefone && (
+                            <div className="bg-gray-50 rounded-lg p-2.5">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <Phone className="h-3 w-3 text-gray-400" />
+                                <span className="text-[10px] font-medium text-gray-500 uppercase">Telefone</span>
+                              </div>
+                              <a
+                                href={`tel:${cliente.telefone}`}
+                                className="text-xs text-blue-600 font-medium"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {formatPhone(cliente.telefone)}
+                              </a>
+                            </div>
+                          )}
+
+                          {/* Email */}
+                          {cliente.email && (
+                            <div className="bg-gray-50 rounded-lg p-2.5">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <Mail className="h-3 w-3 text-gray-400" />
+                                <span className="text-[10px] font-medium text-gray-500 uppercase">Email</span>
+                              </div>
+                              <a
+                                href={`mailto:${cliente.email}`}
+                                className="text-xs text-blue-600 font-medium truncate block"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {cliente.email}
+                              </a>
+                            </div>
+                          )}
+
+                          {/* Contato */}
+                          {cliente.contato && (
+                            <div className="bg-gray-50 rounded-lg p-2.5">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <Users className="h-3 w-3 text-gray-400" />
+                                <span className="text-[10px] font-medium text-gray-500 uppercase">Contato</span>
+                              </div>
+                              <p className="text-xs text-gray-800 truncate">{cliente.contato}</p>
+                            </div>
+                          )}
+
+                          {/* Contrato */}
+                          {cliente.tem_contrato && (
+                            <div className="bg-green-50 rounded-lg p-2.5">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <FileText className="h-3 w-3 text-green-500" />
+                                <span className="text-[10px] font-medium text-green-600 uppercase">Contrato</span>
+                              </div>
+                              <p className="text-xs font-semibold text-green-800">
+                                {cliente.dia_contrato ? `Venc: Dia ${cliente.dia_contrato}` : "Ativo"}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Cidade */}
+                          {cliente.cidade && (
+                            <div className="bg-gray-50 rounded-lg p-2.5">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <Building2 className="h-3 w-3 text-gray-400" />
+                                <span className="text-[10px] font-medium text-gray-500 uppercase">Cidade</span>
+                              </div>
+                              <p className="text-xs text-gray-800 truncate">
+                                {cliente.cidade}{cliente.estado ? ` - ${cliente.estado}` : ""}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Endereço completo se existir */}
+                        {cliente.endereco && (
+                          <div className="bg-gray-50 rounded-lg p-2.5">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <MapPin className="h-3 w-3 text-gray-400" />
+                              <span className="text-[10px] font-medium text-gray-500 uppercase">Endereço</span>
+                            </div>
+                            <p className="text-xs text-gray-800">
+                              {cliente.endereco}{cliente.bairro ? ` - ${cliente.bairro}` : ""}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Botões de ação */}
+                        <div className="flex gap-2 pt-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 h-9 text-xs font-medium text-blue-600 border-blue-200 hover:bg-blue-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEditCliente(cliente)
+                            }}
+                          >
+                            <Edit className="h-3.5 w-3.5 mr-1.5" />
+                            Editar
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-9 text-xs font-medium text-red-600 border-red-200 hover:bg-red-50 bg-transparent px-3"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Tem certeza que deseja excluir o cliente &quot;{cliente.nome}&quot;? Esta ação não pode ser desfeita.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteCliente(cliente)} className="bg-red-600 hover:bg-red-700">
+                                  Excluir
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* ════════════════════════════════════════════════════════════════════
+            DESKTOP VIEW — ResizableTable (hidden on mobile)
+           ════════════════════════════════════════════════════════════════════ */}
+        <Card className="border-0 shadow-lg bg-white hidden md:block">
           <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg p-4 lg:p-6">
             <CardTitle className="text-white">Lista de Clientes</CardTitle>
             <CardDescription className="text-blue-100">
@@ -496,7 +758,7 @@ export default function ClientesPage() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Tem certeza que deseja excluir o cliente "{cliente.nome}"? Esta ação não pode ser desfeita.
+                                  Tem certeza que deseja excluir o cliente &quot;{cliente.nome}&quot;? Esta ação não pode ser desfeita.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
