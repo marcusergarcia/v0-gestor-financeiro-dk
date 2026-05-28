@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Users, Building2, Phone, Mail, Edit, Trash2, Filter, Plus, MapPin, FileText, ChevronRight } from "lucide-react"
+import { Search, Users, Building2, Phone, Mail, Edit, Trash2, Filter, Plus, MapPin, FileText, ChevronRight, UserX, X } from "lucide-react"
 import { ResizableTable, type ColumnDef } from "@/components/ui/resizable-table"
 import { formatCNPJ, formatCPF, formatPhone } from "@/lib/utils"
 import type { Cliente } from "@/types/database"
@@ -29,6 +29,7 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [distanceFilter, setDistanceFilter] = useState("all")
+  const [cardFilter, setCardFilter] = useState<"all" | "empresas" | "com_contrato" | "sem_contrato">("all")
   const [logoMenu, setLogoMenu] = useState<string>("")
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null)
   const { toast } = useToast()
@@ -88,6 +89,21 @@ export default function ClientesPage() {
   // Filtrar clientes usando useMemo para performance
   const filteredClientes = useMemo(() => {
     let filtered = [...clientes]
+
+    // Filtro por card (categoria)
+    if (cardFilter !== "all") {
+      switch (cardFilter) {
+        case "empresas":
+          filtered = filtered.filter((c) => !!c.cnpj)
+          break
+        case "com_contrato":
+          filtered = filtered.filter((c) => c.tem_contrato)
+          break
+        case "sem_contrato":
+          filtered = filtered.filter((c) => !c.tem_contrato)
+          break
+      }
+    }
 
     // Filtro por texto de busca
     if (searchTerm.trim()) {
@@ -171,7 +187,21 @@ export default function ClientesPage() {
       }
       return (a.nome || "").localeCompare(b.nome || "")
     })
-  }, [clientes, searchTerm, distanceFilter])
+  }, [clientes, searchTerm, distanceFilter, cardFilter])
+
+  const getCardFilterLabel = (filter: string) => {
+    switch (filter) {
+      case "empresas": return "Empresas"
+      case "com_contrato": return "Com Contrato"
+      case "sem_contrato": return "Sem Contrato"
+      default: return ""
+    }
+  }
+
+  const handleCardFilterToggle = (filter: "all" | "empresas" | "com_contrato" | "sem_contrato") => {
+    setCardFilter(prev => prev === filter ? "all" : filter)
+    setExpandedClientId(null)
+  }
 
   const handleEditCliente = (cliente: Cliente) => {
     router.push(`/clientes/${cliente.id}/editar`)
@@ -291,9 +321,14 @@ export default function ClientesPage() {
           </Button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100 hover:shadow-xl transition-all duration-300">
+        {/* Stats Cards — clicáveis como filtros */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+          <Card
+            className={`border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100 hover:shadow-xl transition-all duration-300 cursor-pointer select-none ${
+              cardFilter === "all" ? "ring-2 ring-blue-400 ring-offset-1" : "opacity-75 hover:opacity-100"
+            }`}
+            onClick={() => handleCardFilterToggle("all")}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 lg:p-6 pb-1 lg:pb-2">
               <CardTitle className="text-xs lg:text-sm font-medium text-blue-700">Total de Clientes</CardTitle>
               <Users className="h-3 w-3 lg:h-5 lg:w-5 text-blue-600" />
@@ -306,7 +341,12 @@ export default function ClientesPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100 hover:shadow-xl transition-all duration-300">
+          <Card
+            className={`border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100 hover:shadow-xl transition-all duration-300 cursor-pointer select-none ${
+              cardFilter === "empresas" ? "ring-2 ring-green-400 ring-offset-1" : "opacity-75 hover:opacity-100"
+            }`}
+            onClick={() => handleCardFilterToggle("empresas")}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 lg:p-6 pb-1 lg:pb-2">
               <CardTitle className="text-xs lg:text-sm font-medium text-green-700">Empresas</CardTitle>
               <Building2 className="h-3 w-3 lg:h-5 lg:w-5 text-green-600" />
@@ -319,10 +359,15 @@ export default function ClientesPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100 hover:shadow-xl transition-all duration-300">
+          <Card
+            className={`border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100 hover:shadow-xl transition-all duration-300 cursor-pointer select-none ${
+              cardFilter === "com_contrato" ? "ring-2 ring-purple-400 ring-offset-1" : "opacity-75 hover:opacity-100"
+            }`}
+            onClick={() => handleCardFilterToggle("com_contrato")}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 lg:p-6 pb-1 lg:pb-2">
               <CardTitle className="text-xs lg:text-sm font-medium text-purple-700">Com Contrato</CardTitle>
-              <Badge className="h-3 w-3 lg:h-5 lg:w-5 bg-purple-100 text-purple-600" />
+              <FileText className="h-3 w-3 lg:h-5 lg:w-5 text-purple-600" />
             </CardHeader>
             <CardContent className="p-3 lg:p-6 pt-0">
               <div className="text-lg lg:text-3xl font-bold text-purple-800">
@@ -331,7 +376,43 @@ export default function ClientesPage() {
               <p className="text-[10px] lg:text-xs text-purple-600 mt-0.5 lg:mt-1">Contratos ativos</p>
             </CardContent>
           </Card>
+
+          <Card
+            className={`border-0 shadow-lg bg-gradient-to-br from-orange-50 to-orange-100 hover:shadow-xl transition-all duration-300 cursor-pointer select-none ${
+              cardFilter === "sem_contrato" ? "ring-2 ring-orange-400 ring-offset-1" : "opacity-75 hover:opacity-100"
+            }`}
+            onClick={() => handleCardFilterToggle("sem_contrato")}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 lg:p-6 pb-1 lg:pb-2">
+              <CardTitle className="text-xs lg:text-sm font-medium text-orange-700">Sem Contrato</CardTitle>
+              <UserX className="h-3 w-3 lg:h-5 lg:w-5 text-orange-600" />
+            </CardHeader>
+            <CardContent className="p-3 lg:p-6 pt-0">
+              <div className="text-lg lg:text-3xl font-bold text-orange-800">
+                {clientes.filter((c) => !c.tem_contrato).length}
+              </div>
+              <p className="text-[10px] lg:text-xs text-orange-600 mt-0.5 lg:mt-1">Sem contratos</p>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Active card filter indicator */}
+        {cardFilter !== "all" && (
+          <div className="flex items-center gap-2 px-1">
+            <Badge className="text-xs bg-gradient-to-r from-blue-500 to-purple-600 text-white border-0 pl-2.5 pr-1.5 py-1 gap-1.5">
+              Filtro: {getCardFilterLabel(cardFilter)}
+              <button
+                onClick={() => setCardFilter("all")}
+                className="ml-0.5 rounded-full hover:bg-white/20 p-0.5 transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+            <span className="text-xs text-gray-500">
+              {filteredClientes.length} cliente{filteredClientes.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+        )}
 
         {/* Search and Filters */}
         <Card className="border-0 shadow-lg bg-gradient-to-r from-white to-gray-50">
