@@ -219,6 +219,20 @@ export default function ProdutosPage() {
     return result
   }, [produtos, produtoCardFilter, selectedCategoria, selectedMarca])
 
+  // Filtrar categorias do combobox
+  const filteredCategoriasCombobox = useMemo(() => {
+    if (!searchValCategoria) return categorias
+    const search = searchValCategoria.toLowerCase()
+    return categorias.filter((c) => c.nome?.toLowerCase().includes(search))
+  }, [categorias, searchValCategoria])
+
+  // Filtrar marcas do combobox
+  const filteredMarcasCombobox = useMemo(() => {
+    if (!searchValMarca) return marcas
+    const search = searchValMarca.toLowerCase()
+    return marcas.filter((m) => m.nome?.toLowerCase().includes(search) || (m.sigla && m.sigla.toLowerCase().includes(search)))
+  }, [marcas, searchValMarca])
+
   const handleProdutoCardToggle = (filter: string) => {
     setProdutoCardFilter((prev) => (prev === filter ? "all" : filter))
     setExpandedProdutoId(null)
@@ -706,7 +720,7 @@ export default function ProdutosPage() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
-                        <Command>
+                        <Command shouldFilter={false}>
                           <CommandInput 
                             placeholder="Buscar categoria..." 
                             value={searchValCategoria} 
@@ -726,7 +740,7 @@ export default function ProdutosPage() {
                                 <Check className={cn("mr-2 h-4 w-4", selectedCategoria === "all" ? "opacity-100" : "opacity-0")} />
                                 Todas Categorias
                               </CommandItem>
-                              {categorias.map((cat) => (
+                              {filteredCategoriasCombobox.map((cat) => (
                                 <CommandItem
                                   key={cat.id}
                                   value={cat.nome}
@@ -762,7 +776,7 @@ export default function ProdutosPage() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
-                        <Command>
+                        <Command shouldFilter={false}>
                           <CommandInput 
                             placeholder="Buscar marca..." 
                             value={searchValMarca} 
@@ -782,7 +796,7 @@ export default function ProdutosPage() {
                                 <Check className={cn("mr-2 h-4 w-4", selectedMarca === "all" ? "opacity-100" : "opacity-0")} />
                                 Todas Marcas
                               </CommandItem>
-                              {marcas.map((m) => (
+                              {filteredMarcasCombobox.map((m) => (
                                 <CommandItem
                                   key={m.id}
                                   value={m.nome}
@@ -998,7 +1012,7 @@ export default function ProdutosPage() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
-                        <Command>
+                        <Command shouldFilter={false}>
                           <CommandInput 
                             placeholder="Buscar categoria..." 
                             value={searchValCategoria} 
@@ -1018,7 +1032,7 @@ export default function ProdutosPage() {
                                 <Check className={cn("mr-2 h-4 w-4", selectedCategoria === "all" ? "opacity-100" : "opacity-0")} />
                                 Todas Categorias
                               </CommandItem>
-                              {categorias.map((cat) => (
+                              {filteredCategoriasCombobox.map((cat) => (
                                 <CommandItem
                                   key={cat.id}
                                   value={cat.nome}
@@ -1053,7 +1067,7 @@ export default function ProdutosPage() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
-                        <Command>
+                        <Command shouldFilter={false}>
                           <CommandInput 
                             placeholder="Buscar marca..." 
                             value={searchValMarca} 
@@ -1073,7 +1087,7 @@ export default function ProdutosPage() {
                                 <Check className={cn("mr-2 h-4 w-4", selectedMarca === "all" ? "opacity-100" : "opacity-0")} />
                                 Todas Marcas
                               </CommandItem>
-                              {marcas.map((m) => (
+                              {filteredMarcasCombobox.map((m) => (
                                 <CommandItem
                                   key={m.id}
                                   value={m.nome}
