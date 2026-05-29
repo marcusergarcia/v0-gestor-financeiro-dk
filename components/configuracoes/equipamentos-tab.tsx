@@ -17,8 +17,9 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ResizableTable } from "@/components/ui/resizable-table"
-import { Plus, Edit, Trash2 } from "lucide-react"
+import { Plus, Edit, Trash2, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 interface Equipamento {
   id: number
@@ -41,6 +42,7 @@ export function EquipamentosTab() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEquipamento, setEditingEquipamento] = useState<Equipamento | null>(null)
+  const [expandedEquipamentoId, setExpandedEquipamentoId] = useState<number | null>(null)
   const [formData, setFormData] = useState({
     nome: "",
     categoria: "basicos",
@@ -253,38 +255,114 @@ export function EquipamentosTab() {
           {equipamentos.length === 0 ? (
             <p className="text-center text-gray-500 py-4">Nenhum equipamento cadastrado</p>
           ) : (
-            <ResizableTable<Equipamento>
-              storageKey="config-equipamentos"
-              columns={[
-                { key: "nome",       label: "Nome",           width: 200, sortable: true },
-                { key: "categoria",  label: "Categoria",       width: 160, sortable: true },
-                { key: "valor_hora", label: "Valor por Hora",  width: 130, sortable: true },
-                { key: "descricao",  label: "Descrição",        width: 220, sortable: false },
-                { key: "acoes",      label: "Ações",           width: 90,  sortable: false, noResize: true, align: "right" },
-              ]}
-              data={equipamentos.filter((eq) => eq.ativo)}
-              rowKey={(row) => row.id}
-              renderCell={(equipamento, col) => {
-                switch (col) {
-                  case "nome": return <span className="font-medium">{equipamento.nome}</span>
-                  case "categoria": return <span>{getCategoriaLabel(equipamento.categoria)}</span>
-                  case "valor_hora": return <span>{formatCurrency(equipamento.valor_hora)}</span>
-                  case "descricao": return <span className="truncate max-w-xs">{equipamento.descricao || "-"}</span>
-                  case "acoes":
-                    return (
-                      <div className="flex justify-end space-x-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(equipamento)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDelete(equipamento.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )
-                  default: return null
-                }
-              }}
-            />
+            <>
+              {/* DESKTOP VIEW */}
+              <div className="hidden md:block">
+                <ResizableTable<Equipamento>
+                  storageKey="config-equipamentos"
+                  columns={[
+                    { key: "nome",       label: "Nome",           width: 200, sortable: true },
+                    { key: "categoria",  label: "Categoria",       width: 160, sortable: true },
+                    { key: "valor_hora", label: "Valor por Hora",  width: 130, sortable: true },
+                    { key: "descricao",  label: "Descrição",        width: 220, sortable: false },
+                    { key: "acoes",      label: "Ações",           width: 90,  sortable: false, noResize: true, align: "right" },
+                  ]}
+                  data={equipamentos.filter((eq) => eq.ativo)}
+                  rowKey={(row) => row.id}
+                  renderCell={(equipamento, col) => {
+                    switch (col) {
+                      case "nome": return <span className="font-medium">{equipamento.nome}</span>
+                      case "categoria": return <span>{getCategoriaLabel(equipamento.categoria)}</span>
+                      case "valor_hora": return <span>{formatCurrency(equipamento.valor_hora)}</span>
+                      case "descricao": return <span className="truncate max-w-xs">{equipamento.descricao || "-"}</span>
+                      case "acoes":
+                        return (
+                          <div className="flex justify-end space-x-2">
+                            <Button variant="outline" size="sm" onClick={() => handleEdit(equipamento)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handleDelete(equipamento.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )
+                      default: return null
+                    }
+                  }}
+                />
+              </div>
+
+              {/* MOBILE VIEW */}
+              <div className="md:hidden space-y-3">
+                {equipamentos.filter((eq) => eq.ativo).map((equipamento) => {
+                  const isExpanded = expandedEquipamentoId === equipamento.id
+                  return (
+                    <div
+                      key={equipamento.id}
+                      className={`rounded-xl border transition-all duration-200 overflow-hidden bg-white ${
+                        isExpanded ? "shadow-lg ring-1 ring-green-200" : "shadow-sm hover:shadow-md"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setExpandedEquipamentoId(prev => prev === equipamento.id ? null : equipamento.id)}
+                        className="w-full text-left p-3.5 flex items-center gap-3"
+                      >
+                        <div className="h-10 w-10 flex-shrink-0 bg-green-50 text-green-700 rounded-full flex items-center justify-center text-sm font-bold">
+                          {equipamento.nome.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-semibold text-sm text-gray-900 truncate block">
+                            {equipamento.nome}
+                          </span>
+                          <span className="text-[11px] text-gray-500 block">
+                            {getCategoriaLabel(equipamento.categoria)}
+                          </span>
+                        </div>
+                        <div className="text-right flex-shrink-0 mr-1">
+                          <div className="text-sm font-bold text-green-600">{formatCurrency(equipamento.valor_hora)}/h</div>
+                        </div>
+                        <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${
+                          isExpanded ? "rotate-90" : ""
+                        }`} />
+                      </button>
+
+                      {isExpanded && (
+                        <div className="px-3.5 pb-3.5 pt-0 animate-in slide-in-from-top-2 duration-200">
+                          <div className="border-t border-gray-100 pt-3 space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="bg-gray-50 rounded-lg p-2.5">
+                                <span className="text-[10px] font-medium text-gray-500 uppercase block mb-0.5">Valor por Hora</span>
+                                <p className="text-xs font-semibold text-green-600">{formatCurrency(equipamento.valor_hora)}</p>
+                              </div>
+                              <div className="bg-gray-50 rounded-lg p-2.5">
+                                <span className="text-[10px] font-medium text-gray-500 uppercase block mb-0.5">Categoria</span>
+                                <p className="text-xs text-gray-800">{getCategoriaLabel(equipamento.categoria)}</p>
+                              </div>
+                              {equipamento.descricao && (
+                                <div className="bg-gray-50 rounded-lg p-2.5 col-span-2">
+                                  <span className="text-[10px] font-medium text-gray-500 uppercase block mb-0.5">Descrição</span>
+                                  <p className="text-xs text-gray-800">{equipamento.descricao}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                              <Button variant="outline" size="sm" className="flex-1 text-xs hover:bg-blue-50 bg-white" onClick={() => handleEdit(equipamento)}>
+                                <Edit className="w-4 h-4 mr-2" />Editar
+                              </Button>
+                              <Button variant="outline" size="sm" className="flex-1 text-xs hover:bg-red-50 text-red-600 bg-white" onClick={() => handleDelete(equipamento.id)}>
+                                <Trash2 className="w-4 h-4 mr-2" />Excluir
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

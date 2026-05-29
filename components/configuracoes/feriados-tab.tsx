@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Plus, Edit, Trash2, Calendar } from "lucide-react"
+import { Plus, Edit, Trash2, Calendar, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 
 interface Feriado {
@@ -45,6 +45,7 @@ export function FeriadosTab() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingFeriado, setEditingFeriado] = useState<Feriado | null>(null)
+  const [expandedFeriadoId, setExpandedFeriadoId] = useState<number | null>(null)
   const [novoFeriado, setNovoFeriado] = useState({
     data: "",
     nome: "",
@@ -297,89 +298,216 @@ export function FeriadosTab() {
 
       <Card>
         <CardContent className="p-0">
-          <ResizableTable<Feriado>
-            storageKey="config-feriados"
-            columns={[
-              { key: "data",  label: "Data",            width: 110, sortable: true },
-              { key: "nome",  label: "Nome do Feriado",  width: 250, sortable: true },
-              { key: "tipo",  label: "Tipo",             width: 120, sortable: true },
-              { key: "acoes", label: "Ações",           width: 100, sortable: false, noResize: true, align: "center" },
-            ]}
-            data={feriados}
-            rowKey={(row) => row.id}
-            emptyState={
-              <div className="text-center py-8 text-muted-foreground">Nenhum feriado cadastrado</div>
-            }
-            renderCell={(feriado, col) => {
-              switch (col) {
-                case "data": return <span className="font-medium">{formatarData(feriado.data)}</span>
-                case "nome": return <span>{feriado.nome}</span>
-                case "tipo": return <span>{getTipoLabel(feriado.tipo)}</span>
-                case "acoes":
-                  return (
-                    <div className="flex items-center justify-center gap-2">
-                      <Dialog open={editingFeriado?.id === feriado.id} onOpenChange={(open) => { if (!open) setEditingFeriado(null) }}>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" onClick={() => setEditingFeriado({ ...feriado, data: formatarDataParaInput(feriado.data) })}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Editar Feriado</DialogTitle>
-                            <DialogDescription>Altere os dados do feriado conforme necessário.</DialogDescription>
-                          </DialogHeader>
-                          {editingFeriado && (
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="edit-data">Data</Label>
-                                <Input id="edit-data" type="date" value={editingFeriado.data} onChange={(e) => setEditingFeriado({ ...editingFeriado, data: e.target.value })} />
-                              </div>
-                              <div>
-                                <Label htmlFor="edit-nome">Nome do Feriado</Label>
-                                <Input id="edit-nome" value={editingFeriado.nome} onChange={(e) => setEditingFeriado({ ...editingFeriado, nome: e.target.value })} />
-                              </div>
-                              <div>
-                                <Label htmlFor="edit-tipo">Tipo</Label>
-                                <Select value={editingFeriado.tipo} onValueChange={(value) => setEditingFeriado({ ...editingFeriado, tipo: value })}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="nacional">Nacional</SelectItem>
-                                    <SelectItem value="estadual">Estadual</SelectItem>
-                                    <SelectItem value="municipal">Municipal</SelectItem>
-                                    <SelectItem value="pessoa">Pessoa</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="flex justify-end gap-2">
-                                <Button variant="outline" onClick={() => setEditingFeriado(null)}>Cancelar</Button>
-                                <Button onClick={handleEditar}>Salvar</Button>
-                              </div>
-                            </div>
-                          )}
-                        </DialogContent>
-                      </Dialog>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm"><Trash2 className="h-4 w-4" /></Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                            <AlertDialogDescription>Tem certeza que deseja remover o feriado "{feriado.nome}"? Esta ação não pode ser desfeita.</AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleRemover(feriado.id)}>Remover</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  )
-                default: return null
+          {/* DESKTOP VIEW */}
+          <div className="hidden md:block">
+            <ResizableTable<Feriado>
+              storageKey="config-feriados"
+              columns={[
+                { key: "data",  label: "Data",            width: 110, sortable: true },
+                { key: "nome",  label: "Nome do Feriado",  width: 250, sortable: true },
+                { key: "tipo",  label: "Tipo",             width: 120, sortable: true },
+                { key: "acoes", label: "Ações",           width: 100, sortable: false, noResize: true, align: "center" },
+              ]}
+              data={feriados}
+              rowKey={(row) => row.id}
+              emptyState={
+                <div className="text-center py-8 text-muted-foreground">Nenhum feriado cadastrado</div>
               }
-            }}
-          />
+              renderCell={(feriado, col) => {
+                switch (col) {
+                  case "data": return <span className="font-medium">{formatarData(feriado.data)}</span>
+                  case "nome": return <span>{feriado.nome}</span>
+                  case "tipo": return <span>{getTipoLabel(feriado.tipo)}</span>
+                  case "acoes":
+                    return (
+                      <div className="flex items-center justify-center gap-2">
+                        <Dialog open={editingFeriado?.id === feriado.id} onOpenChange={(open) => { if (!open) setEditingFeriado(null) }}>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="sm" onClick={() => setEditingFeriado({ ...feriado, data: formatarDataParaInput(feriado.data) })}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Editar Feriado</DialogTitle>
+                              <DialogDescription>Altere os dados do feriado conforme necessário.</DialogDescription>
+                            </DialogHeader>
+                            {editingFeriado && (
+                              <div className="space-y-4">
+                                <div>
+                                  <Label htmlFor="edit-data">Data</Label>
+                                  <Input id="edit-data" type="date" value={editingFeriado.data} onChange={(e) => setEditingFeriado({ ...editingFeriado, data: e.target.value })} />
+                                </div>
+                                <div>
+                                  <Label htmlFor="edit-nome">Nome do Feriado</Label>
+                                  <Input id="edit-nome" value={editingFeriado.nome} onChange={(e) => setEditingFeriado({ ...editingFeriado, nome: e.target.value })} />
+                                </div>
+                                <div>
+                                  <Label htmlFor="edit-tipo">Tipo</Label>
+                                  <Select value={editingFeriado.tipo} onValueChange={(value) => setEditingFeriado({ ...editingFeriado, tipo: value })}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="nacional">Nacional</SelectItem>
+                                      <SelectItem value="estadual">Estadual</SelectItem>
+                                      <SelectItem value="municipal">Municipal</SelectItem>
+                                      <SelectItem value="pessoa">Pessoa</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                  <Button variant="outline" onClick={() => setEditingFeriado(null)}>Cancelar</Button>
+                                  <Button onClick={handleEditar}>Salvar</Button>
+                                </div>
+                              </div>
+                            )}
+                          </DialogContent>
+                        </Dialog>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm"><Trash2 className="h-4 w-4" /></Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                              <AlertDialogDescription>Tem certeza que deseja remover o feriado "{feriado.nome}"? Esta ação não pode ser desfeita.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleRemover(feriado.id)}>Remover</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )
+                  default: return null
+                }
+              }}
+            />
+          </div>
+
+          {/* MOBILE VIEW */}
+          <div className="md:hidden space-y-3 p-4">
+            {feriados.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">Nenhum feriado cadastrado</div>
+            ) : (
+              feriados.map((feriado) => {
+                const isExpanded = expandedFeriadoId === feriado.id
+                return (
+                  <div
+                    key={feriado.id}
+                    className={`rounded-xl border transition-all duration-200 overflow-hidden bg-white ${
+                      isExpanded ? "shadow-lg ring-1 ring-blue-200" : "shadow-sm hover:shadow-md"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setExpandedFeriadoId(prev => prev === feriado.id ? null : feriado.id)}
+                      className="w-full text-left p-3.5 flex items-center gap-3"
+                    >
+                      <div className="h-10 w-10 flex-shrink-0 bg-blue-50 text-blue-700 rounded-full flex items-center justify-center">
+                        <Calendar className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-semibold text-sm text-gray-900 truncate block">
+                          {feriado.nome}
+                        </span>
+                        <span className="text-[11px] text-gray-500 block">
+                          {formatarData(feriado.data)}
+                        </span>
+                      </div>
+                      <div className="text-right flex-shrink-0 mr-1">
+                        <Badge variant="outline" className="text-[10px]">{getTipoLabel(feriado.tipo)}</Badge>
+                      </div>
+                      <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${
+                        isExpanded ? "rotate-90" : ""
+                      }`} />
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-3.5 pb-3.5 pt-0 animate-in slide-in-from-top-2 duration-200">
+                        <div className="border-t border-gray-100 pt-3 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-gray-50 rounded-lg p-2.5">
+                              <span className="text-[10px] font-medium text-gray-500 uppercase block mb-0.5">Data</span>
+                              <p className="text-xs font-semibold text-gray-800">{formatarData(feriado.data)}</p>
+                            </div>
+                            <div className="bg-gray-50 rounded-lg p-2.5">
+                              <span className="text-[10px] font-medium text-gray-500 uppercase block mb-0.5">Tipo</span>
+                              <p className="text-xs text-gray-800">{getTipoLabel(feriado.tipo)}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 pt-2">
+                            {/* Edit Dialog */}
+                            <Dialog open={editingFeriado?.id === feriado.id} onOpenChange={(open) => { if (!open) setEditingFeriado(null) }}>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="flex-1 text-xs hover:bg-blue-50 bg-white" onClick={() => setEditingFeriado({ ...feriado, data: formatarDataParaInput(feriado.data) })}>
+                                  <Edit className="h-4 w-4 mr-2" />Editar
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Editar Feriado</DialogTitle>
+                                  <DialogDescription>Altere os dados do feriado conforme necessário.</DialogDescription>
+                                </DialogHeader>
+                                {editingFeriado && (
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label htmlFor="mob-edit-data">Data</Label>
+                                      <Input id="mob-edit-data" type="date" value={editingFeriado.data} onChange={(e) => setEditingFeriado({ ...editingFeriado, data: e.target.value })} />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor="mob-edit-nome">Nome do Feriado</Label>
+                                      <Input id="mob-edit-nome" value={editingFeriado.nome} onChange={(e) => setEditingFeriado({ ...editingFeriado, nome: e.target.value })} />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor="mob-edit-tipo">Tipo</Label>
+                                      <Select value={editingFeriado.tipo} onValueChange={(value) => setEditingFeriado({ ...editingFeriado, tipo: value })}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="nacional">Nacional</SelectItem>
+                                          <SelectItem value="estadual">Estadual</SelectItem>
+                                          <SelectItem value="municipal">Municipal</SelectItem>
+                                          <SelectItem value="pessoa">Pessoa</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                      <Button variant="outline" onClick={() => setEditingFeriado(null)}>Cancelar</Button>
+                                      <Button onClick={handleEditar}>Salvar</Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </DialogContent>
+                            </Dialog>
+
+                            {/* Delete Confirm */}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="flex-1 text-xs hover:bg-red-50 text-red-600 bg-white">
+                                  <Trash2 className="h-4 w-4 mr-2" />Remover
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                                  <AlertDialogDescription>Tem certeza que deseja remover o feriado "{feriado.nome}"? Esta ação não pode ser desfeita.</AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleRemover(feriado.id)}>Remover</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

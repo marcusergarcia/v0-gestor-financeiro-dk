@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Plus, Edit, Trash2, Save } from "lucide-react"
+import { Plus, Edit, Trash2, Save, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 
 interface VisitaConfig {
@@ -39,6 +39,7 @@ export function VisitasTab() {
   const [saving, setSaving] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [expandedVisitaIndex, setExpandedVisitaIndex] = useState<number | null>(null)
   const [novaConfig, setNovaConfig] = useState({
     quantidade_visitas: 1,
     percentual_desconto: 0,
@@ -290,56 +291,147 @@ export function VisitasTab() {
 
       <Card>
         <CardContent className="p-0">
-          <ResizableTable<VisitaConfig>
-            storageKey="config-visitas"
-            columns={[
-              { key: "quantidade_visitas",  label: "Quantidade de Visitas",   width: 200, sortable: true },
-              { key: "percentual_desconto", label: "Percentual de Desconto",  width: 180, sortable: true },
-              { key: "acoes",              label: "Ações",                  width: 100, sortable: false, noResize: true, align: "center" },
-            ]}
-            data={configs}
-            rowKey={(row, idx) => `${row.quantidade_visitas}-${idx}`}
-            emptyState={
+          {/* DESKTOP VIEW */}
+          <div className="hidden md:block">
+            <ResizableTable<VisitaConfig>
+              storageKey="config-visitas"
+              columns={[
+                { key: "quantidade_visitas",  label: "Quantidade de Visitas",   width: 200, sortable: true },
+                { key: "percentual_desconto", label: "Percentual de Desconto",  width: 180, sortable: true },
+                { key: "acoes",              label: "Ações",                  width: 100, sortable: false, noResize: true, align: "center" },
+              ]}
+              data={configs}
+              rowKey={(row, idx) => `${row.quantidade_visitas}-${idx}`}
+              emptyState={
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhuma configuração encontrada<br />
+                  <span className="text-sm">Clique em "Adicionar" para criar sua primeira configuração</span>
+                </div>
+              }
+              renderCell={(config, col, idx) => {
+                switch (col) {
+                  case "quantidade_visitas":
+                    return <span className="font-medium">{config.quantidade_visitas} {config.quantidade_visitas === 1 ? "visita" : "visitas"}</span>
+                  case "percentual_desconto":
+                    return <span className="text-blue-600 font-medium">{config.percentual_desconto}%</span>
+                  case "acoes":
+                    return (
+                      <div className="flex items-center justify-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditar(idx)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm"><Trash2 className="h-4 w-4" /></Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja remover a configuração para {config.quantidade_visitas} {config.quantidade_visitas === 1 ? "visita" : "visitas"}?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleRemover(idx)}>Remover</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    )
+                  default: return null
+                }
+              }}
+            />
+          </div>
+
+          {/* MOBILE VIEW */}
+          <div className="md:hidden space-y-3 p-4">
+            {configs.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 Nenhuma configuração encontrada<br />
                 <span className="text-sm">Clique em "Adicionar" para criar sua primeira configuração</span>
               </div>
-            }
-            renderCell={(config, col, idx) => {
-              switch (col) {
-                case "quantidade_visitas":
-                  return <span className="font-medium">{config.quantidade_visitas} {config.quantidade_visitas === 1 ? "visita" : "visitas"}</span>
-                case "percentual_desconto":
-                  return <span className="text-blue-600 font-medium">{config.percentual_desconto}%</span>
-                case "acoes":
-                  return (
-                    <div className="flex items-center justify-center gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEditar(idx)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm"><Trash2 className="h-4 w-4" /></Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja remover a configuração para {config.quantidade_visitas} {config.quantidade_visitas === 1 ? "visita" : "visitas"}?
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleRemover(idx)}>Remover</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  )
-                default: return null
-              }
-            }}
-          />
+            ) : (
+              configs.map((config, idx) => {
+                const isExpanded = expandedVisitaIndex === idx
+                return (
+                  <div
+                    key={`${config.quantidade_visitas}-${idx}`}
+                    className={`rounded-xl border transition-all duration-200 overflow-hidden bg-white ${
+                      isExpanded ? "shadow-lg ring-1 ring-blue-200" : "shadow-sm hover:shadow-md"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setExpandedVisitaIndex(prev => prev === idx ? null : idx)}
+                      className="w-full text-left p-3.5 flex items-center gap-3"
+                    >
+                      <div className="h-10 w-10 flex-shrink-0 bg-blue-50 text-blue-700 rounded-full flex items-center justify-center font-bold text-sm">
+                        V{config.quantidade_visitas}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-semibold text-sm text-gray-900 truncate block">
+                          {config.quantidade_visitas} {config.quantidade_visitas === 1 ? "visita" : "visitas"}
+                        </span>
+                        <span className="text-[11px] text-gray-500 block">
+                          Desconto aplicado
+                        </span>
+                      </div>
+                      <div className="text-right flex-shrink-0 mr-1">
+                        <span className="text-sm font-bold text-blue-600">{config.percentual_desconto}%</span>
+                      </div>
+                      <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${
+                        isExpanded ? "rotate-90" : ""
+                      }`} />
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-3.5 pb-3.5 pt-0 animate-in slide-in-from-top-2 duration-200">
+                        <div className="border-t border-gray-100 pt-3 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-gray-50 rounded-lg p-2.5">
+                              <span className="text-[10px] font-medium text-gray-500 uppercase block mb-0.5">Visitas</span>
+                              <p className="text-xs font-semibold text-gray-800">{config.quantidade_visitas}</p>
+                            </div>
+                            <div className="bg-gray-50 rounded-lg p-2.5">
+                              <span className="text-[10px] font-medium text-gray-500 uppercase block mb-0.5">Desconto</span>
+                              <p className="text-xs font-semibold text-blue-600">{config.percentual_desconto}%</p>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 pt-2">
+                            <Button variant="outline" size="sm" className="flex-1 text-xs hover:bg-blue-50 bg-white" onClick={() => handleEditar(idx)}>
+                              <Edit className="w-4 h-4 mr-2" />Editar
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="flex-1 text-xs hover:bg-red-50 text-red-600 bg-white">
+                                  <Trash2 className="h-4 w-4 mr-2" />Remover
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem certeza que deseja remover a configuração para {config.quantidade_visitas} {config.quantidade_visitas === 1 ? "visita" : "visitas"}?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleRemover(idx)}>Remover</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
         </CardContent>
       </Card>
 
