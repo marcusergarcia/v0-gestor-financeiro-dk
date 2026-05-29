@@ -23,6 +23,7 @@ import {
   User,
   FileText,
   CalendarRange,
+  ChevronRight,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import Link from "next/link"
