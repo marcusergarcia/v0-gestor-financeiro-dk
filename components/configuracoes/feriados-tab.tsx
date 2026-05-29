@@ -27,6 +27,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Plus, Edit, Trash2, Calendar, ChevronRight } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 
 interface Feriado {
