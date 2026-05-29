@@ -215,7 +215,8 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [recentItems, setRecentItems] = useState<RecentItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [showValues, setShowValues] = useState(true)
+  const [showValues, setShowValues] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const [logoMenu, setLogoMenu] = useState<string | null>(null)
   const { toast } = useToast()
 
@@ -229,23 +230,31 @@ export default function DashboardPage() {
       }
     }
 
-    const savedShowValues = localStorage.getItem("dashboard-show-values")
-    if (savedShowValues !== null) {
-      setShowValues(savedShowValues === "true")
+    const checkMobile = () => setIsMobile(window.innerWidth < 768)
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+
+    const saved = localStorage.getItem("ocultar-valores")
+    if (saved !== null) {
+      setShowValues(saved !== "true")
     }
 
     loadData()
+
+    return () => window.removeEventListener("resize", checkMobile)
   }, [user, router])
 
   const toggleShowValues = () => {
     const newValue = !showValues
     setShowValues(newValue)
-    localStorage.setItem("dashboard-show-values", String(newValue))
+    localStorage.setItem("ocultar-valores", String(!newValue))
   }
 
+  const shouldShow = showValues && !isMobile
+
   const formatValueOrHide = (value: number) => {
-    if (!showValues) {
-      return "R$ ****"
+    if (!shouldShow) {
+      return "R$ •••"
     }
     return formatCurrency(value)
   }
@@ -435,17 +444,17 @@ export default function DashboardPage() {
           variant="outline"
           size="sm"
           onClick={toggleShowValues}
-          className="flex items-center justify-center gap-2 h-9 rounded-lg border-2 bg-transparent hover:bg-slate-50"
+          className="hidden md:flex items-center justify-center gap-2 h-9 rounded-lg border-2 bg-transparent hover:bg-slate-50"
         >
-          {showValues ? (
-            <>
-              <EyeOff className="h-4 w-4" />
-              <span className="text-xs font-semibold">Ocultar Valores</span>
-            </>
-          ) : (
+          {!shouldShow ? (
             <>
               <Eye className="h-4 w-4" />
               <span className="text-xs font-semibold">Mostrar Valores</span>
+            </>
+          ) : (
+            <>
+              <EyeOff className="h-4 w-4" />
+              <span className="text-xs font-semibold">Ocultar Valores</span>
             </>
           )}
         </Button>
@@ -554,7 +563,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="font-bold text-sm text-foreground">
-                          {showValues ? formatCurrency(item.valor) : "R$ ****"}
+                          {shouldShow ? formatCurrency(item.valor) : "R$ •••"}
                         </p>
                         <p className="text-[10px] font-medium text-muted-foreground mt-0.5">
                           {item.tipo === "boleto" ? "Boleto" : "Orçamento"}
