@@ -36,6 +36,7 @@ export default function OrdemServicoPage() {
   const [logoMenu, setLogoMenu] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState("")
   const [loteDialogOpen, setLoteDialogOpen] = useState(false)
+  const [expandedOrdemId, setExpandedOrdemId] = useState<number | null>(null)
 
   const [situacaoFilter, setSituacaoFilter] = useState("todas")
   const [tipoServicoFilter, setTipoServicoFilter] = useState("todos")
@@ -625,77 +626,112 @@ export default function OrdemServicoPage() {
                 <p className="text-sm text-gray-500 mb-4">Tente ajustar os filtros de busca</p>
               </div>
             ) : (
-              ordensFiltered.map((os) => (
-                <Card
-                  key={os.id}
-                  className="border-2 border-slate-300 shadow-md hover:shadow-lg transition-shadow overflow-hidden"
-                >
-                  <CardContent className="p-3">
-                    <div className="flex items-start justify-between mb-3 pb-2 border-b-2 border-orange-100">
+              ordensFiltered.map((os) => {
+                const isExpanded = expandedOrdemId === os.id
+
+                return (
+                  <div
+                    key={os.id}
+                    className={`rounded-xl border transition-all duration-200 overflow-hidden border-gray-200 bg-white ${
+                      isExpanded ? "shadow-lg ring-1 ring-orange-200" : "shadow-sm hover:shadow-md"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setExpandedOrdemId(isExpanded ? null : os.id)}
+                      className="w-full text-left p-3.5 flex items-center gap-3"
+                    >
+                      {/* Ícone */}
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold bg-orange-50 text-orange-700`}>
+                        <FileText className="h-4 w-4" />
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <FileText className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                          <span className="font-bold text-orange-600 text-sm">OS {os.numero}</span>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {os.data_atual
-                            ? new Date(os.data_atual.split("T")[0] + "T12:00:00").toLocaleDateString("pt-BR")
-                            : "Não informada"}
-                        </div>
+                        <span className="font-semibold text-sm text-gray-900 truncate block">OS {os.numero}</span>
+                        <span className="text-[11px] text-gray-500 truncate block font-medium mt-0.5">{os.cliente_nome}</span>
                       </div>
-                      <div className="flex-shrink-0">{getStatusBadge(os.situacao)}</div>
-                    </div>
+                      <div className="text-right flex-shrink-0 mr-1">
+                        {getStatusBadge(os.situacao)}
+                      </div>
+                      <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${
+                        isExpanded ? "rotate-90" : ""
+                      }`} />
+                    </button>
 
-                    <div className="space-y-2 mb-3 text-sm">
-                      <div className="flex items-start gap-2">
-                        <User className="h-3.5 w-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 truncate">{os.cliente_nome}</div>
+                    {isExpanded && (
+                      <div className="px-3.5 pb-3.5 pt-0 animate-in slide-in-from-top-2 duration-200">
+                        <div className="border-t border-gray-100 pt-3 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-gray-50 rounded-lg p-2.5 col-span-2">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <User className="h-3 w-3 text-gray-400" />
+                                <span className="text-[10px] font-medium text-gray-500 uppercase">Cliente</span>
+                              </div>
+                              <p className="text-xs font-semibold text-gray-800 truncate">{os.cliente_nome}</p>
+                            </div>
+                            <div className="bg-gray-50 rounded-lg p-2.5">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <Wrench className="h-3 w-3 text-gray-400" />
+                                <span className="text-[10px] font-medium text-gray-500 uppercase">Tipo de Serviço</span>
+                              </div>
+                              <p className="text-xs text-gray-800 truncate">{getTipoServicoLabel(os.tipo_servico)}</p>
+                            </div>
+                            <div className="bg-gray-50 rounded-lg p-2.5">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <Calendar className="h-3 w-3 text-gray-400" />
+                                <span className="text-[10px] font-medium text-gray-500 uppercase">Data</span>
+                              </div>
+                              <p className="text-xs text-gray-800">
+                                {os.data_atual
+                                  ? new Date(os.data_atual.split("T")[0] + "T12:00:00").toLocaleDateString("pt-BR")
+                                  : "Não informada"}
+                              </p>
+                            </div>
+                            {os.tecnico_name && (
+                              <div className="bg-gray-50 rounded-lg p-2.5 col-span-2">
+                                <div className="flex items-center gap-1.5 mb-1">
+                                  <User className="h-3 w-3 text-gray-400" />
+                                  <span className="text-[10px] font-medium text-gray-500 uppercase">Técnico</span>
+                                </div>
+                                <p className="text-xs text-gray-800 truncate">{os.tecnico_name}</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <Link href={`/ordem-servico/${os.id}`} className="flex-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full h-9 text-xs font-medium text-blue-600 border-blue-200 hover:bg-blue-50"
+                              >
+                                <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                Visualizar
+                              </Button>
+                            </Link>
+                            <Link href={`/ordem-servico/${os.id}/editar`} className="flex-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full h-9 text-xs font-medium text-green-600 border-green-200 hover:bg-green-50"
+                              >
+                                <Edit className="h-3.5 w-3.5 mr-1.5" />
+                                Editar
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-9 text-xs font-medium text-red-600 border-red-200 hover:bg-red-50 bg-transparent px-3"
+                              onClick={() => handleDelete(os.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Wrench className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                        <div className="text-gray-600 text-xs">{getTipoServicoLabel(os.tipo_servico)}</div>
-                      </div>
-                      {os.tecnico_name && (
-                        <div className="flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                          <div className="text-gray-600 text-xs truncate">{os.tecnico_name}</div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 pt-3 border-t-2 border-slate-200">
-                      <Link href={`/ordem-servico/${os.id}`} className="w-full">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-9 text-xs bg-blue-50 hover:bg-blue-100 border-2 border-blue-300 text-blue-700 font-medium"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Link href={`/ordem-servico/${os.id}/editar`} className="w-full">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-9 text-xs bg-green-50 hover:bg-green-100 border-2 border-green-300 text-green-700 font-medium"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full h-9 text-xs bg-red-50 hover:bg-red-100 border-2 border-red-300 text-red-600 font-medium"
-                        onClick={() => handleDelete(os.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                    )}
+                  </div>
+                )
+              })
             )}
           </div>
         </CardContent>

@@ -295,6 +295,8 @@ export default function ClientesPage() {
     )
   }
 
+  const hasActiveFilter = searchTerm.trim() !== "" || distanceFilter !== "all" || cardFilter !== "all"
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6">
@@ -478,29 +480,25 @@ export default function ClientesPage() {
            ════════════════════════════════════════════════════════════════════ */}
         <div className="md:hidden space-y-3">
           {/* Header count */}
-          <div className="flex items-center justify-between px-1">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-              {filteredClientes.length} cliente{filteredClientes.length !== 1 ? "s" : ""}
-            </p>
-          </div>
+          {hasActiveFilter && (
+            <div className="flex items-center justify-between px-1">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                {filteredClientes.length} cliente{filteredClientes.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
 
-          {filteredClientes.length === 0 ? (
+          {!hasActiveFilter ? (
+            <div className="text-center py-12 bg-white rounded-xl border border-gray-150 p-6 shadow-sm">
+              <Search className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              <h3 className="text-base font-medium text-gray-700 mb-1">Busque ou filtre para ver os clientes</h3>
+              <p className="text-sm text-gray-500">Digite na busca ou selecione um filtro para começar.</p>
+            </div>
+          ) : filteredClientes.length === 0 ? (
             <div className="text-center py-12">
               <Users className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-              <h3 className="text-base font-medium text-gray-900 mb-1">
-                {searchTerm || distanceFilter !== "all" ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
-              </h3>
-              <p className="text-sm text-gray-500 mb-4">
-                {searchTerm || distanceFilter !== "all"
-                  ? "Tente ajustar os filtros"
-                  : "Comece cadastrando seu primeiro cliente"}
-              </p>
-              {!searchTerm && distanceFilter === "all" && (
-                <Button size="sm" onClick={handleNovoCliente}>
-                  <Plus className="mr-1.5 h-3.5 w-3.5" />
-                  Novo Cliente
-                </Button>
-              )}
+              <h3 className="text-base font-medium text-gray-900 mb-1">Nenhum cliente encontrado</h3>
+              <p className="text-sm text-gray-500 mb-4">Tente ajustar os filtros de busca.</p>
             </div>
           ) : (
             filteredClientes.map((cliente) => {

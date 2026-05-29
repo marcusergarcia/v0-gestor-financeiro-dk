@@ -23,6 +23,7 @@ import {
   Filter,
   Wrench,
   Package,
+  ChevronRight,
 } from "lucide-react"
 import Link from "next/link"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -72,6 +73,7 @@ export default function OrcamentosPage() {
   const [logoMenu, setLogoMenu] = useState<string>("")
   const [searchTerm, setSearchTerm] = useState("")
   const [situacaoFilter, setSituacaoFilter] = useState("todos")
+  const [expandedOrcamentoId, setExpandedOrcamentoId] = useState<string | null>(null)
   const [nfseDialogOpen, setNfseDialogOpen] = useState(false)
   const [nfseOrcamento, setNfseOrcamento] = useState<Orcamento | null>(null)
   const [nfeDialogOpen, setNfeDialogOpen] = useState(false)
@@ -517,6 +519,7 @@ export default function OrcamentosPage() {
   })
 
   const { total, pendentes, aprovados, enviados, notaFiscal, concluidos, valorTotal } = calcularEstatisticas()
+  const hasActiveFilter = searchTerm.trim() !== "" || situacaoFilter !== "todos"
 
   if (loading) {
     return (
@@ -839,132 +842,173 @@ export default function OrcamentosPage() {
 
               {/* Mobile — cards compactos */}
               <div className="md:hidden p-3 space-y-4">
-                {filteredOrcamentos.map((orcamento) => (
-                  <Card
-                    key={orcamento.id}
-                    className="border-2 border-slate-300 shadow-md hover:shadow-lg transition-shadow overflow-hidden"
-                  >
-                    <CardContent className="p-3">
-                      {/* Header do Card */}
-                      <div className="flex items-start justify-between mb-3 pb-2 border-b-2 border-purple-100">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <FileText className="h-4 w-4 text-purple-600 flex-shrink-0" />
-                            <span className="font-bold text-purple-600 text-sm">Orç. {orcamento.numero}</span>
-                          </div>
-                          <div className="text-xs text-gray-500">{formatDate(orcamento.data_orcamento)}</div>
-                        </div>
-                        <div className="flex-shrink-0">{getStatusBadge(orcamento.situacao)}</div>
-                      </div>
+                {!hasActiveFilter ? (
+                  <div className="text-center py-12 bg-white rounded-xl border border-gray-150 p-6 shadow-sm">
+                    <Search className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                    <h3 className="text-base font-medium text-gray-700 mb-1">Busque ou filtre para ver os orçamentos</h3>
+                    <p className="text-sm text-gray-500">Digite na busca ou selecione uma situação para começar.</p>
+                  </div>
+                ) : filteredOrcamentos.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+                    <h3 className="text-base font-medium text-gray-900 mb-1">Nenhum orçamento encontrado</h3>
+                    <p className="text-sm text-gray-500 mb-4">Tente ajustar os filtros de busca.</p>
+                  </div>
+                ) : (
+                  filteredOrcamentos.map((orcamento) => {
+                    const isExpanded = expandedOrcamentoId === orcamento.id
 
-                      {/* Informações */}
-                      <div className="space-y-2 mb-3 text-sm">
-                        <div className="flex items-start gap-2">
-                          <User className="h-3.5 w-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                    return (
+                      <div
+                        key={orcamento.id}
+                        className={`rounded-xl border transition-all duration-200 overflow-hidden border-gray-200 bg-white ${
+                          isExpanded ? "shadow-lg ring-1 ring-purple-200" : "shadow-sm hover:shadow-md"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setExpandedOrcamentoId(isExpanded ? null : orcamento.id)}
+                          className="w-full text-left p-3.5 flex items-center gap-3"
+                        >
+                          {/* Ícone */}
+                          <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold bg-purple-50 text-purple-700`}>
+                            <FileText className="h-4 w-4" />
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium text-gray-900 truncate">{orcamento.cliente_nome}</div>
-                            {orcamento.cliente_codigo && (
-                              <div className="text-xs text-gray-500">{orcamento.cliente_codigo}</div>
-                            )}
+                            <span className="font-semibold text-sm text-gray-900 truncate block">Orç. {orcamento.numero}</span>
+                            <span className="text-[11px] text-gray-500 truncate block font-medium mt-0.5">{orcamento.cliente_nome}</span>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Wrench className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                          <div className="text-gray-600 text-xs">{getTipoServicoLabel(orcamento.tipo_servico)}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
-                          <div className="font-semibold text-green-600 text-sm">
-                            {formatCurrency(Number(orcamento.valor_total))}
+                          <div className="text-right flex-shrink-0 mr-1">
+                            {getStatusBadge(orcamento.situacao)}
                           </div>
-                        </div>
-                      </div>
+                          <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${
+                            isExpanded ? "rotate-90" : ""
+                          }`} />
+                        </button>
 
-                      {/* Botões de Ação */}
-                      {(() => {
-                        const mostraNfBtns = orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida"
-                        const notaInfo = notasEmitidas[orcamento.numero]
-                        const nfseJaEmitida = notaInfo?.temNfse || false
-                        const nfeJaEmitida = notaInfo?.temNfe || false
-                        
-                        // Lógica para NFS-e
-                        const parcelamentoMdo = safeNumber(orcamento.parcelamento_mdo)
-                        const subtotalMdo = calcularSubtotalMdoOrcamento(orcamento)
-                        const precisaNfse = parcelamentoMdo !== 0 && subtotalMdo > 0
-                        const nfseDesabilitado = !precisaNfse || nfseJaEmitida
-                        
-                        // Lógica para NF-e
-                        const parcelamentoMaterial = safeNumber(orcamento.parcelamento_material)
-                        const subtotalMaterial = calcularSubtotalMaterialOrcamento(orcamento)
-                        const precisaNfe = parcelamentoMaterial !== 0 && subtotalMaterial > 0
-                        const nfeDesabilitado = !precisaNfe || nfeJaEmitida
-                        
-                        const totalCols = 2 + (mostraNfBtns ? 1 : 0) + (mostraNfBtns ? 1 : 0) + 1
-                        const gridColsClass = totalCols === 3 ? "grid-cols-3" : totalCols === 4 ? "grid-cols-4" : "grid-cols-5"
-                        return (
-                          <div className={`grid gap-2 pt-3 border-t-2 border-slate-200 ${gridColsClass}`}>
-                            <Link href={`/orcamentos/${orcamento.numero}`} className="w-full">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full h-9 text-xs bg-blue-50 hover:bg-blue-100 border-2 border-blue-300 text-blue-700 font-medium"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            <Link href={`/orcamentos/${orcamento.numero}/editar`} className="w-full">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full h-9 text-xs bg-green-50 hover:bg-green-100 border-2 border-green-300 text-green-700 font-medium"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            {mostraNfBtns && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={nfseDesabilitado}
-                                className={`w-full h-9 text-xs font-medium border-2 ${nfseDesabilitado
-                                  ? "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
-                                  : "bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-700"
-                                }`}
-                                onClick={() => !nfseDesabilitado && handleEmitirNfse(orcamento)}
-                                title={!precisaNfse ? "Sem cobrança de serviço" : nfseJaEmitida ? "NFS-e já emitida" : "NFS-e"}
-                              >
-                                <FileCheck className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {mostraNfBtns && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={nfeDesabilitado}
-                                className={`w-full h-9 text-xs font-medium border-2 ${nfeDesabilitado
-                                  ? "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
-                                  : "bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-700"
-                                }`}
-                                onClick={() => !nfeDesabilitado && handleEmitirNfe(orcamento)}
-                                title={!precisaNfe ? "Sem cobrança de material" : nfeJaEmitida ? "NF-e já emitida" : "NF-e"}
-                              >
-                                <Package className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full h-9 text-xs bg-red-50 hover:bg-red-100 border-2 border-red-300 text-red-600 font-medium"
-                              onClick={() => handleDelete(orcamento.numero)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                        {isExpanded && (
+                          <div className="px-3.5 pb-3.5 pt-0 animate-in slide-in-from-top-2 duration-200">
+                            <div className="border-t border-gray-100 pt-3 space-y-2">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="bg-gray-50 rounded-lg p-2.5 col-span-2">
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <User className="h-3 w-3 text-gray-400" />
+                                    <span className="text-[10px] font-medium text-gray-500 uppercase">Cliente</span>
+                                  </div>
+                                  <p className="text-xs font-semibold text-gray-800 truncate">{orcamento.cliente_nome}</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-2.5">
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <Wrench className="h-3 w-3 text-gray-400" />
+                                    <span className="text-[10px] font-medium text-gray-500 uppercase">Tipo de Serviço</span>
+                                  </div>
+                                  <p className="text-xs text-gray-800 truncate">{getTipoServicoLabel(orcamento.tipo_servico)}</p>
+                                </div>
+                                <div className="bg-gray-50 rounded-lg p-2.5">
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <Calendar className="h-3 w-3 text-gray-400" />
+                                    <span className="text-[10px] font-medium text-gray-500 uppercase">Data</span>
+                                  </div>
+                                  <p className="text-xs text-gray-800">{formatDate(orcamento.data_orcamento)}</p>
+                                </div>
+                                <div className="bg-green-50 rounded-lg p-2.5 col-span-2">
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <DollarSign className="h-3 w-3 text-green-500" />
+                                    <span className="text-[10px] font-medium text-green-500 uppercase">Valor Total</span>
+                                  </div>
+                                  <p className="text-xs font-bold text-green-700">{formatCurrency(Number(orcamento.valor_total))}</p>
+                                </div>
+                              </div>
+
+                              {/* Ações */}
+                              {(() => {
+                                const mostraNfBtns = orcamento.situacao === "aprovado" || orcamento.situacao === "nota fiscal emitida"
+                                const notaInfo = notasEmitidas[orcamento.numero]
+                                const nfseJaEmitida = notaInfo?.temNfse || false
+                                const nfeJaEmitida = notaInfo?.temNfe || false
+                                
+                                // Lógica para NFS-e
+                                const parcelamentoMdo = safeNumber(orcamento.parcelamento_mdo)
+                                const subtotalMdo = calcularSubtotalMdoOrcamento(orcamento)
+                                const precisaNfse = parcelamentoMdo !== 0 && subtotalMdo > 0
+                                const nfseDesabilitado = !precisaNfse || nfseJaEmitida
+                                
+                                // Lógica para NF-e
+                                const parcelamentoMaterial = safeNumber(orcamento.parcelamento_material)
+                                const subtotalMaterial = calcularSubtotalMaterialOrcamento(orcamento)
+                                const precisaNfe = parcelamentoMaterial !== 0 && subtotalMaterial > 0
+                                const nfeDesabilitado = !precisaNfe || nfeJaEmitida
+
+                                return (
+                                  <div className="flex flex-wrap gap-2 pt-1">
+                                    <Link href={`/orcamentos/${orcamento.numero}`} className="flex-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full h-9 text-xs font-medium text-blue-600 border-blue-200 hover:bg-blue-50"
+                                      >
+                                        <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                        Visualizar
+                                      </Button>
+                                    </Link>
+                                    <Link href={`/orcamentos/${orcamento.numero}/editar`} className="flex-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full h-9 text-xs font-medium text-green-600 border-green-200 hover:bg-green-50"
+                                      >
+                                        <Edit className="h-3.5 w-3.5 mr-1.5" />
+                                        Editar
+                                      </Button>
+                                    </Link>
+                                    {mostraNfBtns && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={nfseDesabilitado}
+                                        className={`h-9 text-xs font-medium border-2 px-3 ${nfseDesabilitado
+                                          ? "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
+                                          : "bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-700"
+                                        }`}
+                                        onClick={() => !nfseDesabilitado && handleEmitirNfse(orcamento)}
+                                        title={!precisaNfse ? "Sem cobrança de serviço" : nfseJaEmitida ? "NFS-e já emitida" : "NFS-e"}
+                                      >
+                                        <FileCheck className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    {mostraNfBtns && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={nfeDesabilitado}
+                                        className={`h-9 text-xs font-medium border-2 px-3 ${nfeDesabilitado
+                                          ? "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
+                                          : "bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-700"
+                                        }`}
+                                        onClick={() => !nfeDesabilitado && handleEmitirNfe(orcamento)}
+                                        title={!precisaNfe ? "Sem cobrança de material" : nfeJaEmitida ? "NF-e já emitida" : "NF-e"}
+                                      >
+                                        <Package className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-9 text-xs bg-red-50 hover:bg-red-100 border-2 border-red-300 text-red-600 font-medium px-3"
+                                      onClick={() => handleDelete(orcamento.numero)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                )
+                              })()}
+                            </div>
                           </div>
-                        )
-                      })()}
-                    </CardContent>
-                  </Card>
-                ))}
+                        )}
+                      </div>
+                    )
+                  })
+                )}
               </div>
             </>
           )}
