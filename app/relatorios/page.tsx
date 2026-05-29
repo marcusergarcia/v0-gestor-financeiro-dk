@@ -857,37 +857,69 @@ export default function RelatoriosPage() {
         {/* Estilo Global de Impressão */}
         <style>{`
           @media print {
-            body {
+            /* Resetar fundos e forçar cores padrão */
+            html, body {
               background: white !important;
               color: black !important;
+              height: auto !important;
+              overflow: visible !important;
             }
-            /* Ocultar elementos normais de navegação e filtros */
-            body > *:not(#printable-report-area) {
+
+            /* Ocultar elementos desnecessários do app e a própria visualização em tela */
+            aside,
+            header,
+            .no-print,
+            [role="navigation"],
+            button,
+            .fixed {
               display: none !important;
             }
+
+            /* Resetar estrutura flex e containers de scroll para fluxo vertical contínuo */
+            .flex,
+            .flex-1,
+            main,
+            .mx-auto,
+            .max-w-7xl,
+            div:not(#printable-report-area):not(#printable-report-area *) {
+              height: auto !important;
+              min-height: 0 !important;
+              overflow: visible !important;
+              display: block !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              border: none !important;
+              box-shadow: none !important;
+            }
+
+            /* Forçar a exibição do bloco de impressão */
             #printable-report-area {
               display: block !important;
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
-              padding: 0;
-              margin: 0;
-              background: white;
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              z-index: 99999 !important;
+              background: white !important;
+              color: black !important;
+              padding: 0 !important;
+              margin: 0 !important;
             }
-            .no-print {
-              display: none !important;
-            }
-            .shadow-lg, .shadow-md, .shadow-sm {
-              box-shadow: none !important;
-              border: 1px solid #e2e8f0 !important;
-            }
+
+            /* Forçar exibição de tabelas completas */
             table {
-              page-break-inside: auto;
+              width: 100% !important;
+              border-collapse: collapse !important;
+              page-break-inside: auto !important;
             }
             tr {
-              page-break-inside: avoid;
-              page-break-after: auto;
+              page-break-inside: avoid !important;
+              page-break-after: auto !important;
+            }
+            th, td {
+              border: 1px solid #ddd !important;
+              padding: 6px !important;
+              text-align: left !important;
             }
           }
         `}</style>
