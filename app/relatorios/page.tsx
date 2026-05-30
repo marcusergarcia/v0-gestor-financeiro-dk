@@ -1,14 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BarChart, Filter, AlertCircle, RefreshCw, Printer, Download, Calendar, Users, Package, FileText, DollarSign, Wrench } from "lucide-react"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { BarChart, Filter, AlertCircle, RefreshCw, Printer, Download, Calendar, Users, Package, FileText, DollarSign, Wrench, Check, ChevronsUpDown } from "lucide-react"
+import { formatCurrency, formatDate, cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 
 interface RelatorioData {
@@ -481,19 +483,7 @@ export default function RelatoriosPage() {
         {(tipoRelatorio === "clientes" || tipoRelatorio === "orcamentos" || tipoRelatorio === "financeiro" || tipoRelatorio === "ordens_servico") && (
           <div>
             <Label htmlFor="cliente" className="font-semibold text-gray-700">Cliente</Label>
-            <Select value={clienteId} onValueChange={setClienteId}>
-              <SelectTrigger className="bg-white border-gray-200 mt-1">
-                <SelectValue placeholder="Selecione o cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os Clientes</SelectItem>
-                {clientes.map((cliente) => (
-                  <SelectItem key={cliente.id} value={cliente.id.toString()}>
-                    {cliente.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ClienteFilter value={clienteId} onValueChange={setClienteId} clientes={clientes} />
           </div>
         )}
       </div>
@@ -1352,5 +1342,88 @@ export default function RelatoriosPage() {
 
       </div>
     </div>
+  )
+}
+
+interface ClienteFilterProps {
+  value: string
+  onValueChange: (value: string) => void
+  clientes: any[]
+}
+
+function ClienteFilter({ value, onValueChange, clientes }: ClienteFilterProps) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+
+  const filtered = useMemo(() => {
+    if (!search) return clientes
+    const s = search.toLowerCase()
+    return clientes.filter((c) => c.nome?.toLowerCase().includes(s) || c.email?.toLowerCase().includes(s))
+  }, [clientes, search])
+
+  const selectedClienteName = useMemo(() => {
+    if (value === "todos") return "Todos os Clientes"
+    const c = clientes.find((c) => c.id.toString() === value)
+    return c ? c.nome : "Selecionar Cliente"
+  }, [value, clientes])
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between bg-white text-gray-800 border border-gray-250 h-9 font-normal hover:bg-gray-50 mt-1"
+        >
+          <span className="truncate">{selectedClienteName}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[280px] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput 
+            placeholder="Buscar cliente..." 
+            value={search} 
+            onValueChange={setSearch} 
+          />
+          <CommandList>
+            <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="todos"
+                onSelect={() => {
+                  onValueChange("todos")
+                  setOpen(false)
+                  setSearch("")
+                }}
+              >
+                <Check className={cn("mr-2 h-4 w-4", value === "todos" ? "opacity-100" : "opacity-0")} />
+                Todos os Clientes
+              </CommandItem>
+              {filtered.slice(0, 50).map((cliente) => (
+                <CommandItem
+                  key={cliente.id}
+                  value={cliente.id.toString()}
+                  onSelect={() => {
+                    onValueChange(cliente.id.toString())
+                    setOpen(false)
+                    setSearch("")
+                  }}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", value === cliente.id.toString() ? "opacity-100" : "opacity-0")} />
+                  {cliente.nome}
+                </CommandItem>
+              ))}
+              {filtered.length > 50 && (
+                <div className="text-[10px] text-gray-400 text-center py-1 border-t border-gray-100 mt-1">
+                  Continue digitando para filtrar...
+                </div>
+              )}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }
