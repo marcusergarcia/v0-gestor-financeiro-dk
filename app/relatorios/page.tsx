@@ -457,7 +457,7 @@ export default function RelatoriosPage() {
               setNivelUsuario("todos")
               if (value === "feriados") {
                 setPeriodoPreset("todos_meses")
-              } else if (value === "equipamentos" || value === "logs_sistema") {
+              } else if (value === "equipamentos" || value === "logs_sistema" || value === "usuarios") {
                 setPeriodoPreset("todos")
               } else {
                 setPeriodoPreset("este_mes")
@@ -485,7 +485,7 @@ export default function RelatoriosPage() {
         </div>
 
         {/* Preset de Período */}
-        {tipoRelatorio !== "equipamentos" && tipoRelatorio !== "logs_sistema" && (
+        {tipoRelatorio !== "equipamentos" && tipoRelatorio !== "logs_sistema" && tipoRelatorio !== "usuarios" && (
           <div>
             <Label htmlFor="preset-periodo" className="font-semibold text-gray-700">Período</Label>
             <Select value={periodoPreset} onValueChange={setPeriodoPreset}>
@@ -591,8 +591,9 @@ export default function RelatoriosPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="administrador">Administrador</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="tecnico">Técnico</SelectItem>
+                <SelectItem value="vendedor">Vendedor</SelectItem>
                 <SelectItem value="usuario">Usuário</SelectItem>
               </SelectContent>
             </Select>
@@ -603,7 +604,7 @@ export default function RelatoriosPage() {
         {(tipoRelatorio === "orcamentos" || tipoRelatorio === "financeiro" || tipoRelatorio === "ordens_servico" || tipoRelatorio === "notas_fiscais" || tipoRelatorio === "propostas_contratos" || tipoRelatorio === "contratos_ativos" || tipoRelatorio === "usuarios" || tipoRelatorio === "logs_sistema" || tipoRelatorio === "feriados" || tipoRelatorio === "equipamentos") && (
           <div>
             <Label htmlFor="status" className="font-semibold text-gray-700">
-              {tipoRelatorio === "logs_sistema" ? "Nível / Tipo" : "Status"}
+              {tipoRelatorio === "logs_sistema" ? "Tipo" : "Status"}
             </Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger className="bg-white border-gray-200 mt-1">
