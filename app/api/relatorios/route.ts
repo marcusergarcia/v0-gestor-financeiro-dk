@@ -19,19 +19,25 @@ export async function GET(request: NextRequest) {
     let startDateStr = ""
     let endDateStr = ""
 
-    if (dataInicio) {
+    const parsedPeriodo = Number.parseInt(periodo)
+
+    if (dataInicio && dataInicio.trim() !== "") {
       startDateStr = dataInicio
-    } else {
+    } else if (!Number.isNaN(parsedPeriodo)) {
       const dataLimite = new Date()
-      dataLimite.setDate(dataLimite.getDate() - Number.parseInt(periodo))
+      dataLimite.setDate(dataLimite.getDate() - parsedPeriodo)
       startDateStr = dataLimite.toISOString().split("T")[0]
+    } else {
+      startDateStr = "1970-01-01"
     }
 
-    if (dataFim) {
+    if (dataFim && dataFim.trim() !== "") {
       endDateStr = dataFim
     } else {
-      endDateStr = new Date().toISOString().split("T")[0]
+      endDateStr = "2099-12-31"
     }
+
+    const nivel = searchParams.get("nivel") || "todos"
 
     let data: any = {}
 
@@ -492,6 +498,10 @@ export async function GET(request: NextRequest) {
             userQuery += ` AND u.ativo = ?`
             userParams.push(isAtivo)
           }
+          if (nivel && nivel !== "todos") {
+            userQuery += ` AND u.tipo = ?`
+            userParams.push(nivel)
+          }
           userQuery += ` ORDER BY u.nome ASC`
           const [userData] = await pool.execute(userQuery, userParams)
           const totalUser = (userData as any[]).length
@@ -501,7 +511,7 @@ export async function GET(request: NextRequest) {
             usuarios: userData,
             total: totalUser,
             estatisticas: { ativos: ativosUser, inativos: inativosUser },
-            filtros: { status }
+            filtros: { status, nivel }
           }
           break
 
@@ -516,7 +526,7 @@ export async function GET(request: NextRequest) {
           `
           const logParams: any[] = [startDateStr, endDateStr]
           if (status && status !== "todos") {
-            logQuery += ` AND u.tipo = ?`
+            logQuery += ` AND l.tipo = ?`
             logParams.push(status)
           }
           logQuery += ` ORDER BY l.data_hora DESC LIMIT 500`

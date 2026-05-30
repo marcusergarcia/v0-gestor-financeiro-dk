@@ -41,6 +41,7 @@ export default function RelatoriosPage() {
   const [tipoNota, setTipoNota] = useState("todos")
   const [categoriaEquipamento, setCategoriaEquipamento] = useState("todos")
   const [categoriasEquipamentos, setCategoriasEquipamentos] = useState<string[]>([])
+  const [nivelUsuario, setNivelUsuario] = useState("todos")
   
   const [relatorioData, setRelatorioData] = useState<RelatorioData | null>(null)
   const [logoMenu, setLogoMenu] = useState<string>("")
@@ -204,6 +205,7 @@ export default function RelatoriosPage() {
         categoriaId: tipoRelatorio === "equipamentos" ? categoriaEquipamento : categoriaId,
         tipoNota,
         periodo: periodoPreset,
+        nivel: nivelUsuario,
       })
 
       console.log("Gerando relatório com filtros:", { tipoRelatorio, dataInicio, dataFim, status, clienteId, categoriaId, tipoNota, periodoPreset })
@@ -452,6 +454,7 @@ export default function RelatoriosPage() {
               setCategoriaId("todos")
               setCategoriaEquipamento("todos")
               setTipoNota("todos")
+              setNivelUsuario("todos")
               if (value === "feriados") {
                 setPeriodoPreset("todos_meses")
               } else if (value === "equipamentos" || value === "logs_sistema") {
@@ -578,6 +581,24 @@ export default function RelatoriosPage() {
           </div>
         )}
 
+        {/* Nível do Usuário (Apenas para relatório de usuários) */}
+        {tipoRelatorio === "usuarios" && (
+          <div>
+            <Label htmlFor="nivelUsuario" className="font-semibold text-gray-700">Nível / Tipo</Label>
+            <Select value={nivelUsuario} onValueChange={setNivelUsuario}>
+              <SelectTrigger className="bg-white border-gray-200 mt-1">
+                <SelectValue placeholder="Todos os níveis" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="administrador">Administrador</SelectItem>
+                <SelectItem value="tecnico">Técnico</SelectItem>
+                <SelectItem value="usuario">Usuário</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {/* Filtros de Status / Nível / Tipo */}
         {(tipoRelatorio === "orcamentos" || tipoRelatorio === "financeiro" || tipoRelatorio === "ordens_servico" || tipoRelatorio === "notas_fiscais" || tipoRelatorio === "propostas_contratos" || tipoRelatorio === "contratos_ativos" || tipoRelatorio === "usuarios" || tipoRelatorio === "logs_sistema" || tipoRelatorio === "feriados" || tipoRelatorio === "equipamentos") && (
           <div>
@@ -625,9 +646,9 @@ export default function RelatoriosPage() {
                 {tipoRelatorio === "propostas_contratos" && (
                   <>
                     <SelectItem value="rascunho">Rascunho</SelectItem>
-                    <SelectItem value="enviada">Enviada</SelectItem>
-                    <SelectItem value="aprovada">Aprovada</SelectItem>
-                    <SelectItem value="rejeitada">Rejeitada</SelectItem>
+                    <SelectItem value="enviada">Enviadas</SelectItem>
+                    <SelectItem value="aprovada">Aprovadas</SelectItem>
+                    <SelectItem value="rejeitada">Rejeitadas</SelectItem>
                   </>
                 )}
                 {tipoRelatorio === "contratos_ativos" && (
@@ -646,9 +667,14 @@ export default function RelatoriosPage() {
                 )}
                 {tipoRelatorio === "logs_sistema" && (
                   <>
-                    <SelectItem value="administrador">Administrador</SelectItem>
-                    <SelectItem value="tecnico">Técnico</SelectItem>
-                    <SelectItem value="usuario">Usuário</SelectItem>
+                    <SelectItem value="info">Informação</SelectItem>
+                    <SelectItem value="warning">Aviso</SelectItem>
+                    <SelectItem value="error">Erro</SelectItem>
+                    <SelectItem value="login">Login</SelectItem>
+                    <SelectItem value="logout">Logout</SelectItem>
+                    <SelectItem value="create">Criação</SelectItem>
+                    <SelectItem value="update">Edição</SelectItem>
+                    <SelectItem value="delete">Exclusão</SelectItem>
                   </>
                 )}
                 {tipoRelatorio === "feriados" && (
