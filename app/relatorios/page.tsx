@@ -1016,6 +1016,477 @@ export default function RelatoriosPage() {
     )
   }
 
+  const renderNotasFiscais = () => {
+    if (!relatorioData?.notasFiscais) return null
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 shadow-sm">
+            <div className="text-2xl font-bold text-blue-900">{relatorioData.total || 0}</div>
+            <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider mt-1">Total Notas Fiscais</div>
+            <div className="text-lg font-bold text-blue-800 mt-2">{formatCurrency(relatorioData.valorTotal || 0)}</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm">
+            <div className="text-2xl font-bold text-green-900">{relatorioData.estatisticas?.autorizadas || 0}</div>
+            <div className="text-xs font-semibold text-green-700 uppercase tracking-wider mt-1">Autorizadas</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl border border-red-200 shadow-sm">
+            <div className="text-2xl font-bold text-red-900">{relatorioData.estatisticas?.canceladas || 0}</div>
+            <div className="text-xs font-semibold text-red-700 uppercase tracking-wider mt-1">Canceladas</div>
+          </div>
+        </div>
+
+        <Card className="border-0 shadow-lg bg-white overflow-hidden">
+          <CardHeader className="bg-slate-50 border-b border-slate-100 py-4">
+            <CardTitle className="text-lg text-slate-800">Notas Fiscais Emitidas</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-700">
+                <thead className="bg-slate-100/50 uppercase text-[11px] font-bold text-gray-500 border-b border-gray-200">
+                  <tr>
+                    <th className="p-4">Número / Série</th>
+                    <th className="p-4">Chave de Acesso</th>
+                    <th className="p-4">Cliente</th>
+                    <th className="p-4">Data Emissão</th>
+                    <th className="p-4 text-right">Valor Total</th>
+                    <th className="p-4 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-150">
+                  {relatorioData.notasFiscais.map((nf: any) => (
+                    <tr key={nf.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 font-semibold font-mono text-xs">#{nf.numero} / S.{nf.serie}</td>
+                      <td className="p-4 text-xs font-mono text-gray-500 max-w-[150px] truncate">{nf.chave_acesso || "-"}</td>
+                      <td className="p-4 font-medium text-gray-900">{nf.cliente_nome}</td>
+                      <td className="p-4 text-xs">{formatDate(nf.data_emissao)}</td>
+                      <td className="p-4 text-right font-bold text-slate-900">{formatCurrency(nf.valor || 0)}</td>
+                      <td className="p-4 text-center">
+                        <Badge
+                          variant={
+                            nf.status === "autorizada" || nf.status === "transmitida" || nf.status === "sucesso"
+                              ? "default"
+                              : "destructive"
+                          }
+                          className="text-xs uppercase"
+                        >
+                          {nf.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const renderPropostasContratos = () => {
+    if (!relatorioData?.propostas) return null
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl border border-indigo-200 shadow-sm">
+            <div className="text-2xl font-bold text-indigo-900">{relatorioData.total || 0}</div>
+            <div className="text-xs font-semibold text-indigo-700 uppercase tracking-wider mt-1">Total Propostas</div>
+            <div className="text-lg font-bold text-indigo-800 mt-2">{formatCurrency(relatorioData.valorTotal || 0)}</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm">
+            <div className="text-2xl font-bold text-green-900">{relatorioData.estatisticas?.aprovadas || 0}</div>
+            <div className="text-xs font-semibold text-green-700 uppercase tracking-wider mt-1">Aprovadas</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 shadow-sm">
+            <div className="text-2xl font-bold text-blue-900">{relatorioData.estatisticas?.enviadas || 0}</div>
+            <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider mt-1">Enviadas</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl border border-red-200 shadow-sm">
+            <div className="text-2xl font-bold text-red-900">{relatorioData.estatisticas?.rejeitadas || 0}</div>
+            <div className="text-xs font-semibold text-red-700 uppercase tracking-wider mt-1">Rejeitadas</div>
+          </div>
+        </div>
+
+        <Card className="border-0 shadow-lg bg-white overflow-hidden">
+          <CardHeader className="bg-slate-50 border-b border-slate-100 py-4">
+            <CardTitle className="text-lg text-slate-800">Propostas de Contratos</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-700">
+                <thead className="bg-slate-100/50 uppercase text-[11px] font-bold text-gray-500 border-b border-gray-200">
+                  <tr>
+                    <th className="p-4">Número</th>
+                    <th className="p-4">Cliente</th>
+                    <th className="p-4">Data Proposta</th>
+                    <th className="p-4">Tipo</th>
+                    <th className="p-4 text-right">Valor Total</th>
+                    <th className="p-4 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-150">
+                  {relatorioData.propostas.map((p: any) => (
+                    <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 font-semibold font-mono text-xs">#{p.numero}</td>
+                      <td className="p-4 font-medium text-gray-900">{p.cliente_nome}</td>
+                      <td className="p-4 text-xs">{formatDate(p.data_proposta)}</td>
+                      <td className="p-4 text-xs uppercase">{p.tipo}</td>
+                      <td className="p-4 text-right font-bold text-slate-900">{formatCurrency(p.valor || 0)}</td>
+                      <td className="p-4 text-center">
+                        <Badge
+                          variant={
+                            p.status === "aprovada" || p.status === "aprovado"
+                              ? "default"
+                              : p.status === "rejeitada" || p.status === "rejeitado"
+                                ? "destructive"
+                                : "secondary"
+                          }
+                          className="text-xs uppercase"
+                        >
+                          {p.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const renderContratosAtivos = () => {
+    if (!relatorioData?.contratos) return null
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl border border-indigo-200 shadow-sm">
+            <div className="text-2xl font-bold text-indigo-900">{relatorioData.total || 0}</div>
+            <div className="text-xs font-semibold text-indigo-700 uppercase tracking-wider mt-1">Total Contratos</div>
+            <div className="text-lg font-bold text-indigo-800 mt-2">{formatCurrency(relatorioData.valorTotal || 0)}/mês</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm">
+            <div className="text-2xl font-bold text-green-900">{relatorioData.estatisticas?.ativos || 0}</div>
+            <div className="text-xs font-semibold text-green-700 uppercase tracking-wider mt-1">Ativos</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl border border-amber-200 shadow-sm">
+            <div className="text-2xl font-bold text-amber-900">{relatorioData.estatisticas?.suspensos || 0}</div>
+            <div className="text-xs font-semibold text-amber-700 uppercase tracking-wider mt-1">Suspensos</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl border border-red-200 shadow-sm">
+            <div className="text-2xl font-bold text-red-900">{relatorioData.estatisticas?.cancelados || 0}</div>
+            <div className="text-xs font-semibold text-red-700 uppercase tracking-wider mt-1">Cancelados</div>
+          </div>
+        </div>
+
+        <Card className="border-0 shadow-lg bg-white overflow-hidden">
+          <CardHeader className="bg-slate-50 border-b border-slate-100 py-4">
+            <CardTitle className="text-lg text-slate-800">Contratos de Conservação</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-700">
+                <thead className="bg-slate-100/50 uppercase text-[11px] font-bold text-gray-500 border-b border-gray-200">
+                  <tr>
+                    <th className="p-4">Número</th>
+                    <th className="p-4">Cliente</th>
+                    <th className="p-4">Data Início</th>
+                    <th className="p-4">Data Fim</th>
+                    <th className="p-4 text-right">Valor Mensal</th>
+                    <th className="p-4 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-150">
+                  {relatorioData.contratos.map((c: any) => (
+                    <tr key={c.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 font-semibold font-mono text-xs">#{c.numero}</td>
+                      <td className="p-4 font-medium text-gray-900">{c.cliente_nome}</td>
+                      <td className="p-4 text-xs">{formatDate(c.data_inicio)}</td>
+                      <td className="p-4 text-xs">{c.data_fim ? formatDate(c.data_fim) : "Indeterminado"}</td>
+                      <td className="p-4 text-right font-bold text-slate-900">{formatCurrency(c.valor || 0)}</td>
+                      <td className="p-4 text-center">
+                        <Badge
+                          variant={c.status === "ativo" ? "default" : c.status === "suspenso" ? "secondary" : "destructive"}
+                          className="text-xs uppercase"
+                        >
+                          {c.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const renderUsuarios = () => {
+    if (!relatorioData?.usuarios) return null
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 shadow-sm flex items-center gap-4">
+            <Users className="h-10 w-10 text-blue-600 bg-white p-2 rounded-lg shadow-sm" />
+            <div>
+              <div className="text-2xl font-bold text-blue-900">{relatorioData.total || 0}</div>
+              <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Total Usuários</div>
+            </div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm">
+            <div className="text-2xl font-bold text-green-900">{relatorioData.estatisticas?.ativos || 0}</div>
+            <div className="text-xs font-semibold text-green-700 uppercase tracking-wider mt-1">Ativos</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-200 rounded-xl border border-slate-300 shadow-sm">
+            <div className="text-2xl font-bold text-slate-900">{relatorioData.estatisticas?.inativos || 0}</div>
+            <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider mt-1">Inativos</div>
+          </div>
+        </div>
+
+        <Card className="border-0 shadow-lg bg-white overflow-hidden">
+          <CardHeader className="bg-slate-50 border-b border-slate-100 py-4">
+            <CardTitle className="text-lg text-slate-800">Usuários do Sistema</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-700">
+                <thead className="bg-slate-100/50 uppercase text-[11px] font-bold text-gray-500 border-b border-gray-200">
+                  <tr>
+                    <th className="p-4">Nome</th>
+                    <th className="p-4">E-mail</th>
+                    <th className="p-4">Nível / Tipo</th>
+                    <th className="p-4">Criado em</th>
+                    <th className="p-4 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-150">
+                  {relatorioData.usuarios.map((u: any) => (
+                    <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 font-semibold text-gray-900">{u.nome}</td>
+                      <td className="p-4 text-xs font-mono text-gray-500">{u.email}</td>
+                      <td className="p-4 text-xs uppercase">{u.tipo}</td>
+                      <td className="p-4 text-xs">{formatDate(u.created_at)}</td>
+                      <td className="p-4 text-center">
+                        <Badge variant={u.ativo ? "default" : "secondary"} className="text-xs">
+                          {u.ativo ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const renderLogs = () => {
+    if (!relatorioData?.logs) return null
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 shadow-sm">
+            <div className="text-2xl font-bold text-blue-900">{relatorioData.total || 0}</div>
+            <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider mt-1">Total Logs</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-sky-50 to-sky-100 rounded-xl border border-sky-200 shadow-sm">
+            <div className="text-2xl font-bold text-sky-900">{relatorioData.estatisticas?.info || 0}</div>
+            <div className="text-xs font-semibold text-sky-700 uppercase tracking-wider mt-1">Informações</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl border border-amber-200 shadow-sm">
+            <div className="text-2xl font-bold text-amber-900">{relatorioData.estatisticas?.warning || 0}</div>
+            <div className="text-xs font-semibold text-amber-700 uppercase tracking-wider mt-1">Avisos (Warn)</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl border border-red-200 shadow-sm">
+            <div className="text-2xl font-bold text-red-900">{relatorioData.estatisticas?.error || 0}</div>
+            <div className="text-xs font-semibold text-red-700 uppercase tracking-wider mt-1">Erros</div>
+          </div>
+        </div>
+
+        <Card className="border-0 shadow-lg bg-white overflow-hidden">
+          <CardHeader className="bg-slate-50 border-b border-slate-100 py-4">
+            <CardTitle className="text-lg text-slate-800">Logs do Sistema</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-700">
+                <thead className="bg-slate-100/50 uppercase text-[11px] font-bold text-gray-500 border-b border-gray-200">
+                  <tr>
+                    <th className="p-4">Data/Hora</th>
+                    <th className="p-4">Usuário</th>
+                    <th className="p-4">Ação</th>
+                    <th className="p-4">Módulo</th>
+                    <th className="p-4">Tipo</th>
+                    <th className="p-4 font-mono">IP</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-150">
+                  {relatorioData.logs.map((l: any) => (
+                    <tr key={l.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 text-xs font-mono">{formatDate(l.data_hora)}</td>
+                      <td className="p-4 font-medium text-gray-900">{l.usuario_nome || "Sistema"}</td>
+                      <td className="p-4 text-xs text-gray-700">{l.acao}</td>
+                      <td className="p-4 text-xs uppercase font-semibold text-gray-500">{l.modulo}</td>
+                      <td className="p-4 text-xs">
+                        <Badge
+                          variant={
+                            l.tipo?.toLowerCase() === "error"
+                              ? "destructive"
+                              : l.tipo?.toLowerCase() === "warning" || l.tipo?.toLowerCase() === "warn"
+                                ? "secondary"
+                                : "default"
+                          }
+                          className="text-[10px] px-1.5 py-0 uppercase"
+                        >
+                          {l.tipo}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-xs font-mono text-gray-500">{l.ip_address || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const renderFeriados = () => {
+    if (!relatorioData?.feriados) return null
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 shadow-sm text-center">
+            <div className="text-2xl font-bold text-blue-900">{relatorioData.estatisticas?.nacionais || 0}</div>
+            <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider mt-1">Nacionais</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl border border-emerald-200 shadow-sm text-center">
+            <div className="text-2xl font-bold text-emerald-900">{relatorioData.estatisticas?.estaduais || 0}</div>
+            <div className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mt-1">Estaduais</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl border border-indigo-200 shadow-sm text-center">
+            <div className="text-2xl font-bold text-indigo-900">{relatorioData.estatisticas?.municipais || 0}</div>
+            <div className="text-xs font-semibold text-indigo-700 uppercase tracking-wider mt-1">Municipais</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 shadow-sm text-center">
+            <div className="text-2xl font-bold text-purple-900">{relatorioData.estatisticas?.personalizados || 0}</div>
+            <div className="text-xs font-semibold text-purple-700 uppercase tracking-wider mt-1">Personalizados</div>
+          </div>
+        </div>
+
+        <Card className="border-0 shadow-lg bg-white overflow-hidden">
+          <CardHeader className="bg-slate-50 border-b border-slate-100 py-4">
+            <CardTitle className="text-lg text-slate-800">Feriados Cadastrados</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-700">
+                <thead className="bg-slate-100/50 uppercase text-[11px] font-bold text-gray-500 border-b border-gray-200">
+                  <tr>
+                    <th className="p-4">Data</th>
+                    <th className="p-4">Nome</th>
+                    <th className="p-4">Tipo</th>
+                    <th className="p-4 text-center">Recorrente</th>
+                    <th className="p-4 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-150">
+                  {relatorioData.feriados.map((f: any) => (
+                    <tr key={f.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 font-semibold text-gray-900">{formatDate(f.data)}</td>
+                      <td className="p-4 text-xs font-medium text-gray-800">{f.nome}</td>
+                      <td className="p-4 text-xs uppercase font-semibold text-blue-600">{f.tipo}</td>
+                      <td className="p-4 text-center text-xs">
+                        <Badge variant={f.recorrente ? "default" : "secondary"}>
+                          {f.recorrente ? "Sim" : "Não"}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-center text-xs">
+                        <Badge variant={f.ativo ? "outline" : "secondary"} className={f.ativo ? "border-green-300 text-green-700 bg-green-50" : ""}>
+                          {f.ativo ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const renderEquipamentos = () => {
+    if (!relatorioData?.equipamentos) return null
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 shadow-sm flex items-center gap-4">
+            <Wrench className="h-10 w-10 text-blue-600 bg-white p-2 rounded-lg shadow-sm" />
+            <div>
+              <div className="text-2xl font-bold text-blue-900">{relatorioData.total || 0}</div>
+              <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Total Equipamentos</div>
+            </div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm">
+            <div className="text-2xl font-bold text-green-900">{relatorioData.estatisticas?.ativos || 0}</div>
+            <div className="text-xs font-semibold text-green-700 uppercase tracking-wider mt-1">Ativos</div>
+          </div>
+          <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-200 rounded-xl border border-slate-300 shadow-sm">
+            <div className="text-2xl font-bold text-slate-900">{relatorioData.estatisticas?.inativos || 0}</div>
+            <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider mt-1">Inativos</div>
+          </div>
+        </div>
+
+        <Card className="border-0 shadow-lg bg-white overflow-hidden">
+          <CardHeader className="bg-slate-50 border-b border-slate-100 py-4">
+            <CardTitle className="text-lg text-slate-800">Equipamentos e Ferramentas</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-gray-700">
+                <thead className="bg-slate-100/50 uppercase text-[11px] font-bold text-gray-500 border-b border-gray-200">
+                  <tr>
+                    <th className="p-4">Nome</th>
+                    <th className="p-4">Categoria</th>
+                    <th className="p-4 text-right">Valor Hora</th>
+                    <th className="p-4">Descrição</th>
+                    <th className="p-4 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-150">
+                  {relatorioData.equipamentos.map((e: any) => (
+                    <tr key={e.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 font-semibold text-gray-900">{e.nome}</td>
+                      <td className="p-4 text-xs uppercase font-semibold text-gray-500">{e.categoria}</td>
+                      <td className="p-4 text-right font-bold text-green-600">{formatCurrency(e.valor_hora || 0)}</td>
+                      <td className="p-4 text-xs text-gray-600 max-w-[250px] truncate">{e.descricao || "-"}</td>
+                      <td className="p-4 text-center text-xs">
+                        <Badge variant={e.ativo ? "default" : "secondary"}>
+                          {e.ativo ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-12">
       <div className="container mx-auto p-4 md:p-6 space-y-6">
