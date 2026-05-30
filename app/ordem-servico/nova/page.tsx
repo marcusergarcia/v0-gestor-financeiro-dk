@@ -1018,6 +1018,7 @@ export default function NovaOrdemServicoPage() {
       <ClienteFormDialog
         open={showNovoClienteDialog}
         onOpenChange={setShowNovoClienteDialog}
+        asDrawer={true}
         onSuccess={handleNovoClienteCriado}
       />
     </div>
