@@ -508,28 +508,30 @@ export async function GET(request: NextRequest) {
         case "logs_sistema":
           let logQuery = `
             SELECT 
-              l.id, l.usuario_nome, l.acao, l.modulo, l.tipo, l.ip_address, l.data_hora
+              l.id, l.usuario_nome, l.acao, l.modulo, l.tipo, l.ip_address, l.data_hora,
+              u.tipo as usuario_tipo
             FROM logs_sistema l
+            LEFT JOIN usuarios u ON l.usuario_id = u.id
             WHERE DATE(l.data_hora) BETWEEN ? AND ?
           `
           const logParams: any[] = [startDateStr, endDateStr]
           if (status && status !== "todos") {
-            logQuery += ` AND l.tipo = ?`
+            logQuery += ` AND u.tipo = ?`
             logParams.push(status)
           }
           logQuery += ` ORDER BY l.data_hora DESC LIMIT 500`
           const [logData] = await pool.execute(logQuery, logParams)
           const totalLog = (logData as any[]).length
-          const infoLogs = (logData as any[]).filter(l => l.tipo?.toLowerCase() === "info").length
-          const warnLogs = (logData as any[]).filter(l => l.tipo?.toLowerCase() === "warning" || l.tipo?.toLowerCase() === "warn").length
-          const errorLogs = (logData as any[]).filter(l => l.tipo?.toLowerCase() === "error").length
+          const adminLogs = (logData as any[]).filter(l => l.usuario_tipo === "administrador").length
+          const userLogs = (logData as any[]).filter(l => l.usuario_tipo === "usuario").length
+          const tecLogs = (logData as any[]).filter(l => l.usuario_tipo === "tecnico").length
           data = {
             logs: logData,
             total: totalLog,
-            estatisticas: { info: infoLogs, warning: warnLogs, error: errorLogs },
+            estatisticas: { administrador: adminLogs, usuario: userLogs, tecnico: tecLogs },
             filtros: { status, dataInicio: startDateStr, dataFim: endDateStr }
           }
-          break
+          break;
 
         case "feriados":
           let ferQuery = `

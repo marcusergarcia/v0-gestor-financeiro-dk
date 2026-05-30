@@ -111,6 +111,7 @@ export default function RelatoriosPage() {
     loadLogoMenu()
     loadClientes()
     loadTipos()
+    loadCategoriasEquipamentos()
     
     // Inicializar datas com o preset padrão "este_mes"
     const { inicio, fim } = getDatasParaPeriodo("este_mes")
@@ -161,6 +162,30 @@ export default function RelatoriosPage() {
       }
     } catch (error) {
       console.error("Erro ao carregar tipos:", error)
+    }
+  }
+
+  const loadCategoriasEquipamentos = async () => {
+    try {
+      const response = await fetch("/api/relatorios?tipo=equipamentos")
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.data?.categorias) {
+          setCategoriasEquipamentos(result.data.categorias)
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao carregar categorias de equipamentos:", error)
+    }
+  }
+
+  const formatCategoriaEquipamento = (cat: string) => {
+    switch (cat) {
+      case "basicos": return "Básicos"
+      case "portoes_pedestre": return "Portões de Pedestre"
+      case "software_redes": return "Software & Redes"
+      case "portoes_veiculos": return "Portões de Veículos"
+      default: return cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, " ")
     }
   }
 
@@ -545,7 +570,7 @@ export default function RelatoriosPage() {
                 <SelectItem value="todos">Todas</SelectItem>
                 {categoriasEquipamentos.map((cat) => (
                   <SelectItem key={cat} value={cat}>
-                    {cat}
+                    {formatCategoriaEquipamento(cat)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -621,9 +646,9 @@ export default function RelatoriosPage() {
                 )}
                 {tipoRelatorio === "logs_sistema" && (
                   <>
-                    <SelectItem value="info">Informação (Info)</SelectItem>
-                    <SelectItem value="warning">Aviso (Warning)</SelectItem>
-                    <SelectItem value="error">Erro (Error)</SelectItem>
+                    <SelectItem value="administrador">Administrador</SelectItem>
+                    <SelectItem value="tecnico">Técnico</SelectItem>
+                    <SelectItem value="usuario">Usuário</SelectItem>
                   </>
                 )}
                 {tipoRelatorio === "feriados" && (
@@ -1373,17 +1398,17 @@ export default function RelatoriosPage() {
             <div className="text-2xl font-bold text-blue-900">{relatorioData.total || 0}</div>
             <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider mt-1">Total Logs</div>
           </div>
-          <div className="p-4 bg-gradient-to-br from-sky-50 to-sky-100 rounded-xl border border-sky-200 shadow-sm">
-            <div className="text-2xl font-bold text-sky-900">{relatorioData.estatisticas?.info || 0}</div>
-            <div className="text-xs font-semibold text-sky-700 uppercase tracking-wider mt-1">Informações</div>
+          <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 shadow-sm">
+            <div className="text-2xl font-bold text-green-900">{relatorioData.estatisticas?.administrador || 0}</div>
+            <div className="text-xs font-semibold text-green-700 uppercase tracking-wider mt-1">Administradores</div>
           </div>
           <div className="p-4 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl border border-amber-200 shadow-sm">
-            <div className="text-2xl font-bold text-amber-900">{relatorioData.estatisticas?.warning || 0}</div>
-            <div className="text-xs font-semibold text-amber-700 uppercase tracking-wider mt-1">Avisos (Warn)</div>
+            <div className="text-2xl font-bold text-amber-900">{relatorioData.estatisticas?.tecnico || 0}</div>
+            <div className="text-xs font-semibold text-amber-700 uppercase tracking-wider mt-1">Técnicos</div>
           </div>
-          <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl border border-red-200 shadow-sm">
-            <div className="text-2xl font-bold text-red-900">{relatorioData.estatisticas?.error || 0}</div>
-            <div className="text-xs font-semibold text-red-700 uppercase tracking-wider mt-1">Erros</div>
+          <div className="p-4 bg-gradient-to-br from-sky-50 to-sky-100 rounded-xl border border-sky-200 shadow-sm">
+            <div className="text-2xl font-bold text-sky-900">{relatorioData.estatisticas?.usuario || 0}</div>
+            <div className="text-xs font-semibold text-sky-700 uppercase tracking-wider mt-1">Usuários</div>
           </div>
         </div>
 
@@ -1408,7 +1433,14 @@ export default function RelatoriosPage() {
                   {relatorioData.logs.map((l: any) => (
                     <tr key={l.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-4 text-xs font-mono">{formatDate(l.data_hora)}</td>
-                      <td className="p-4 font-medium text-gray-900">{l.usuario_nome || "Sistema"}</td>
+                      <td className="p-4 font-medium text-gray-900">
+                        {l.usuario_nome || "Sistema"}
+                        {l.usuario_tipo && (
+                          <Badge variant="outline" className="ml-2 text-[9px] uppercase">
+                            {l.usuario_tipo}
+                          </Badge>
+                        )}
+                      </td>
                       <td className="p-4 text-xs text-gray-700">{l.acao}</td>
                       <td className="p-4 text-xs uppercase font-semibold text-gray-500">{l.modulo}</td>
                       <td className="p-4 text-xs">
@@ -1545,9 +1577,9 @@ export default function RelatoriosPage() {
                   {relatorioData.equipamentos.map((e: any) => (
                     <tr key={e.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="p-4 font-semibold text-gray-900">{e.nome}</td>
-                      <td className="p-4 text-xs uppercase font-semibold text-gray-500">{e.categoria}</td>
+                      <td className="p-4 text-xs uppercase font-semibold text-gray-550">{formatCategoriaEquipamento(e.categoria)}</td>
                       <td className="p-4 text-right font-bold text-green-600">{formatCurrency(e.valor_hora || 0)}</td>
-                      <td className="p-4 text-xs text-gray-600 max-w-[250px] truncate">{e.descricao || "-"}</td>
+                      <td className="p-4 text-xs text-gray-650 max-w-[250px] truncate">{e.descricao || "-"}</td>
                       <td className="p-4 text-center text-xs">
                         <Badge variant={e.ativo ? "default" : "secondary"}>
                           {e.ativo ? "Ativo" : "Inativo"}
@@ -2038,7 +2070,10 @@ export default function RelatoriosPage() {
                   {tipoRelatorio === "logs_sistema" && relatorioData.logs?.map((l: any) => (
                     <tr key={l.id}>
                       <td className="p-2 border-r border-gray-300 font-mono">{formatDate(l.data_hora)}</td>
-                      <td className="p-2 border-r border-gray-300">{l.usuario_nome || "Sistema"}</td>
+                      <td className="p-2 border-r border-gray-300">
+                        {l.usuario_nome || "Sistema"}
+                        {l.usuario_tipo && ` (${l.usuario_tipo.toUpperCase()})`}
+                      </td>
                       <td className="p-2 border-r border-gray-300">{l.acao}</td>
                       <td className="p-2 border-r border-gray-300 uppercase">{l.modulo}</td>
                       <td className="p-2 border-r border-gray-300 uppercase">{l.tipo}</td>
@@ -2057,7 +2092,7 @@ export default function RelatoriosPage() {
                   {tipoRelatorio === "equipamentos" && relatorioData.equipamentos?.map((e: any) => (
                     <tr key={e.id}>
                       <td className="p-2 border-r border-gray-300">{e.nome}</td>
-                      <td className="p-2 border-r border-gray-300 uppercase">{e.categoria}</td>
+                      <td className="p-2 border-r border-gray-300 uppercase">{formatCategoriaEquipamento(e.categoria)}</td>
                       <td className="p-2 border-r border-gray-300 text-right">{formatCurrency(e.valor_hora)}</td>
                       <td className="p-2 border-r border-gray-300 text-[10px]">{e.descricao || "-"}</td>
                       <td className="p-2 text-center">{e.ativo ? "ATIVO" : "INATIVO"}</td>
@@ -2234,16 +2269,16 @@ export default function RelatoriosPage() {
               {tipoRelatorio === "logs_sistema" && (
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div className="border border-gray-300 p-2 rounded">
-                    <div className="text-[10px] uppercase text-gray-500 font-bold">Informações (Info)</div>
-                    <div className="text-lg font-bold text-blue-700">{relatorioData.estatisticas?.info || 0}</div>
+                    <div className="text-[10px] uppercase text-gray-500 font-bold">Administradores</div>
+                    <div className="text-lg font-bold text-green-700">{relatorioData.estatisticas?.administrador || 0}</div>
                   </div>
                   <div className="border border-gray-300 p-2 rounded bg-gray-50">
-                    <div className="text-[10px] uppercase text-gray-500 font-bold">Alertas (Warning)</div>
-                    <div className="text-lg font-bold text-amber-700">{relatorioData.estatisticas?.warning || 0}</div>
+                    <div className="text-[10px] uppercase text-gray-500 font-bold">Técnicos</div>
+                    <div className="text-lg font-bold text-amber-700">{relatorioData.estatisticas?.tecnico || 0}</div>
                   </div>
                   <div className="border border-gray-300 p-2 rounded">
-                    <div className="text-[10px] uppercase text-gray-500 font-bold">Erros Críticos</div>
-                    <div className="text-lg font-bold text-red-600">{relatorioData.estatisticas?.error || 0}</div>
+                    <div className="text-[10px] uppercase text-gray-500 font-bold">Usuários</div>
+                    <div className="text-lg font-bold text-blue-700">{relatorioData.estatisticas?.usuario || 0}</div>
                   </div>
                 </div>
               )}
