@@ -33,7 +33,7 @@ import type { OrdemServico } from "@/types/ordem-servico"
 import { LotePreventivasDialog } from "@/components/ordem-servico/lote-preventivas-dialog"
 import { NovaOSDialog } from "@/components/ordem-servico/nova-os-dialog"
 
-export default function OrdemServicoPage() {
+export default function OrdemServicoPage({ searchParams }: { searchParams: Promise<{ nova?: string }> }) {
   const [loading, setLoading] = useState(true)
   const [ordensServico, setOrdensServico] = useState<OrdemServico[]>([])
   const [logoMenu, setLogoMenu] = useState<string | null>(null)
@@ -42,6 +42,17 @@ export default function OrdemServicoPage() {
   const [expandedOrdemId, setExpandedOrdemId] = useState<number | null>(null)
   const [pageIndex, setPageIndex] = useState(0)
   const [isNovaOSOpen, setIsNovaOSOpen] = useState(false)
+  const { toast } = useToast()
+  const router = useRouter()
+
+  useEffect(() => {
+    searchParams.then((params) => {
+      if (params.nova === "true") {
+        setIsNovaOSOpen(true)
+        router.replace("/ordem-servico")
+      }
+    })
+  }, [searchParams, router])
 
   const [situacaoFilter, setSituacaoFilter] = useState("todas")
   const [tipoServicoFilter, setTipoServicoFilter] = useState("todos")
@@ -56,8 +67,6 @@ export default function OrdemServicoPage() {
     preventivas: 0,
     manutencoes: 0,
   })
-
-  const router = useRouter()
 
   const filterByPeriod = (ordens: OrdemServico[]) => {
     if (periodoFilter === "todos") return ordens
