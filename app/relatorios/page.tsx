@@ -918,7 +918,6 @@ export default function RelatoriosPage() {
               height: auto !important;
               overflow: visible !important;
               font-family: 'Inter', sans-serif !important;
-              counter-reset: page;
             }
 
             /* Ocultar elementos de navegação, cabeçalhos do app, botões, sidebar e blobs de fundo */
@@ -1012,10 +1011,6 @@ export default function RelatoriosPage() {
               width: 100% !important;
               background: white !important;
               display: block !important;
-              counter-increment: page;
-            }
-            .print-page-number::after {
-              content: "Página " counter(page);
             }
           }
         `}</style>
@@ -1364,7 +1359,7 @@ export default function RelatoriosPage() {
             <div className="print-footer hidden print:block text-slate-500 fixed bottom-0 w-full left-0 px-8">
               <div className="border-t border-gray-300 pt-2 flex justify-between items-center text-[9px] font-sans">
                 <div>Gestor Financeiro - {getNomeRelatorio()}</div>
-                <div className="print-page-number"></div>
+                <div>Extraído em {new Date().toLocaleDateString("pt-BR")}</div>
               </div>
             </div>
           </div>
