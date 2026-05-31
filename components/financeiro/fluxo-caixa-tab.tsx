@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { useToast } from "@/hooks/use-toast"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import {
@@ -34,7 +36,8 @@ import {
   FileSpreadsheet,
   Check,
   AlertCircle,
-  FileText
+  FileText,
+  ChevronsUpDown
 } from "lucide-react"
 import {
   ResponsiveContainer,
@@ -141,6 +144,33 @@ export function FluxoCaixaTab() {
   const [importing, setImporting] = useState(false)
   const [selectedConta, setSelectedConta] = useState<string>("all")
   const [selectedPeriod, setSelectedPeriod] = useState<string>("all")
+  const [categoriesList, setCategoriesList] = useState<{ nome: string; tipo: "entrada" | "saida" }[]>([
+    { nome: "Faturamento", tipo: "entrada" },
+    { nome: "Outras Receitas", tipo: "entrada" },
+    { nome: "Investimentos", tipo: "entrada" },
+    { nome: "Alimentação", tipo: "saida" },
+    { nome: "Tecnologia & SaaS", tipo: "saida" },
+    { nome: "Transporte & Viagem", tipo: "saida" },
+    { nome: "Combustível", tipo: "saida" },
+    { nome: "Impostos & Tributos", tipo: "saida" },
+    { nome: "Aluguel & Condomínio", tipo: "saida" },
+    { nome: "Energia Elétrica", tipo: "saida" },
+    { nome: "Água, Esgoto & Gás", tipo: "saida" },
+    { nome: "Internet & Telefone", tipo: "saida" },
+    { nome: "Marketing & Anúncios", tipo: "saida" },
+    { nome: "Pessoal & Pro-labore", tipo: "saida" },
+    { nome: "Tarifas Bancárias", tipo: "saida" },
+    { nome: "Material de Escritório", tipo: "saida" },
+    { nome: "Fornecedores", tipo: "saida" },
+    { nome: "Outras Despesas", tipo: "saida" },
+    { nome: "Outros", tipo: "saida" }
+  ])
+  const [categorySearchVal, setCategorySearchVal] = useState("")
+  const [newTxCatOpen, setNewTxCatOpen] = useState(false)
+  const [openRowCatId, setOpenRowCatId] = useState<number | null>(null)
+  const [showManageCategoriesModal, setShowManageCategoriesModal] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState("")
+  const [newCategoryType, setNewCategoryType] = useState<"entrada" | "saida">("saida")
   
   // New Account fields
   const [newAccNome, setNewAccNome] = useState("")
@@ -199,6 +229,13 @@ export function FluxoCaixaTab() {
       
       if (accountsData.success) {
         setAccounts(accountsData.data || [])
+      }
+
+      // Fetch categories list
+      const catsRes = await fetch("/api/financeiro/categorias")
+      const catsData = await catsRes.json()
+      if (catsData.success) {
+        setCategoriesList(catsData.data || [])
       }
 
       // Performance Optimization: Only load transaction list if both account and period are selected
@@ -316,6 +353,45 @@ export function FluxoCaixaTab() {
       }
     } catch (err) {
       toast({ title: "Erro", description: "Erro de rede ao excluir transação", variant: "destructive" })
+    }
+  }
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return
+    try {
+      const res = await fetch("/api/financeiro/categorias", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: newCategoryName, tipo: newCategoryType })
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast({ title: "Sucesso", description: `Categoria "${newCategoryName}" criada!` })
+        setNewCategoryName("")
+        await loadData()
+      } else {
+        toast({ title: "Erro", description: data.error, variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Erro", description: "Erro de conexão ao criar categoria", variant: "destructive" })
+    }
+  }
+
+  const handleRemoveCategory = async (nome: string) => {
+    if (!confirm(`Tem certeza que deseja remover a categoria "${nome}"?`)) return
+    try {
+      const res = await fetch(`/api/financeiro/categorias?nome=${encodeURIComponent(nome)}`, {
+        method: "DELETE"
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast({ title: "Sucesso", description: `Categoria "${nome}" removida!` })
+        await loadData()
+      } else {
+        toast({ title: "Não é possível remover", description: data.error, variant: "destructive" })
+      }
+    } catch {
+      toast({ title: "Erro", description: "Erro de conexão ao remover categoria", variant: "destructive" })
     }
   }
 
@@ -707,6 +783,13 @@ export function FluxoCaixaTab() {
           >
             📊 Centro de Conciliação
           </Button>
+          <Button
+            onClick={() => setShowManageCategoriesModal(true)}
+            variant="outline"
+            className="h-9 border-border hover:bg-muted/50 text-foreground gap-2 text-xs font-semibold"
+          >
+            🏷️ Categorias
+          </Button>
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -1081,32 +1164,80 @@ export function FluxoCaixaTab() {
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <Label htmlFor="tx-cat" className="text-xs">Categoria</Label>
-                  <Select value={newTxCat} onValueChange={setNewTxCat}>
-                    <SelectTrigger id="tx-cat" className="h-9 mt-1">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Faturamento">Faturamento</SelectItem>
-                      <SelectItem value="Investimentos">Investimentos</SelectItem>
-                      <SelectItem value="Alimentação">Alimentação</SelectItem>
-                      <SelectItem value="Tecnologia & SaaS">Tecnologia & SaaS</SelectItem>
-                      <SelectItem value="Transporte & Viagem">Transporte & Viagem</SelectItem>
-                      <SelectItem value="Combustível">Combustível</SelectItem>
-                      <SelectItem value="Impostos & Tributos">Impostos & Tributos</SelectItem>
-                      <SelectItem value="Aluguel & Condomínio">Aluguel & Condomínio</SelectItem>
-                      <SelectItem value="Energia Elétrica">Energia Elétrica</SelectItem>
-                      <SelectItem value="Água, Esgoto & Gás">Água, Esgoto & Gás</SelectItem>
-                      <SelectItem value="Internet & Telefone">Internet & Telefone</SelectItem>
-                      <SelectItem value="Marketing & Anúncios">Marketing & Anúncios</SelectItem>
-                      <SelectItem value="Pessoal & Pro-labore">Pessoal & Pro-labore</SelectItem>
-                      <SelectItem value="Tarifas Bancárias">Tarifas Bancárias</SelectItem>
-                      <SelectItem value="Material de Escritório">Material de Escritório</SelectItem>
-                      <SelectItem value="Fornecedores">Fornecedores</SelectItem>
-                      <SelectItem value="Outras Receitas">Outras Receitas</SelectItem>
-                      <SelectItem value="Outras Despesas">Outras Despesas</SelectItem>
-                      <SelectItem value="Outros">Outros</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Popover open={newTxCatOpen} onOpenChange={setNewTxCatOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="tx-cat"
+                        variant="outline"
+                        role="combobox"
+                        className="w-full h-9 mt-1 justify-between text-xs font-normal border-border bg-card hover:bg-muted/50 text-foreground"
+                      >
+                        {newTxCat || "Selecione a categoria"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0 bg-card border-border">
+                      <Command className="bg-card">
+                        <CommandInput placeholder="Buscar categoria..." className="h-9 text-xs" value={categorySearchVal} onValueChange={setCategorySearchVal} />
+                        <CommandList>
+                          <CommandEmpty className="p-2 text-[11px] text-muted-foreground flex flex-col gap-1.5 items-center">
+                            <span>Nenhuma encontrada.</span>
+                            {categorySearchVal.trim() && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                className="h-6 text-[10px] w-full"
+                                onClick={async () => {
+                                  const val = categorySearchVal.trim();
+                                  if (val) {
+                                    try {
+                                      const res = await fetch("/api/financeiro/categorias", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ nome: val, tipo: newTxTipo })
+                                      })
+                                      const data = await res.json()
+                                      if (data.success) {
+                                        setCategoriesList(prev => Array.from(new Set([...prev, { nome: val, tipo: newTxTipo }])));
+                                        setNewTxCat(val);
+                                        setCategorySearchVal("");
+                                        setNewTxCatOpen(false);
+                                      } else {
+                                        toast({ title: "Erro", description: data.error, variant: "destructive" })
+                                      }
+                                    } catch {
+                                      toast({ title: "Erro", description: "Erro ao criar categoria", variant: "destructive" })
+                                    }
+                                  }
+                                }}
+                              >
+                                Criar "{categorySearchVal}"
+                              </Button>
+                            )}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {categoriesList.map((cat) => (
+                              <CommandItem
+                                key={cat.nome}
+                                value={cat.nome}
+                                onSelect={() => {
+                                  setNewTxCat(cat.nome);
+                                  setNewTxCatOpen(false);
+                                }}
+                                className="text-xs cursor-pointer hover:bg-muted/50"
+                              >
+                                <Check
+                                  className={`mr-2 h-3 w-3 ${newTxCat === cat.nome ? "opacity-100" : "opacity-0"}`}
+                                />
+                                {cat.nome} <span className="text-[9px] text-muted-foreground ml-1">({cat.tipo === "entrada" ? "Crédito" : "Débito"})</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <Label htmlFor="tx-val" className="text-xs">Valor da Transação (R$) *</Label>
@@ -1188,52 +1319,94 @@ export function FluxoCaixaTab() {
                           <div>
                             <div className="flex items-center gap-2">
                               <h4 className="text-sm font-semibold text-foreground">{tx.descricao}</h4>
-                              <Select
-                                value={tx.categoria || "Outros"}
-                                onValueChange={async (newCat) => {
-                                  try {
-                                    const response = await fetch(`/api/financeiro/transacoes/${tx.id}`, {
-                                      method: "PATCH",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ categoria: newCat }),
-                                    })
-                                    const result = await response.json()
-                                    if (result.success) {
-                                      toast({ title: "Sucesso", description: "Categoria atualizada!" })
-                                      await loadData()
-                                    } else {
-                                      toast({ title: "Erro", description: "Erro ao atualizar", variant: "destructive" })
-                                    }
-                                  } catch (err) {
-                                    toast({ title: "Erro", description: "Erro de conexão", variant: "destructive" })
-                                  }
-                                }}
-                              >
-                                <SelectTrigger className={`h-6 px-2.5 py-0.5 text-[10px] font-semibold border rounded-full w-auto flex gap-1.5 items-center justify-between cursor-pointer transition-all hover:opacity-85 focus:ring-0 shadow-sm ${getCategoryBadgeStyles(tx.categoria)}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="text-xs">
-                                  <SelectItem value="Faturamento">Faturamento</SelectItem>
-                                  <SelectItem value="Investimentos">Investimentos</SelectItem>
-                                  <SelectItem value="Alimentação">Alimentação</SelectItem>
-                                  <SelectItem value="Tecnologia & SaaS">Tecnologia & SaaS</SelectItem>
-                                  <SelectItem value="Transporte & Viagem">Transporte & Viagem</SelectItem>
-                                  <SelectItem value="Combustível">Combustível</SelectItem>
-                                  <SelectItem value="Impostos & Tributos">Impostos & Tributos</SelectItem>
-                                  <SelectItem value="Aluguel & Condomínio">Aluguel & Condomínio</SelectItem>
-                                  <SelectItem value="Energia Elétrica">Energia Elétrica</SelectItem>
-                                  <SelectItem value="Água, Esgoto & Gás">Água, Esgoto & Gás</SelectItem>
-                                  <SelectItem value="Internet & Telefone">Internet & Telefone</SelectItem>
-                                  <SelectItem value="Marketing & Anúncios">Marketing & Anúncios</SelectItem>
-                                  <SelectItem value="Pessoal & Pro-labore">Pessoal & Pro-labore</SelectItem>
-                                  <SelectItem value="Tarifas Bancárias">Tarifas Bancárias</SelectItem>
-                                  <SelectItem value="Material de Escritório">Material de Escritório</SelectItem>
-                                  <SelectItem value="Fornecedores">Fornecedores</SelectItem>
-                                  <SelectItem value="Outras Receitas">Outras Receitas</SelectItem>
-                                  <SelectItem value="Outras Despesas">Outras Despesas</SelectItem>
-                                  <SelectItem value="Outros">Outros</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              <Popover open={openRowCatId === tx.id} onOpenChange={(open) => { setOpenRowCatId(open ? tx.id : null); if (!open) setCategorySearchVal(""); }}>
+                                <PopoverTrigger asChild>
+                                  <button className={`h-6 px-2.5 py-0.5 text-[10px] font-semibold border rounded-full w-auto flex gap-1.5 items-center justify-between cursor-pointer transition-all hover:opacity-85 focus:ring-0 shadow-sm ${getCategoryBadgeStyles(tx.categoria)}`}>
+                                    <span>{tx.categoria || "Outros"}</span>
+                                    <ChevronsUpDown className="h-3 w-3 opacity-50" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0 bg-card border-border">
+                                  <Command className="bg-card">
+                                    <CommandInput placeholder="Buscar categoria..." className="h-9 text-xs" value={categorySearchVal} onValueChange={setCategorySearchVal} />
+                                    <CommandList>
+                                      <CommandEmpty className="p-2 text-[11px] text-muted-foreground flex flex-col gap-1.5 items-center">
+                                        <span>Nenhuma encontrada.</span>
+                                        {categorySearchVal.trim() && (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="secondary"
+                                            className="h-6 text-[10px] w-full"
+                                            onClick={async () => {
+                                              const val = categorySearchVal.trim();
+                                              if (val) {
+                                                try {
+                                                  await fetch("/api/financeiro/categorias", {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ nome: val, tipo: tx.tipo })
+                                                  })
+                                                  setCategoriesList(prev => Array.from(new Set([...prev, { nome: val, tipo: tx.tipo }])));
+                                                  const response = await fetch(`/api/financeiro/transacoes/${tx.id}`, {
+                                                    method: "PATCH",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ categoria: val }),
+                                                  })
+                                                  const result = await response.json()
+                                                  if (result.success) {
+                                                    toast({ title: "Sucesso", description: "Categoria atualizada!" })
+                                                    setCategorySearchVal("");
+                                                    setOpenRowCatId(null);
+                                                    await loadData()
+                                                  }
+                                                } catch (err) {
+                                                  console.error(err)
+                                                }
+                                              }
+                                            }}
+                                          >
+                                            Criar "{categorySearchVal}"
+                                          </Button>
+                                        )}
+                                      </CommandEmpty>
+                                      <CommandGroup>
+                                        {categoriesList.map((cat) => (
+                                          <CommandItem
+                                            key={cat.nome}
+                                            value={cat.nome}
+                                            onSelect={async () => {
+                                              try {
+                                                const response = await fetch(`/api/financeiro/transacoes/${tx.id}`, {
+                                                  method: "PATCH",
+                                                  headers: { "Content-Type": "application/json" },
+                                                  body: JSON.stringify({ categoria: cat.nome }),
+                                                })
+                                                const result = await response.json()
+                                                if (result.success) {
+                                                  toast({ title: "Sucesso", description: "Categoria atualizada!" })
+                                                  setOpenRowCatId(null);
+                                                  await loadData()
+                                                } else {
+                                                  toast({ title: "Erro", description: "Erro ao atualizar", variant: "destructive" })
+                                                }
+                                              } catch (err) {
+                                                toast({ title: "Erro", description: "Erro de conexão", variant: "destructive" })
+                                              }
+                                            }}
+                                            className="text-xs cursor-pointer hover:bg-muted/50"
+                                          >
+                                            <Check
+                                              className={`mr-2 h-3 w-3 ${tx.categoria === cat.nome ? "opacity-100" : "opacity-0"}`}
+                                            />
+                                            {cat.nome} <span className="text-[9px] text-muted-foreground ml-1">({cat.tipo === "entrada" ? "Crédito" : "Débito"})</span>
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
                             </div>
                             <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
                               <span>{formatDate(tx.data)}</span>
@@ -1270,6 +1443,29 @@ export function FluxoCaixaTab() {
                         <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                           📊 Distribuição por Categoria
                         </h5>
+                        
+                        {/* Resumo Financeiro */}
+                        <div className="grid grid-cols-3 gap-2 p-2.5 rounded-lg bg-card/60 border border-border/50 text-[10px]">
+                          <div className="space-y-0.5">
+                            <span className="text-muted-foreground block font-medium">Saldo Anterior</span>
+                            <span className="font-semibold text-foreground block truncate">
+                              {formatCurrency(currentPeriodData.saldoAnterior)}
+                            </span>
+                          </div>
+                          <div className="space-y-0.5 border-x border-border/40 px-2">
+                            <span className="text-muted-foreground block font-medium">Total Despesas</span>
+                            <span className="font-semibold text-red-600 dark:text-red-400 block truncate">
+                              {formatCurrency(currentPeriodData.saidas)}
+                            </span>
+                          </div>
+                          <div className="space-y-0.5 pl-1">
+                            <span className="text-muted-foreground block font-medium">Saldo Final</span>
+                            <span className={`font-semibold block truncate ${currentPeriodData.saldoFinal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                              {formatCurrency(currentPeriodData.saldoFinal)}
+                            </span>
+                          </div>
+                        </div>
+
                         <div className="h-44 w-full relative">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -1556,6 +1752,80 @@ export function FluxoCaixaTab() {
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setShowConciliationModal(false)} className="bg-indigo-600 hover:bg-indigo-700 text-white border-0">
               Fechar Painel
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog: Gerenciar Categorias */}
+      <AlertDialog open={showManageCategoriesModal} onOpenChange={setShowManageCategoriesModal}>
+        <AlertDialogContent className="border-border bg-card text-foreground shadow-2xl max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground flex items-center gap-2">
+              🏷️ Gerenciar Categorias Financeiras
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4 mt-2">
+              <span className="block text-xs text-muted-foreground">
+                Cadastre novas categorias ou remova as existentes. Categorias em uso em transações não podem ser excluídas.
+              </span>
+              
+              {/* Adicionar Categoria */}
+              <span className="flex gap-2 items-center">
+                <Input
+                  placeholder="Nome da nova categoria"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="h-9 text-xs flex-1"
+                />
+                <Select value={newCategoryType} onValueChange={(val: any) => setNewCategoryType(val)}>
+                  <SelectTrigger className="w-28 h-9 text-xs border-border bg-card text-foreground">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="entrada">Crédito</SelectItem>
+                    <SelectItem value="saida">Débito</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  onClick={handleAddCategory}
+                  className="h-9 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  Adicionar
+                </Button>
+              </span>
+
+              {/* Lista de Categorias */}
+              <span className="block max-h-[250px] overflow-y-auto border border-border rounded-lg divide-y divide-border">
+                {categoriesList.map((cat) => (
+                  <span key={cat.nome} className="flex items-center justify-between p-2.5 bg-card">
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-foreground">{cat.nome}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${cat.tipo === "entrada" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400"}`}>
+                        {cat.tipo === "entrada" ? "Crédito" : "Débito"}
+                      </span>
+                    </span>
+                    <Button
+                      onClick={() => handleRemoveCategory(cat.nome)}
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-muted focus:ring-0"
+                      title="Excluir Categoria"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </span>
+                ))}
+                {categoriesList.length === 0 && (
+                  <span className="block text-center text-xs text-muted-foreground py-6">
+                    Nenhuma categoria cadastrada.
+                  </span>
+                )}
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowManageCategoriesModal(false)} className="bg-indigo-600 hover:bg-indigo-700 text-white border-0">
+              Fechar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
