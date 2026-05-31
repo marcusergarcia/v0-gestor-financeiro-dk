@@ -24,6 +24,15 @@ export function LayoutContent({ children }: LayoutContentProps) {
   }, [])
 
   useEffect(() => {
+    // Reset scroll position of the main layout container and window on route change
+    const mainElement = document.querySelector("main")
+    if (mainElement) {
+      mainElement.scrollTo({ top: 0 })
+    }
+    window.scrollTo({ top: 0 })
+  }, [pathname])
+
+  useEffect(() => {
     // Não executar até estar montado
     if (!mounted || loading) return
 
