@@ -500,7 +500,7 @@ export default function UsuariosPage() {
                         <AvatarFallback className="bg-muted text-foreground">{usuario.nome.split(" ").map((n) => n[0]).join("").toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <span className="font-semibold text-sm text-foreground truncate block">
+                        <span className="font-semibold text-sm text-foreground break-words whitespace-normal leading-tight mt-1 block">
                           {usuario.nome}
                         </span>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">

@@ -561,7 +561,7 @@ export default function ClientesPage() {
                     {/* Info principal */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-gray-900 truncate">
+                        <span className="font-semibold text-sm text-gray-900 break-words whitespace-normal leading-tight">
                           {cliente.nome}
                         </span>
                       </div>

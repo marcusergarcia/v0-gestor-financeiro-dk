@@ -1021,7 +1021,7 @@ export default function OrcamentosPage({
                         </div>
                         <div className="flex-1 min-w-0">
                           <span className="font-semibold text-sm text-foreground truncate block">Orç. {orcamento.numero}</span>
-                          <span className="text-[11px] text-muted-foreground truncate block mt-0.5">{orcamento.cliente_nome}</span>
+                          <span className="text-[11px] text-muted-foreground break-words whitespace-normal leading-tight mt-1 block">{orcamento.cliente_nome}</span>
                         </div>
                         <div className="text-right flex-shrink-0 mr-1">
                           {getStatusBadge(orcamento.situacao)}

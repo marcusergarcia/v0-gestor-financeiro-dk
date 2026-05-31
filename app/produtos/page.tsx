@@ -358,7 +358,7 @@ export default function ProdutosPage({
               <Badge variant="outline" className="text-muted-foreground border-border text-[10px]">Sem NCM</Badge>
             )
           case "descricao":
-            return <span className="font-medium text-sm truncate text-foreground" title={produto.descricao}>{produto.descricao}</span>
+            return <span className="font-medium text-sm text-foreground break-words whitespace-normal leading-tight" title={produto.descricao}>{produto.descricao}</span>
           case "categoria_nome":
             return produto.categoria_nome && produto.categoria_nome !== "0" ? (
               <Badge className="bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs border-0 truncate max-w-[110px]" title={produto.categoria_nome}>
@@ -495,7 +495,7 @@ export default function ProdutosPage({
           case "codigo":
             return <Badge variant="outline" className="font-mono text-xs text-foreground bg-muted/40 border-border">{servico.codigo}</Badge>
           case "descricao":
-            return <span className="font-medium text-sm truncate text-foreground" title={servico.descricao}>{servico.descricao}</span>
+            return <span className="font-medium text-sm text-foreground break-words whitespace-normal leading-tight" title={servico.descricao}>{servico.descricao}</span>
           case "categoria_nome":
             return (
               <Badge className="bg-orange-500/10 text-orange-600 dark:text-orange-400 text-xs border-0">
@@ -600,7 +600,7 @@ export default function ProdutosPage({
           case "codigo":
             return <Badge variant="outline" className="font-mono text-foreground bg-muted/40 border-border">{categoria.codigo}</Badge>
           case "nome":
-            return <span className="font-medium truncate text-foreground" title={categoria.nome}>{categoria.nome}</span>
+            return <span className="font-medium text-foreground break-words whitespace-normal leading-tight" title={categoria.nome}>{categoria.nome}</span>
           case "ativo":
             return (
               <Badge
@@ -688,7 +688,7 @@ export default function ProdutosPage({
       renderCell={(marca, col) => {
         switch (col) {
           case "nome":
-            return <span className="font-medium truncate text-foreground" title={marca.nome}>{marca.nome}</span>
+            return <span className="font-medium text-foreground break-words whitespace-normal leading-tight" title={marca.nome}>{marca.nome}</span>
           case "sigla":
             return marca.sigla ? (
               <Badge variant="outline" className="font-mono text-foreground bg-muted/40 border-border">{marca.sigla}</Badge>

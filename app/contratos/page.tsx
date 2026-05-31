@@ -970,7 +970,7 @@ export default function ContratosPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm text-gray-900 truncate">
+                            <span className="font-semibold text-sm text-gray-900 break-words whitespace-normal leading-tight">
                               {proposta.cliente_nome}
                             </span>
                           </div>
@@ -1311,7 +1311,7 @@ export default function ContratosPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm text-gray-900 truncate">
+                            <span className="font-semibold text-sm text-gray-900 break-words whitespace-normal leading-tight">
                               {contrato.cliente_nome}
                             </span>
                           </div>

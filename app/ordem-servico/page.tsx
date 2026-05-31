@@ -785,11 +785,11 @@ export default function OrdemServicoPage({ searchParams }: { searchParams: Promi
                         <FileText className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="font-semibold text-sm text-foreground truncate block">OS {os.numero}</span>
-                        <span className="text-[11px] text-muted-foreground truncate block font-medium mt-0.5">{os.cliente_nome}</span>
-                      </div>
-                      <div className="text-right flex-shrink-0 mr-1">
-                        {getStatusBadge(os.situacao)}
+                        <div className="flex items-center justify-between gap-2 mr-1">
+                          <span className="font-semibold text-sm text-foreground truncate">OS {os.numero}</span>
+                          <div>{getStatusBadge(os.situacao)}</div>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground font-medium mt-1 block break-words whitespace-normal leading-tight">{os.cliente_nome}</span>
                       </div>
                       <ChevronRight className={`h-4 w-4 text-muted-foreground/60 transition-transform duration-200 flex-shrink-0 ${
                         isExpanded ? "rotate-90" : ""

@@ -647,7 +647,7 @@ export default function LogsPage() {
                         <User className="h-5 w-5 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="font-semibold text-sm text-foreground truncate block">
+                        <span className="font-semibold text-sm text-foreground break-words whitespace-normal leading-tight mt-1 block">
                           {log.usuario_nome || "Sistema"}
                         </span>
                         <div className="flex items-center gap-2 mt-0.5 flex-wrap">

@@ -1077,7 +1077,7 @@ export default function FinanceiroPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm text-foreground truncate">
+                            <span className="font-semibold text-sm text-foreground break-words whitespace-normal leading-tight">
                               {boleto.cliente_nome}
                             </span>
                           </div>
@@ -1438,7 +1438,7 @@ export default function FinanceiroPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm text-foreground truncate">
+                            <span className="font-semibold text-sm text-foreground break-words whitespace-normal leading-tight">
                               {recibo.cliente_nome}
                             </span>
                           </div>
