@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Printer, X } from "lucide-react"
 
@@ -623,64 +623,25 @@ export function DocumentoPrint({ documento, isOpen, onClose }: DocumentoPrintPro
   const sindico = clienteCompleto?.sindico || documento.cliente_sindico || ""
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent
-        className="overflow-hidden flex flex-col p-0"
-        style={{
-          width: `${size.width}px`,
-          height: `${size.height}px`,
-          maxWidth: "none",
-        }}
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent
+        className="w-full sm:max-w-[80vw] h-full flex flex-col p-0 gap-0 overflow-hidden border-l border-border shadow-2xl bg-card text-foreground animate-in slide-in-from-right duration-300"
       >
-        {/* Resize Handles */}
-        <div
-          className="absolute top-0 left-0 right-0 h-1 cursor-n-resize hover:bg-blue-500 z-50"
-          onMouseDown={(e) => handleMouseDown(e, "n")}
-        />
-        <div
-          className="absolute bottom-0 left-0 right-0 h-1 cursor-s-resize hover:bg-blue-500 z-50"
-          onMouseDown={(e) => handleMouseDown(e, "s")}
-        />
-        <div
-          className="absolute top-0 bottom-0 left-0 w-1 cursor-w-resize hover:bg-blue-500 z-50"
-          onMouseDown={(e) => handleMouseDown(e, "w")}
-        />
-        <div
-          className="absolute top-0 bottom-0 right-0 w-1 cursor-e-resize hover:bg-blue-500 z-50"
-          onMouseDown={(e) => handleMouseDown(e, "e")}
-        />
-        <div
-          className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize hover:bg-blue-500 z-50"
-          onMouseDown={(e) => handleMouseDown(e, "nw")}
-        />
-        <div
-          className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize hover:bg-blue-500 z-50"
-          onMouseDown={(e) => handleMouseDown(e, "ne")}
-        />
-        <div
-          className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize hover:bg-blue-500 z-50"
-          onMouseDown={(e) => handleMouseDown(e, "sw")}
-        />
-        <div
-          className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize hover:bg-blue-500 z-50"
-          onMouseDown={(e) => handleMouseDown(e, "se")}
-        />
-
-        <DialogHeader className="flex-shrink-0 px-6 py-4 border-b">
-          <DialogTitle>Visualizar Documento para Impressão</DialogTitle>
-        </DialogHeader>
+        <SheetHeader className="flex-shrink-0 px-6 py-4 border-b border-border bg-muted/20">
+          <SheetTitle className="text-foreground">Visualizar Documento para Impressão</SheetTitle>
+        </SheetHeader>
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Carregando configurações...</p>
+              <p className="text-muted-foreground">Carregando configurações...</p>
             </div>
           </div>
         ) : (
           <div className="flex-1 flex flex-col min-h-0">
             {/* Preview do Documento */}
-            <div className="flex-1 bg-white text-black border-t overflow-hidden flex flex-col">
+            <div className="flex-1 bg-white text-black border-t border-border overflow-hidden flex flex-col">
               <div className="flex-1 overflow-y-auto p-8">
                 {/* Cabeçalho Preview - SEM código e versão */}
                 <div className="text-center mb-8 border-b pb-6">
@@ -784,8 +745,8 @@ export function DocumentoPrint({ documento, isOpen, onClose }: DocumentoPrintPro
             </div>
 
             {/* Botões de Ação */}
-            <div className="flex-shrink-0 flex justify-between items-center border-t bg-gray-50 px-6 py-3">
-              <div className="text-xs text-gray-500 space-y-1">
+            <div className="flex-shrink-0 flex justify-between items-center border-t border-border bg-muted/20 px-6 py-4">
+              <div className="text-xs text-muted-foreground space-y-0.5 font-medium">
                 <div>
                   <strong>Configuração:</strong> {configuracaoTimbrado?.tamanho_papel || "A4"} -{" "}
                   {configuracaoTimbrado?.orientacao || "Retrato"}
@@ -796,10 +757,6 @@ export function DocumentoPrint({ documento, isOpen, onClose }: DocumentoPrintPro
               </div>
 
               <div className="flex gap-3">
-                <Button onClick={onClose} variant="outline">
-                  <X className="h-4 w-4 mr-2" />
-                  Fechar
-                </Button>
                 <Button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white">
                   <Printer className="h-4 w-4 mr-2" />
                   Imprimir
@@ -808,7 +765,7 @@ export function DocumentoPrint({ documento, isOpen, onClose }: DocumentoPrintPro
             </div>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }

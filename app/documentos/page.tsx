@@ -328,7 +328,7 @@ export default function DocumentosPage() {
                     key={documento.id}
                     className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 border border-border rounded-xl hover:border-blue-500/50 bg-card hover:bg-muted/10 transition-all duration-300 hover:shadow-md hover:scale-[1.01] gap-4"
                   >
-                    <div className="flex items-start sm:items-center gap-4 sm:gap-6 w-full sm:w-auto">
+                    <div className="flex items-start sm:items-center gap-4 sm:gap-6 w-full min-w-0">
                       <div className="flex-shrink-0">
                         <div className="h-16 w-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg">
                           {getTipoIcon(documento.tipo_documento)}

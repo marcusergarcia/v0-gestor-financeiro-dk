@@ -45,8 +45,24 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend
+  Legend,
+  PieChart,
+  Pie,
+  Cell
 } from "recharts"
+
+const COLORS = [
+  "#3b82f6", // Blue
+  "#10b981", // Emerald
+  "#6366f1", // Indigo
+  "#f59e0b", // Amber
+  "#ec4899", // Pink
+  "#8b5cf6", // Violet
+  "#14b8a6", // Teal
+  "#f43f5e", // Rose
+  "#06b6d4", // Cyan
+  "#a855f7", // Purple
+]
 
 interface Account {
   id: number
@@ -556,15 +572,22 @@ export function FluxoCaixaTab() {
   })
 
   // Compute category statistics for the filtered transactions
-  const categoryStats: Record<string, { total: number; count: number }> = {}
+  const categoryStats: Record<string, { total: number; count: number; tipo: "entrada" | "saida" }> = {}
   filteredTransactions.forEach((tx) => {
     const cat = tx.categoria || "Outros"
     if (!categoryStats[cat]) {
-      categoryStats[cat] = { total: 0, count: 0 }
+      categoryStats[cat] = { total: 0, count: 0, tipo: tx.tipo }
     }
-    categoryStats[cat].total += tx.valor
+    categoryStats[cat].total += Math.abs(tx.valor)
     categoryStats[cat].count += 1
   })
+
+  const pieData = Object.entries(categoryStats).map(([name, stat]) => ({
+    name,
+    value: parseFloat(stat.total.toFixed(2)),
+    count: stat.count,
+    tipo: stat.tipo,
+  }))
 
   // Dynamic calculations for pending statements check
   const today = new Date()
@@ -1115,7 +1138,7 @@ export function FluxoCaixaTab() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Select value={selectedConta} onValueChange={setSelectedConta}>
-                  <SelectTrigger className="w-36 h-8 text-xs">
+                  <SelectTrigger className="w-60 h-8 text-xs">
                     <SelectValue placeholder="Selecionar conta" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1129,7 +1152,7 @@ export function FluxoCaixaTab() {
                 </Select>
 
                 <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                  <SelectTrigger className="w-36 h-8 text-xs">
+                  <SelectTrigger className="w-40 h-8 text-xs">
                     <SelectValue placeholder="Selecionar período" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1141,7 +1164,7 @@ export function FluxoCaixaTab() {
                 </Select>
               </div>
             </CardHeader>
-            <CardContent className="p-0 max-h-[300px] overflow-y-auto">
+            <CardContent className="p-0">
               {selectedConta === "all" || selectedPeriod === "all" ? (
                 <div className="text-center py-10 px-4 text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
                   <span className="text-2xl">🔍</span>
@@ -1149,115 +1172,150 @@ export function FluxoCaixaTab() {
                   <p className="max-w-[280px]">Selecione uma conta e um período de referência específicos para visualizar o extrato detalhado.</p>
                 </div>
               ) : (
-                <div className="divide-y divide-border">
-                  {/* Category statistics row */}
-                  {Object.keys(categoryStats).length > 0 && (
-                    <div className="p-4 bg-muted/20 border-b border-border">
-                      <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2.5 flex items-center gap-1.5">
-                        📊 Resumo por Categoria
-                      </h5>
-                      <div className="flex flex-wrap gap-2">
-                        {Object.entries(categoryStats).map(([cat, stat]) => (
-                          <div
-                            key={cat}
-                            className={`text-[10px] px-2.5 py-1 rounded-full border font-semibold flex items-center gap-1.5 shadow-sm transition-all hover:scale-102 ${getCategoryBadgeStyles(cat)}`}
-                          >
-                            <span>{cat}</span>
-                            <span className="opacity-40">•</span>
-                            <span>{formatCurrency(stat.total)}</span>
-                            <span className="text-[9px] opacity-50">({stat.count})</span>
+                <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-border">
+                  {/* Left Column: Transaction list (7 cols) */}
+                  <div className="lg:col-span-7 max-h-[400px] overflow-y-auto divide-y divide-border">
+                    {filteredTransactions.map((tx) => (
+                      <div key={tx.id} className="flex items-center justify-between p-3 px-4 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${tx.tipo === "entrada" ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-red-50 dark:bg-red-950/40"}`}>
+                            {tx.tipo === "entrada" ? (
+                              <ArrowUpRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {filteredTransactions.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between p-3 px-4 hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${tx.tipo === "entrada" ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-red-50 dark:bg-red-950/40"}`}>
-                          {tx.tipo === "entrada" ? (
-                            <ArrowUpRight className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                          ) : (
-                            <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
-                          )}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-semibold text-foreground">{tx.descricao}</h4>
-                            <Select
-                              value={tx.categoria || "Outros"}
-                              onValueChange={async (newCat) => {
-                                try {
-                                  const response = await fetch(`/api/financeiro/transacoes/${tx.id}`, {
-                                    method: "PATCH",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ categoria: newCat }),
-                                  })
-                                  const result = await response.json()
-                                  if (result.success) {
-                                    toast({ title: "Sucesso", description: "Categoria atualizada!" })
-                                    await loadData()
-                                  } else {
-                                    toast({ title: "Erro", description: "Erro ao atualizar", variant: "destructive" })
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-semibold text-foreground">{tx.descricao}</h4>
+                              <Select
+                                value={tx.categoria || "Outros"}
+                                onValueChange={async (newCat) => {
+                                  try {
+                                    const response = await fetch(`/api/financeiro/transacoes/${tx.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ categoria: newCat }),
+                                    })
+                                    const result = await response.json()
+                                    if (result.success) {
+                                      toast({ title: "Sucesso", description: "Categoria atualizada!" })
+                                      await loadData()
+                                    } else {
+                                      toast({ title: "Erro", description: "Erro ao atualizar", variant: "destructive" })
+                                    }
+                                  } catch (err) {
+                                    toast({ title: "Erro", description: "Erro de conexão", variant: "destructive" })
                                   }
-                                } catch (err) {
-                                  toast({ title: "Erro", description: "Erro de conexão", variant: "destructive" })
-                                }
-                              }}
-                            >
-                              <SelectTrigger className={`h-6 px-2.5 py-0.5 text-[10px] font-semibold border rounded-full w-auto flex gap-1.5 items-center justify-between cursor-pointer transition-all hover:opacity-85 focus:ring-0 shadow-sm ${getCategoryBadgeStyles(tx.categoria)}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs">
-                                <SelectItem value="Faturamento">Faturamento</SelectItem>
-                                <SelectItem value="Investimentos">Investimentos</SelectItem>
-                                <SelectItem value="Alimentação">Alimentação</SelectItem>
-                                <SelectItem value="Tecnologia & SaaS">Tecnologia & SaaS</SelectItem>
-                                <SelectItem value="Transporte & Viagem">Transporte & Viagem</SelectItem>
-                                <SelectItem value="Combustível">Combustível</SelectItem>
-                                <SelectItem value="Impostos & Tributos">Impostos & Tributos</SelectItem>
-                                <SelectItem value="Aluguel & Condomínio">Aluguel & Condomínio</SelectItem>
-                                <SelectItem value="Energia Elétrica">Energia Elétrica</SelectItem>
-                                <SelectItem value="Água, Esgoto & Gás">Água, Esgoto & Gás</SelectItem>
-                                <SelectItem value="Internet & Telefone">Internet & Telefone</SelectItem>
-                                <SelectItem value="Marketing & Anúncios">Marketing & Anúncios</SelectItem>
-                                <SelectItem value="Pessoal & Pro-labore">Pessoal & Pro-labore</SelectItem>
-                                <SelectItem value="Tarifas Bancárias">Tarifas Bancárias</SelectItem>
-                                <SelectItem value="Material de Escritório">Material de Escritório</SelectItem>
-                                <SelectItem value="Fornecedores">Fornecedores</SelectItem>
-                                <SelectItem value="Outras Receitas">Outras Receitas</SelectItem>
-                                <SelectItem value="Outras Despesas">Outras Despesas</SelectItem>
-                                <SelectItem value="Outros">Outros</SelectItem>
-                              </SelectContent>
-                            </Select>
+                                }}
+                              >
+                                <SelectTrigger className={`h-6 px-2.5 py-0.5 text-[10px] font-semibold border rounded-full w-auto flex gap-1.5 items-center justify-between cursor-pointer transition-all hover:opacity-85 focus:ring-0 shadow-sm ${getCategoryBadgeStyles(tx.categoria)}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="text-xs">
+                                  <SelectItem value="Faturamento">Faturamento</SelectItem>
+                                  <SelectItem value="Investimentos">Investimentos</SelectItem>
+                                  <SelectItem value="Alimentação">Alimentação</SelectItem>
+                                  <SelectItem value="Tecnologia & SaaS">Tecnologia & SaaS</SelectItem>
+                                  <SelectItem value="Transporte & Viagem">Transporte & Viagem</SelectItem>
+                                  <SelectItem value="Combustível">Combustível</SelectItem>
+                                  <SelectItem value="Impostos & Tributos">Impostos & Tributos</SelectItem>
+                                  <SelectItem value="Aluguel & Condomínio">Aluguel & Condomínio</SelectItem>
+                                  <SelectItem value="Energia Elétrica">Energia Elétrica</SelectItem>
+                                  <SelectItem value="Água, Esgoto & Gás">Água, Esgoto & Gás</SelectItem>
+                                  <SelectItem value="Internet & Telefone">Internet & Telefone</SelectItem>
+                                  <SelectItem value="Marketing & Anúncios">Marketing & Anúncios</SelectItem>
+                                  <SelectItem value="Pessoal & Pro-labore">Pessoal & Pro-labore</SelectItem>
+                                  <SelectItem value="Tarifas Bancárias">Tarifas Bancárias</SelectItem>
+                                  <SelectItem value="Material de Escritório">Material de Escritório</SelectItem>
+                                  <SelectItem value="Fornecedores">Fornecedores</SelectItem>
+                                  <SelectItem value="Outras Receitas">Outras Receitas</SelectItem>
+                                  <SelectItem value="Outras Despesas">Outras Despesas</SelectItem>
+                                  <SelectItem value="Outros">Outros</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                              <span>{formatDate(tx.data)}</span>
+                              <span>•</span>
+                              <span>{tx.conta_nome || "Conta desconhecida"}</span>
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                            <span>{formatDate(tx.data)}</span>
-                            <span>•</span>
-                            <span>{tx.conta_nome || "Conta desconhecida"}</span>
-                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className={`font-bold text-sm ${tx.tipo === "entrada" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                            {tx.tipo === "entrada" ? "+" : "-"} {formatCurrency(tx.valor)}
+                          </div>
+                          <Button
+                            onClick={() => handleDeleteTransaction(tx.id)}
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-muted focus:ring-0"
+                            title="Excluir Transação"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className={`font-bold text-sm ${tx.tipo === "entrada" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                          {tx.tipo === "entrada" ? "+" : "-"} {formatCurrency(tx.valor)}
+                    ))}
+                    {filteredTransactions.length === 0 && (
+                      <p className="text-sm text-muted-foreground py-8 text-center">Nenhuma movimentação registrada para este período nesta conta.</p>
+                    )}
+                  </div>
+
+                  {/* Right Column: Chart & Summary (5 cols) */}
+                  <div className="lg:col-span-5 p-4 bg-muted/10 dark:bg-slate-900/10 flex flex-col justify-between max-h-[400px] overflow-y-auto">
+                    {pieData.length > 0 ? (
+                      <div className="space-y-4">
+                        <h5 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          📊 Distribuição por Categoria
+                        </h5>
+                        <div className="h-44 w-full relative">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={pieData}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={45}
+                                outerRadius={60}
+                                paddingAngle={2}
+                                dataKey="value"
+                              >
+                                {pieData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip
+                                formatter={(value: any) => formatCurrency(value)}
+                                contentStyle={{ backgroundColor: "var(--card)", borderColor: "var(--border)", borderRadius: "8px" }}
+                                itemStyle={{ color: "var(--foreground)" }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
                         </div>
-                        <Button
-                          onClick={() => handleDeleteTransaction(tx.id)}
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-muted focus:ring-0"
-                          title="Excluir Transação"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {/* Summary details */}
+                        <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                          {pieData.map((data, index) => (
+                            <div key={data.name} className="flex items-center justify-between text-[11px] py-1 border-b border-border/30 last:border-0">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                                <span className="font-semibold text-foreground truncate">{data.name}</span>
+                                <span className="text-[9px] text-muted-foreground">({data.count})</span>
+                              </div>
+                              <span className={`font-bold ${data.tipo === "entrada" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                                {data.tipo === "entrada" ? "+" : "-"} {formatCurrency(data.value)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {filteredTransactions.length === 0 && (
-                    <p className="text-sm text-muted-foreground py-8 text-center">Nenhuma movimentação registrada para este período nesta conta.</p>
-                  )}
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-xs text-muted-foreground py-8">
+                        Sem categorias para exibir gráfico
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>
