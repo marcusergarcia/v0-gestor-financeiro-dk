@@ -471,16 +471,7 @@ export function VisualizarBoletosDialog({ open, onOpenChange, numeroBase }: Visu
                 </CardContent>
               </Card>
 
-              <div className="flex justify-end pt-2">
-                <Button
-                  onClick={() => onOpenChange(false)}
-                  variant="outline"
-                  className="border-border hover:bg-muted bg-card text-foreground"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Fechar
-                </Button>
-              </div>
+
             </div>
           )}
         </SheetContent>

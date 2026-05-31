@@ -890,10 +890,6 @@ export function PropostaPrint({ proposta, isOpen, onClose }: PropostaPrintProps)
               <Printer className="h-4 w-4 mr-2" />
               Imprimir
             </Button>
-            <Button onClick={onClose} variant="outline">
-              <X className="h-4 w-4 mr-2" />
-              Fechar
-            </Button>
           </div>
         </SheetContent>
       </Sheet>
