@@ -728,53 +728,39 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Tabs */}
-      <Card className="border border-border shadow-sm bg-card overflow-hidden">
-        <Tabs defaultValue="boletos" className="w-full">
-          <div className="border-b border-border bg-muted/20 p-2.5">
-            <TabsList className="inline-flex justify-start gap-1 p-1 bg-muted/50 dark:bg-muted/80 rounded-xl h-auto">
-              <TabsTrigger
-                value="boletos"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:shadow-sm hover:text-foreground"
-              >
-                <FileText className="h-4 w-4" />
-                Boletos ({boletosStatsPorPeriodo.total})
-              </TabsTrigger>
-              <TabsTrigger
-                value="recibos"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:shadow-sm hover:text-foreground"
-              >
-                <DollarSign className="h-4 w-4" />
-                Recibos ({recibosStats.total})
-              </TabsTrigger>
-              <TabsTrigger
-                value="fluxo-caixa"
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all text-muted-foreground data-[state=active]:bg-card data-[state=active]:text-indigo-600 dark:data-[state=active]:text-indigo-400 data-[state=active]:shadow-sm hover:text-foreground"
-              >
-                <TrendingUp className="h-4 w-4" />
-                Fluxo de Caixa
-              </TabsTrigger>
-            </TabsList>
-          </div>
+      <Tabs defaultValue="boletos" className="space-y-4 lg:space-y-6">
+        <TabsList className="grid w-full grid-cols-3 lg:w-[500px] p-1 bg-muted dark:bg-slate-900/60 border border-border">
+          <TabsTrigger
+            value="boletos"
+            className="text-xs lg:text-sm data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-600 data-[state=active]:text-white"
+          >
+            Boletos ({boletosStatsPorPeriodo.total})
+          </TabsTrigger>
+          <TabsTrigger
+            value="recibos"
+            className="text-xs lg:text-sm data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-600 data-[state=active]:text-white"
+          >
+            Recibos ({recibosStats.total})
+          </TabsTrigger>
+          <TabsTrigger
+            value="fluxo-caixa"
+            className="text-xs lg:text-sm data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-600 data-[state=active]:text-white"
+          >
+            Fluxo de Caixa
+          </TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="boletos" className="p-6 space-y-6">
-            {/* Boletos Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-foreground">Boletos</h2>
-                <p className="text-sm text-muted-foreground">Gerencie todos os boletos emitidos</p>
-              </div>
-              <Button
-                onClick={() => setShowNovoBoleto(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-4 text-sm font-medium transition-all"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Boleto
-              </Button>
-            </div>
+        <TabsContent value="boletos" className="space-y-4 lg:space-y-6">
 
             {/* Boletos Filters */}
-            <Card className="border border-border bg-muted/20">
-              <CardContent className="p-4">
+            <Card className="border border-border shadow-md bg-card text-card-foreground">
+              <CardHeader className="p-3 md:p-6 pb-2 md:pb-3">
+                <CardTitle className="text-base md:text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-purple-400">
+                  Buscar e Filtrar Boletos
+                </CardTitle>
+                <CardDescription className="text-xs md:text-sm">Pesquise por número ou cliente</CardDescription>
+              </CardHeader>
+              <CardContent className="p-3 md:p-6 pt-0">
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -823,13 +809,25 @@ export default function FinanceiroPage() {
 
             {/* Desktop Table View */}
             <div className="hidden md:block">
-              <Card className="border border-border shadow-sm overflow-hidden">
-                <CardHeader className="bg-muted/40 border-b border-border p-4 flex flex-row items-center justify-between space-y-0">
-                  <div>
-                    <CardTitle className="text-sm font-semibold text-foreground">Lista de Boletos</CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                      {filteredBoletos.length} boleto{filteredBoletos.length !== 1 ? "s" : ""} encontrado{filteredBoletos.length !== 1 ? "s" : ""}
-                    </CardDescription>
+              <Card className="border border-border shadow-md bg-card text-card-foreground">
+                <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg p-4 lg:p-6 dark:from-blue-900/50 dark:to-purple-900/50 dark:border-b dark:border-border">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 w-full">
+                    <div>
+                      <CardTitle className="text-white flex items-center gap-2 text-lg lg:text-xl">
+                        <FileText className="h-4 w-4 lg:h-5 lg:w-5" />
+                        Boletos de Cobrança
+                      </CardTitle>
+                      <CardDescription className="text-blue-100 text-sm">
+                        {filteredBoletos.length} boleto{filteredBoletos.length !== 1 ? "s" : ""} encontrado{filteredBoletos.length !== 1 ? "s" : ""}
+                      </CardDescription>
+                    </div>
+                    <Button
+                      onClick={() => setShowNovoBoleto(true)}
+                      className="bg-white text-blue-600 hover:bg-blue-50 text-sm lg:text-base dark:bg-slate-900 dark:text-blue-400 dark:hover:bg-slate-800 dark:border-slate-800"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Novo Boleto
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -1118,20 +1116,7 @@ export default function FinanceiroPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="recibos" className="p-6 space-y-6">
-            {/* Recibos Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-foreground">Recibos</h2>
-                <p className="text-sm text-muted-foreground">Gerencie todos os recibos emitidos</p>
-              </div>
-              <Link href="/financeiro/novo-recibo">
-                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-4 text-sm font-medium transition-all">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Recibo
-                </Button>
-              </Link>
-            </div>
+          <TabsContent value="recibos" className="space-y-4 lg:space-y-6">
 
             {/* Recibos Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1160,9 +1145,15 @@ export default function FinanceiroPage() {
               </Card>
             </div>
 
-            {/* Recibos Search */}
-            <Card className="border border-border bg-muted/20">
-              <CardContent className="p-4">
+            {/* Recibos Filters */}
+            <Card className="border border-border shadow-md bg-card text-card-foreground">
+              <CardHeader className="p-3 md:p-6 pb-2 md:pb-3">
+                <CardTitle className="text-base md:text-xl font-bold bg-gradient-to-r from-emerald-600 to-blue-600 bg-clip-text text-transparent dark:from-emerald-400 dark:to-blue-400">
+                  Buscar e Filtrar Recibos
+                </CardTitle>
+                <CardDescription className="text-xs md:text-sm">Pesquise por número, cliente ou descrição</CardDescription>
+              </CardHeader>
+              <CardContent className="p-3 md:p-6 pt-0">
                 <div className="relative">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -1177,13 +1168,24 @@ export default function FinanceiroPage() {
 
             {/* Desktop Table View */}
             <div className="hidden md:block">
-              <Card className="border border-border shadow-sm overflow-hidden">
-                <CardHeader className="bg-muted/40 border-b border-border p-4 flex flex-row items-center justify-between space-y-0">
-                  <div>
-                    <CardTitle className="text-sm font-semibold text-foreground">Lista de Recibos</CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                      {filteredRecibos.length} recibo{filteredRecibos.length !== 1 ? "s" : ""} encontrado{filteredRecibos.length !== 1 ? "s" : ""}
-                    </CardDescription>
+              <Card className="border border-border shadow-md bg-card text-card-foreground">
+                <CardHeader className="bg-gradient-to-r from-emerald-500 to-blue-600 text-white rounded-t-lg p-4 lg:p-6 dark:from-emerald-900/50 dark:to-blue-900/50 dark:border-b dark:border-border">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 w-full">
+                    <div>
+                      <CardTitle className="text-white flex items-center gap-2 text-lg lg:text-xl">
+                        <DollarSign className="h-4 w-4 lg:h-5 lg:w-5" />
+                        Recibos Emitidos
+                      </CardTitle>
+                      <CardDescription className="text-emerald-100 text-sm">
+                        {filteredRecibos.length} recibo{filteredRecibos.length !== 1 ? "s" : ""} encontrado{filteredRecibos.length !== 1 ? "s" : ""}
+                      </CardDescription>
+                    </div>
+                    <Link href="/financeiro/novo-recibo">
+                      <Button className="bg-white text-emerald-600 hover:bg-emerald-50 text-sm lg:text-base dark:bg-slate-900 dark:text-emerald-400 dark:hover:bg-slate-800 dark:border-slate-800">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Novo Recibo
+                      </Button>
+                    </Link>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -1424,11 +1426,10 @@ export default function FinanceiroPage() {
             </div>
           </TabsContent>
 
-          <TabsContent value="fluxo-caixa" className="p-6 space-y-6">
+          <TabsContent value="fluxo-caixa" className="p-0">
             <FluxoCaixaTab />
           </TabsContent>
         </Tabs>
-      </Card>
 
       {/* Dialogs */}
       <NovoBoletoDialog open={showNovoBoleto} onOpenChange={setShowNovoBoleto} onSuccess={loadData} />
