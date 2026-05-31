@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, Search, FileText, Edit, Eye, Trash2, Printer, Filter } from "lucide-react"
+import { Plus, Search, FileText, Edit, Eye, Trash2, Printer, Filter, MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -25,6 +25,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu"
 
 interface Documento {
   id: number
@@ -221,8 +227,8 @@ export default function DocumentosPage() {
         {/* Filtros com design moderno */}
         <Card className="shadow-lg border border-border bg-card text-card-foreground">
           <CardHeader className="p-4 border-b border-border/40">
-            <CardTitle className="flex items-center gap-2 text-gray-800">
-              <Filter className="h-5 w-5 text-blue-600" />
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Filter className="h-5 w-5 text-blue-500 dark:text-blue-400" />
               Filtros de Pesquisa
             </CardTitle>
           </CardHeader>
@@ -300,11 +306,11 @@ export default function DocumentosPage() {
               </div>
             ) : documentos.length === 0 ? (
               <div className="text-center py-16">
-                <div className="mx-auto h-24 w-24 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center mb-6">
-                  <FileText className="h-12 w-12 text-blue-600" />
+                <div className="mx-auto h-24 w-24 bg-gradient-to-r from-blue-500/10 to-purple-500/10 dark:from-blue-950/20 dark:to-purple-950/20 rounded-full flex items-center justify-center mb-6">
+                  <FileText className="h-12 w-12 text-blue-500 dark:text-blue-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Nenhum documento encontrado</h3>
-                <p className="text-gray-500 mb-8">Comece criando um novo documento para organizar seus arquivos.</p>
+                <h3 className="text-xl font-semibold text-foreground mb-2">Nenhum documento encontrado</h3>
+                <p className="text-muted-foreground mb-8">Comece criando um novo documento para organizar seus arquivos.</p>
                 <Link href="/documentos/novo">
                   <Button
                     size="lg"
@@ -320,80 +326,142 @@ export default function DocumentosPage() {
                 {documentos.map((documento) => (
                   <div
                     key={documento.id}
-                    className="group flex items-center justify-between p-6 border border-border rounded-xl hover:border-blue-500/50 bg-card hover:bg-muted/10 transition-all duration-300 hover:shadow-md hover:scale-[1.01]"
+                    className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-6 border border-border rounded-xl hover:border-blue-500/50 bg-card hover:bg-muted/10 transition-all duration-300 hover:shadow-md hover:scale-[1.01] gap-4"
                   >
-                    <div className="flex items-center space-x-6">
+                    <div className="flex items-start sm:items-center gap-4 sm:gap-6 w-full sm:w-auto">
                       <div className="flex-shrink-0">
                         <div className="h-16 w-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white text-2xl shadow-lg">
                           {getTipoIcon(documento.tipo_documento)}
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold text-foreground truncate">{documento.titulo}</h3>
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <h3 className="text-sm sm:text-base md:text-lg font-semibold text-foreground break-words">{documento.titulo}</h3>
                           {getStatusBadge(documento.status)}
                         </div>
-                        <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                          <span className="font-medium">📋 {documento.codigo}</span>
-                          <span>🔄 v{documento.versao}</span>
-                          <span>📁 {documento.tipo_documento}</span>
-                          {documento.cliente_nome && <span>👤 {documento.cliente_nome}</span>}
-                          <span>📅 {format(new Date(documento.updated_at), "dd/MM/yyyy", { locale: ptBR })}</span>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 sm:gap-x-6 text-xs sm:text-sm text-muted-foreground">
+                          <span className="font-medium whitespace-nowrap">📋 {documento.codigo}</span>
+                          <span className="whitespace-nowrap">🔄 v{documento.versao}</span>
+                          <span className="whitespace-nowrap">📁 {documento.tipo_documento}</span>
+                          {documento.cliente_nome && <span className="break-all">👤 {documento.cliente_nome}</span>}
+                          <span className="whitespace-nowrap">📅 {format(new Date(documento.updated_at), "dd/MM/yyyy", { locale: ptBR })}</span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handlePrint(documento)}
-                        className="hover:bg-blue-100 hover:text-blue-700 rounded-lg"
-                      >
-                        <Printer className="h-4 w-4" />
-                      </Button>
-                      <Link href={`/documentos/${documento.id}`}>
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      {/* Desktop View: Show buttons directly on large screens */}
+                      <div className="hidden xl:flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="hover:bg-green-100 hover:text-green-700 rounded-lg"
+                          onClick={() => handlePrint(documento)}
+                          className="hover:bg-blue-500/10 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 text-muted-foreground rounded-lg"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Printer className="h-4 w-4" />
                         </Button>
-                      </Link>
-                      <Link href={`/documentos/${documento.id}/editar`}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="hover:bg-yellow-100 hover:text-yellow-700 rounded-lg"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="hover:bg-red-100 hover:text-red-700 rounded-lg">
-                            <Trash2 className="h-4 w-4" />
+                        <Link href={`/documentos/${documento.id}`}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400 text-muted-foreground rounded-lg"
+                          >
+                            <Eye className="h-4 w-4" />
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="rounded-xl">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Tem certeza que deseja excluir o documento "{documento.titulo}"? Esta ação não pode ser
-                              desfeita.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel className="rounded-lg">Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(documento)}
-                              className="bg-red-600 hover:bg-red-700 rounded-lg"
+                        </Link>
+                        <Link href={`/documentos/${documento.id}/editar`}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-yellow-500/10 hover:text-yellow-600 dark:hover:bg-yellow-950/40 dark:hover:text-yellow-400 text-muted-foreground rounded-lg"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="hover:bg-red-500/10 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 text-muted-foreground rounded-lg"
                             >
-                              Excluir
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="rounded-xl">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja excluir o documento "{documento.titulo}"? Esta ação não pode ser
+                                desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="rounded-lg">Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(documento)}
+                                className="bg-red-600 hover:bg-red-700 rounded-lg text-white"
+                              >
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+
+                      {/* Mobile/Tablet View: Show dropdown menu on smaller screens */}
+                      <div className="xl:hidden">
+                        <AlertDialog>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-card border-border">
+                              <DropdownMenuItem onClick={() => handlePrint(documento)} className="cursor-pointer">
+                                <Printer className="mr-2 h-4 w-4 text-blue-500" />
+                                <span>Imprimir</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild className="cursor-pointer">
+                                <Link href={`/documentos/${documento.id}`}>
+                                  <Eye className="mr-2 h-4 w-4 text-emerald-500" />
+                                  <span>Visualizar</span>
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild className="cursor-pointer">
+                                <Link href={`/documentos/${documento.id}/editar`}>
+                                  <Edit className="mr-2 h-4 w-4 text-yellow-500" />
+                                  <span>Editar</span>
+                                </Link>
+                              </DropdownMenuItem>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onSelect={(e) => e.preventDefault()}>
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  <span>Excluir</span>
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          <AlertDialogContent className="rounded-xl">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem certeza que deseja excluir o documento "{documento.titulo}"? Esta ação não pode ser
+                                desfeita.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel className="rounded-lg">Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(documento)}
+                                className="bg-red-600 hover:bg-red-700 rounded-lg text-white"
+                              >
+                                Excluir
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   </div>
                 ))}
