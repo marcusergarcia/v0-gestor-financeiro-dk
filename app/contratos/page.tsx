@@ -830,7 +830,7 @@ export default function ContratosPage() {
                         { key: "status",                label: "Status",       width: 100, sortable: true },
                         { key: "data_proposta",          label: "Data",         width: 90,  sortable: true },
                         { key: "data_validade",          label: "Validade",     width: 90,  sortable: true },
-                        { key: "acoes",                 label: "Ações",        width: 60,  sortable: false, noResize: true },
+                        { key: "acoes",                 label: "Ações",        width: 120,  sortable: false, noResize: true },
                       ]}
                       data={filteredPropostas}
                       rowKey={(row) => row.id}
@@ -852,42 +852,57 @@ export default function ContratosPage() {
                           case "data_validade": return <span className="text-sm">{proposta.data_validade ? formatDateShort(proposta.data_validade) : "-"}</span>
                           case "acoes":
                             return (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem asChild>
-                                    <Link 
-                                      href={`/contratos/proposta/${proposta.numero}`} 
-                                      className="flex items-center"
-                                      onClick={(e) => {
-                                        e.preventDefault()
+                              <div className="flex items-center gap-1">
+                                {/* Desktop View: Show buttons directly on large screens */}
+                                <div className="hidden xl:flex gap-1">
+                                  <Button size="sm" variant="outline"
+                                    onClick={() => {
+                                      setSelectedPropostaNumero(proposta.numero)
+                                      setIsVisualizarPropostaOpen(true)
+                                    }}
+                                    className="text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 border-blue-200 dark:border-blue-900/50 bg-transparent h-8 w-8 p-0" title="Visualizar">
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="sm" variant="outline"
+                                    onClick={() => {
+                                      setSelectedPropostaNumero(proposta.numero)
+                                      setIsEditarPropostaOpen(true)
+                                    }}
+                                    className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 border-indigo-200 dark:border-indigo-900/50 bg-transparent h-8 w-8 p-0" title="Editar">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="sm" variant="outline"
+                                    onClick={() => excluirProposta(proposta.numero)}
+                                    className="text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-200 dark:border-red-900/50 bg-transparent h-8 w-8 p-0" title="Excluir">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                {/* Mobile/Tablet View: Show dropdown menu on smaller screens */}
+                                <div className="xl:hidden">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => {
                                         setSelectedPropostaNumero(proposta.numero)
                                         setIsVisualizarPropostaOpen(true)
-                                      }}
-                                    >
-                                      <Eye className="h-4 w-4 mr-2" />Visualizar
-                                    </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem asChild>
-                                    <Link 
-                                      href={`/contratos/proposta/${proposta.numero}/editar`} 
-                                      className="flex items-center"
-                                      onClick={(e) => {
-                                        e.preventDefault()
+                                      }}>
+                                        <Eye className="h-4 w-4 mr-2" />Visualizar
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => {
                                         setSelectedPropostaNumero(proposta.numero)
                                         setIsEditarPropostaOpen(true)
-                                      }}
-                                    >
-                                      <Edit className="h-4 w-4 mr-2" />Editar
-                                    </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => excluirProposta(proposta.numero)}>
-                                    <Trash2 className="h-4 w-4 mr-2" />Excluir
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                                      }}>
+                                        <Edit className="h-4 w-4 mr-2" />Editar
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => excluirProposta(proposta.numero)}>
+                                        <Trash2 className="h-4 w-4 mr-2" />Excluir
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
                             )
                           default: return null
                         }
@@ -1142,7 +1157,7 @@ export default function ContratosPage() {
                         { key: "status",         label: "Status",              width: 100, sortable: true },
                         { key: "data_inicio",    label: "Início",              width: 90,  sortable: true },
                         { key: "prazo_meses",    label: "Prazo",               width: 100, sortable: true },
-                        { key: "acoes",          label: "Ações",               width: 100, sortable: false, noResize: true },
+                        { key: "acoes",          label: "Ações",               width: 160, sortable: false, noResize: true },
                       ]}
                       data={filteredContratos}
                       rowKey={(row) => row.id}
@@ -1178,48 +1193,66 @@ export default function ContratosPage() {
                           case "acoes":
                             return (
                               <div className="flex items-center gap-1">
-                                {contrato.status === "ativo" && (
-                                  <Button size="sm" variant="outline" onClick={() => handleIniciarEmitirNfse(contrato)}
-                                    className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50 border-emerald-200 bg-transparent" title="Emitir NFS-e">
-                                    <FileCheck className="h-4 w-4" />
+                                {/* Desktop View: Show buttons directly on large screens */}
+                                <div className="hidden xl:flex gap-1">
+                                  {contrato.status === "ativo" && (
+                                    <Button size="sm" variant="outline" onClick={() => handleIniciarEmitirNfse(contrato)}
+                                      className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50/10 border-emerald-200 bg-transparent" title="Emitir NFS-e">
+                                      <FileCheck className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button size="sm" variant="outline"
+                                    onClick={() => {
+                                      setSelectedContratoNumero(contrato.numero)
+                                      setIsVisualizarContratoOpen(true)
+                                    }}
+                                    className="text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 border-blue-200 dark:border-blue-900/50 bg-transparent h-8 w-8 p-0" title="Visualizar">
+                                    <Eye className="h-4 w-4" />
                                   </Button>
-                                )}
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem asChild>
-                                      <Link 
-                                        href={`/contratos/${contrato.numero}`} 
-                                        className="flex items-center"
-                                        onClick={(e) => {
-                                          e.preventDefault()
-                                          setSelectedContratoNumero(contrato.numero)
-                                          setIsVisualizarContratoOpen(true)
-                                        }}
-                                      >
+                                  <Button size="sm" variant="outline"
+                                    onClick={() => {
+                                      setSelectedContratoNumero(contrato.numero)
+                                      setIsEditarContratoOpen(true)
+                                    }}
+                                    className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/10 border-indigo-200 dark:border-indigo-900/50 bg-transparent h-8 w-8 p-0" title="Editar">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="sm" variant="outline"
+                                    onClick={() => excluirContrato(contrato.numero)}
+                                    className="text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-200 dark:border-red-900/50 bg-transparent h-8 w-8 p-0" title="Excluir">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                                {/* Mobile/Tablet View: Show dropdown menu on smaller screens */}
+                                <div className="xl:hidden">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      {contrato.status === "ativo" && (
+                                        <DropdownMenuItem onClick={() => handleIniciarEmitirNfse(contrato)}>
+                                          <FileCheck className="h-4 w-4 mr-2" />Emitir NFS-e
+                                        </DropdownMenuItem>
+                                      )}
+                                      <DropdownMenuItem onClick={() => {
+                                        setSelectedContratoNumero(contrato.numero)
+                                        setIsVisualizarContratoOpen(true)
+                                      }}>
                                         <Eye className="h-4 w-4 mr-2" />Visualizar
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                      <Link 
-                                        href={`/contratos/${contrato.numero}/editar`} 
-                                        className="flex items-center"
-                                        onClick={(e) => {
-                                          e.preventDefault()
-                                          setSelectedContratoNumero(contrato.numero)
-                                          setIsEditarContratoOpen(true)
-                                        }}
-                                      >
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => {
+                                        setSelectedContratoNumero(contrato.numero)
+                                        setIsEditarContratoOpen(true)
+                                      }}>
                                         <Edit className="h-4 w-4 mr-2" />Editar
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => excluirContrato(contrato.numero)}>
-                                      <Trash2 className="h-4 w-4 mr-2" />Excluir
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => excluirContrato(contrato.numero)}>
+                                        <Trash2 className="h-4 w-4 mr-2" />Excluir
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
                               </div>
                             )
                           default: return null
