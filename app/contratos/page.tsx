@@ -1044,10 +1044,9 @@ export default function ContratosPage() {
           </TabsContent>
 
           <TabsContent value="contratos" className="space-y-4 lg:space-y-6">
-            {/* Search and Filters Contratos */}
-            <Card className="border-0 shadow-lg bg-gradient-to-r from-white to-gray-50">
+            <Card className="border border-border shadow-md bg-card text-card-foreground">
               <CardHeader className="p-3 md:p-6 pb-2 md:pb-3">
-                <CardTitle className="text-base md:text-xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
+                <CardTitle className="text-base md:text-xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent dark:from-green-400 dark:to-blue-400">
                   Buscar e Filtrar Contratos
                 </CardTitle>
                 <CardDescription className="text-xs md:text-sm">Pesquise por número ou nome do cliente</CardDescription>
@@ -1061,7 +1060,7 @@ export default function ContratosPage() {
                       placeholder="Digite para buscar..."
                       value={searchContratos}
                       onChange={(e) => setSearchContratos(e.target.value)}
-                      className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                      className="pl-10 border-border bg-background text-foreground focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
 
@@ -1069,7 +1068,7 @@ export default function ContratosPage() {
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-gray-400" />
                     <Select value={contratoStatusFilter} onValueChange={setContratoStatusFilter}>
-                      <SelectTrigger className="w-full sm:w-48 border-gray-200 focus:border-blue-500">
+                      <SelectTrigger className="w-full sm:w-48 border-border bg-background text-foreground focus:border-blue-500">
                         <SelectValue placeholder="Filtrar por status" />
                       </SelectTrigger>
                       <SelectContent>

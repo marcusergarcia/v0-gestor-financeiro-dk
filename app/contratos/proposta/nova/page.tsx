@@ -716,7 +716,7 @@ export default function NovaPropostaPage({
               <CardContent className="p-6">
                 <div className="space-y-6">
                   {Object.entries(CATEGORIAS).map(([categoria, config]) => {
-                    const equipamentosCategoria = equipments.filter((eq) => eq.categoria === categoria)
+                    const equipamentosCategoria = equipamentos.filter((eq) => eq.categoria === categoria)
 
                     return (
                       <div key={categoria} className="space-y-3">
