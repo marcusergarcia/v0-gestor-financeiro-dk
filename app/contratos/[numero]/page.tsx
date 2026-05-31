@@ -299,16 +299,14 @@ export default function ContratoPage({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
-          <Button variant="outline" onClick={() => {
-            if (asDrawer && onClose) {
-              onClose()
-            } else {
+          {!asDrawer && (
+            <Button variant="outline" onClick={() => {
               router.push("/contratos")
-            }
-          }}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {asDrawer ? "Fechar" : "Voltar"}
-          </Button>
+            }}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar
+            </Button>
+          )}
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">Contrato {contrato.numero}</h1>
             <p className="text-muted-foreground text-sm">Cliente: {contrato.cliente_nome}</p>

@@ -329,16 +329,14 @@ export default function EditarContratoPage({
     <div className={asDrawer ? "bg-transparent text-foreground p-0 space-y-4 pb-24 md:pb-6" : "container mx-auto p-6 space-y-6 pb-24 md:pb-6 bg-gradient-to-br from-slate-50 to-slate-100"}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => {
-            if (asDrawer && onClose) {
-              onClose()
-            } else {
+          {!asDrawer && (
+            <Button variant="outline" onClick={() => {
               router.back()
-            }
-          }}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {asDrawer ? "Fechar" : "Voltar"}
-          </Button>
+            }}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar
+            </Button>
+          )}
           <div>
             <h1 className="text-2xl font-bold">Editar Contrato</h1>
             <p className="text-muted-foreground text-sm">Contrato #{contrato.numero}</p>

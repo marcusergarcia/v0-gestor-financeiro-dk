@@ -231,16 +231,14 @@ export default function VisualizarPropostaPage({
             <p className="text-gray-600 dark:text-gray-300 mt-1 text-sm">Visualização detalhada da proposta de contrato</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" className="bg-transparent" onClick={() => {
-              if (asDrawer && onClose) {
-                onClose()
-              } else {
+            {!asDrawer && (
+              <Button variant="outline" className="bg-transparent" onClick={() => {
                 router.push("/contratos")
-              }
-            }}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {asDrawer ? "Fechar" : "Voltar"}
-            </Button>
+              }}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
+              </Button>
+            )}
             <Button variant="outline" className="bg-transparent" onClick={() => setShowPrintModal(true)}>
               <Printer className="h-4 w-4 mr-2" />
               Imprimir

@@ -618,16 +618,14 @@ export default function EditarPropostaPage({
             <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">Edite os detalhes da proposta de contrato</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="bg-transparent" onClick={() => {
-              if (asDrawer && onClose) {
-                onClose()
-              } else {
+            {!asDrawer && (
+              <Button variant="outline" className="bg-transparent" onClick={() => {
                 router.push(`/contratos/proposta/${numero}`)
-              }
-            }}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Cancelar
-            </Button>
+              }}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Cancelar
+              </Button>
+            )}
             <Button
               onClick={salvarProposta}
               disabled={saving || !cliente || equipamentosSelecionados.length === 0}

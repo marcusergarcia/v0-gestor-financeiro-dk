@@ -790,20 +790,18 @@ export function EditarOrcamentoClient({
             </p>
           </div>
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (asDrawer && onClose) {
-                  onClose()
-                } else {
+            {!asDrawer && (
+              <Button
+                variant="outline"
+                onClick={() => {
                   router.push(`/orcamentos/${orcamento.numero}`)
-                }
-              }}
-              className="bg-white/10 hover:bg-white/20 text-white border-white/30"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {asDrawer ? "Fechar" : "Voltar"}
-            </Button>
+                }}
+                className="bg-white/10 hover:bg-white/20 text-white border-white/30"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => setShowPrintModal(true)}

@@ -777,23 +777,21 @@ export default function EditarOrdemServicoPage({
               )}
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (asDrawer && onClose) {
-                  onClose()
-                } else {
+          {!asDrawer && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
                   router.back()
-                }
-              }}
-              className="bg-white/80 backdrop-blur-sm flex-1 md:flex-none"
-              size="sm"
-            >
-              <ArrowLeft className="h-4 w-4 md:mr-2" />
-              <span className="md:inline">{asDrawer ? "Fechar" : "Voltar"}</span>
-            </Button>
-          </div>
+                }}
+                className="bg-white/80 backdrop-blur-sm flex-1 md:flex-none"
+                size="sm"
+              >
+                <ArrowLeft className="h-4 w-4 md:mr-2" />
+                <span className="md:inline">Voltar</span>
+              </Button>
+            </div>
+          )}
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
