@@ -251,7 +251,7 @@ export function Header() {
   const TipoIcon = tipoConfig.icon
 
   return (
-    <header className="bg-card/70 backdrop-blur-md border-b border-border/50 fixed top-0 left-0 right-0 w-full z-40 shadow-sm">
+    <header className="bg-card/70 backdrop-blur-md border-b border-border/50 sticky top-0 w-full z-40 shadow-sm">
       <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
       <div className="flex items-center justify-between h-16 px-4 md:px-6">
         {/* Lado Esquerdo */}
