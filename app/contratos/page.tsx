@@ -418,7 +418,7 @@ export default function ContratosPage() {
             if (nf.origem === "contrato" && nf.origem_numero && (nf.status === "emitida" || nf.status === "processando")) {
               const num = String(nf.origem_numero)
               // Track per month: key = "contrato_numero|mes_referencia"
-              const mesRef = nf.descricao_servico?.match(/Ref\.\s*(\d{2}\/\d{4})/)?.[1] || ""
+              const mesRef = nf.descricao_servico?.match(/(?:Ref\.|realizada em|em)\s*(\d{2}\/\d{4})/i)?.[1] || nf.descricao_servico?.match(/(\d{2}\/\d{4})/)?.[1] || ""
               const chave = mesRef ? `${num}|${mesRef}` : num
               if (!mapa[chave]) mapa[chave] = { temNfse: false }
               mapa[chave].temNfse = true
