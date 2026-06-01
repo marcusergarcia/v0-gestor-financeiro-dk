@@ -140,7 +140,7 @@ export function LayoutContent({ children }: LayoutContentProps) {
         <AppSidebar />
         <div id="layout-wrapper" className="flex-1 flex flex-col overflow-auto relative z-10">
           <Header />
-          <main className="flex-1 overflow-auto p-4 lg:p-6 mt-16">
+          <main className="flex-1 overflow-auto p-4 lg:p-6 mt-[84px]">
             <div className="mx-auto max-w-7xl">{children}</div>
           </main>
         </div>
