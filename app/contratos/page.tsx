@@ -202,7 +202,10 @@ export default function ContratosPage() {
   const [nfseContrato, setNfseContrato] = useState<Contrato | null>(null)
   const [nfseMesReferencia, setNfseMesReferencia] = useState("")
   const [nfseMesPreventivaRef, setNfseMesPreventivaRef] = useState("")
-  const [notasEmitidasContrato, setNotasEmitidasContrato] = useState<Record<string, { temNfse: boolean }>>({})
+  const [notasEmitidasContrato, setNotasEmitidasContrato] = useState<Record<string, { temNfse: boolean; numero_nfse?: string; data_emissao?: string }>>({})
+  const [allBoletos, setAllBoletos] = useState<any[]>([])
+  const [feriados, setFeriados] = useState<any[]>([])
+  
   // Month reference dialog
   const [mesRefDialogOpen, setMesRefDialogOpen] = useState(false)
   const [mesRefContrato, setMesRefContrato] = useState<Contrato | null>(null)
@@ -217,11 +220,88 @@ export default function ContratosPage() {
   const [batchAnoRef, setBatchAnoRef] = useState("")
   const [batchMesPreventiva, setBatchMesPreventiva] = useState("")
   const [batchAnoPreventiva, setBatchAnoPreventiva] = useState("")
+  const [batchTab, setBatchTab] = useState<string>("nfse")
   const [batchSelecionados, setBatchSelecionados] = useState<string[]>([])
+  const [batchBoletosSelecionados, setBatchBoletosSelecionados] = useState<string[]>([])
+  const [batchAsaasSelecionados, setBatchAsaasSelecionados] = useState<string[]>([])
   const [batchRunning, setBatchRunning] = useState(false)
   const [batchProgress, setBatchProgress] = useState<Record<string, "pending" | "loading" | "success" | "error">>({})
 
   const { toast } = useToast()
+
+  const loadBoletos = async () => {
+    try {
+      const res = await fetch("/api/boletos")
+      const result = await res.json()
+      if (result.success) {
+        setAllBoletos(result.data || [])
+      }
+    } catch (error) {
+      console.error("Erro ao buscar boletos:", error)
+    }
+  }
+
+  const loadFeriados = async () => {
+    try {
+      const res = await fetch("/api/configuracoes/feriados")
+      const result = await res.json()
+      if (result.success) {
+        setFeriados(result.data || [])
+      }
+    } catch (error) {
+      console.error("Erro ao buscar feriados:", error)
+    }
+  }
+
+  const calculateDueDate = (diaVencimento: number, mesRef: string, anoRef: string, feriadosList: any[]): string => {
+    const month = parseInt(mesRef, 10)
+    const year = parseInt(anoRef, 10)
+    
+    let targetMonth = month
+    let targetYear = year
+    if (targetMonth === 12) {
+      targetMonth = 1
+      targetYear += 1
+    } else {
+      targetMonth += 1
+    }
+    
+    const ultimoDia = new Date(targetYear, targetMonth, 0).getDate()
+    const diaValido = Math.min(diaVencimento, ultimoDia)
+    
+    const targetDate = new Date(targetYear, targetMonth - 1, diaValido)
+    
+    const formatDateObj = (d: Date) => {
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, "0")
+      const day = String(d.getDate()).padStart(2, "0")
+      return `${y}-${m}-${day}`
+    }
+
+    const isWeekend = (d: Date) => {
+      const day = d.getDay()
+      return day === 0 || day === 6
+    }
+
+    const isFeriado = (d: Date) => {
+      const dateStr = formatDateObj(d)
+      return feriadosList.some((f) => {
+        const feriadoDate = new Date(f.data)
+        const feriadoStr = feriadoDate.toISOString().split("T")[0]
+        return feriadoStr === dateStr
+      })
+    }
+
+    const isBusinessDay = (d: Date) => {
+      return !isWeekend(d) && !isFeriado(d)
+    }
+
+    while (!isBusinessDay(targetDate)) {
+      targetDate.setDate(targetDate.getDate() + 1)
+    }
+
+    return formatDateObj(targetDate)
+  }
 
   const MESES = [
     { value: "01", label: "Janeiro" },
@@ -250,6 +330,8 @@ export default function ContratosPage() {
     loadPropostas()
     loadContratos()
     loadLogoMenu()
+    loadBoletos()
+    loadFeriados()
   }, [])
 
   const loadLogoMenu = async () => {
@@ -308,8 +390,10 @@ export default function ContratosPage() {
           variant: "destructive",
         })
       }
-      // Buscar notas emitidas para controlar icones
+      // Buscar notas emitidas, boletos e feriados para controlar icones e o faturamento
       await fetchNotasEmitidasPorContrato()
+      await loadBoletos()
+      await loadFeriados()
     } catch (error) {
       console.error("Erro ao carregar contratos:", error)
       toast({
@@ -325,7 +409,7 @@ export default function ContratosPage() {
   const fetchNotasEmitidasPorContrato = async () => {
     try {
       const nfseRes = await fetch("/api/nfse").catch(() => null)
-      const mapa: Record<string, { temNfse: boolean }> = {}
+      const mapa: Record<string, { temNfse: boolean; numero_nfse?: string; data_emissao?: string }> = {}
 
       if (nfseRes?.ok) {
         const nfseData = await nfseRes.json()
@@ -338,6 +422,8 @@ export default function ContratosPage() {
               const chave = mesRef ? `${num}|${mesRef}` : num
               if (!mapa[chave]) mapa[chave] = { temNfse: false }
               mapa[chave].temNfse = true
+              mapa[chave].numero_nfse = nf.numero_nfse || nf.numero || ""
+              mapa[chave].data_emissao = nf.data_emissao || nf.created_at || ""
               // Also mark general
               if (!mapa[num]) mapa[num] = { temNfse: false }
               mapa[num].temNfse = true
@@ -435,6 +521,43 @@ export default function ContratosPage() {
     loadContratos()
   }
 
+
+  const recalculateBatchSelections = (mes: string, ano: string) => {
+    const mesRef = `${mes}/${ano}`
+    const contratosAtivos = contratos.filter((c) => c.status === "ativo")
+    
+    // NFS-e selecionados
+    const elegiveisNfse = contratosAtivos.filter((c) => {
+      const chave = `${c.numero}|${mesRef}`
+      return !notasEmitidasContrato[chave]?.temNfse
+    }).map((c) => c.numero)
+    setBatchSelecionados(elegiveisNfse)
+
+    // Boletos selecionados
+    const elegiveisBoletos = contratosAtivos.filter((c) => {
+      const chave = `${c.numero}|${mesRef}`
+      const nota = notasEmitidasContrato[chave]
+      if (!nota || !nota.numero_nfse) return false
+      const temBoleto = allBoletos.some(
+        (b) => String(b.cliente_id) === String(c.cliente_id) && String(b.numero_nota) === String(nota.numero_nfse)
+      )
+      return !temBoleto
+    }).map((c) => c.numero)
+    setBatchBoletosSelecionados(elegiveisBoletos)
+
+    // Asaas selecionados
+    const elegiveisAsaas = contratosAtivos.filter((c) => {
+      const chave = `${c.numero}|${mesRef}`
+      const nota = notasEmitidasContrato[chave]
+      if (!nota || !nota.numero_nfse) return false
+      const boleto = allBoletos.find(
+        (b) => String(b.cliente_id) === String(c.cliente_id) && String(b.numero_nota) === String(nota.numero_nfse)
+      )
+      return boleto && !boleto.asaas_id
+    }).map((c) => c.numero)
+    setBatchAsaasSelecionados(elegiveisAsaas)
+  }
+
   const handleIniciarBatch = () => {
     const now = new Date()
     const currentMonth = String(now.getMonth() + 1).padStart(2, "0")
@@ -447,93 +570,234 @@ export default function ContratosPage() {
     setBatchAnoRef(currentYr)
     setBatchMesPreventiva(String(mesAnterior).padStart(2, "0"))
     setBatchAnoPreventiva(String(anoAnterior))
+    setBatchTab("nfse")
     
-    const mesRef = `${currentMonth}/${currentYr}`
-    const contratosAtivos = contratos.filter((c) => c.status === "ativo")
-    const elegiveis = contratosAtivos.filter((c) => {
-      const chave = `${c.numero}|${mesRef}`
-      return !notasEmitidasContrato[chave]?.temNfse
-    }).map((c) => c.numero)
-
-    setBatchSelecionados(elegiveis)
     setBatchProgress({})
     setBatchRunning(false)
     setIsBatchOpen(true)
+
+    // Run selections recalculation
+    setTimeout(() => {
+      recalculateBatchSelections(currentMonth, currentYr)
+    }, 100)
   }
 
   const handleExecutarBatch = async () => {
-    if (batchSelecionados.length === 0) {
-      toast({
-        title: "Atenção",
-        description: "Selecione pelo menos um contrato para faturar.",
-        variant: "destructive"
-      })
-      return
-    }
-
-    setBatchRunning(true)
-    const initialProgress: Record<string, "pending" | "loading" | "success" | "error"> = {}
-    batchSelecionados.forEach((num) => {
-      initialProgress[num] = "pending"
-    })
-    setBatchProgress(initialProgress)
-
-    const mesPreventivaFormatado = batchMesPreventiva && batchAnoPreventiva 
-      ? `${batchMesPreventiva}/${batchAnoPreventiva}` 
-      : ""
-
-    for (const num of batchSelecionados) {
-      const contrato = contratos.find((c) => c.numero === num)
-      if (!contrato) continue
-
-      setBatchProgress((prev) => ({ ...prev, [num]: "loading" }))
-
-      try {
-        const payload = {
-          origem: "contrato",
-          origem_numero: contrato.numero,
-          cliente_id: Number(contrato.cliente_id),
-          tomador_tipo: contrato.cliente_cnpj ? "PJ" : "PF",
-          tomador_cpf_cnpj: contrato.cliente_cnpj || contrato.cliente_cpf || "",
-          tomador_razao_social: contrato.cliente_nome,
-          tomador_email: contrato.cliente_email || "",
-          tomador_telefone: contrato.cliente_telefone || "",
-          tomador_endereco: contrato.cliente_endereco || "",
-          tomador_bairro: contrato.cliente_bairro || "",
-          tomador_cidade: contrato.cliente_cidade || "",
-          tomador_uf: contrato.cliente_estado || "",
-          tomador_cep: contrato.cliente_cep || "",
-          descricao_servico: buildDescricaoContrato(contrato, mesPreventivaFormatado),
-          valor_servicos: Number(contrato.valor_mensal),
-          valor_deducoes: 0,
-          iss_retido: false,
-        }
-
-        const response = await fetch("/api/nfse/emitir", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+    if (batchTab === "nfse") {
+      if (batchSelecionados.length === 0) {
+        toast({
+          title: "Atenção",
+          description: "Selecione pelo menos um contrato para faturar.",
+          variant: "destructive"
         })
+        return
+      }
 
-        const result = await response.json()
-        if (result.success) {
-          setBatchProgress((prev) => ({ ...prev, [num]: "success" }))
-        } else {
-          console.error(`Erro ao faturar contrato ${num}:`, result.message)
+      setBatchRunning(true)
+      const initialProgress: Record<string, "pending" | "loading" | "success" | "error"> = {}
+      batchSelecionados.forEach((num) => {
+        initialProgress[num] = "pending"
+      })
+      setBatchProgress(initialProgress)
+
+      const mesPreventivaFormatado = batchMesPreventiva && batchAnoPreventiva 
+        ? `${batchMesPreventiva}/${batchAnoPreventiva}` 
+        : ""
+
+      for (const num of batchSelecionados) {
+        const contrato = contratos.find((c) => c.numero === num)
+        if (!contrato) continue
+
+        setBatchProgress((prev) => ({ ...prev, [num]: "loading" }))
+
+        try {
+          const payload = {
+            origem: "contrato",
+            origem_numero: contrato.numero,
+            cliente_id: Number(contrato.cliente_id),
+            tomador_tipo: contrato.cliente_cnpj ? "PJ" : "PF",
+            tomador_cpf_cnpj: contrato.cliente_cnpj || contrato.cliente_cpf || "",
+            tomador_razao_social: contrato.cliente_nome,
+            tomador_email: contrato.cliente_email || "",
+            tomador_telefone: contrato.cliente_telefone || "",
+            tomador_endereco: contrato.cliente_endereco || "",
+            tomador_bairro: contrato.cliente_bairro || "",
+            tomador_cidade: contrato.cliente_cidade || "",
+            tomador_uf: contrato.cliente_estado || "",
+            tomador_cep: contrato.cliente_cep || "",
+            descricao_servico: buildDescricaoContrato(contrato, mesPreventivaFormatado),
+            valor_servicos: Number(contrato.valor_mensal),
+            valor_deducoes: 0,
+            iss_retido: false,
+          }
+
+          const response = await fetch("/api/nfse/emitir", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+
+          const result = await response.json()
+          if (result.success) {
+            setBatchProgress((prev) => ({ ...prev, [num]: "success" }))
+          } else {
+            console.error(`Erro ao faturar contrato ${num}:`, result.message)
+            setBatchProgress((prev) => ({ ...prev, [num]: "error" }))
+          }
+        } catch (error) {
+          console.error(`Erro de conexão no contrato ${num}:`, error)
           setBatchProgress((prev) => ({ ...prev, [num]: "error" }))
         }
-      } catch (error) {
-        console.error(`Erro de conexão no contrato ${num}:`, error)
-        setBatchProgress((prev) => ({ ...prev, [num]: "error" }))
       }
-    }
 
-    setBatchRunning(false)
-    toast({
-      title: "Faturamento em Lote Concluído",
-      description: "O processo de emissão sequencial das NFS-e terminou."
-    })
-    loadContratos()
+      setBatchRunning(false)
+      toast({
+        title: "Faturamento em Lote Concluído",
+        description: "O processo de emissão sequencial das NFS-e terminou."
+      })
+      loadContratos()
+    } else if (batchTab === "boletos") {
+      if (batchBoletosSelecionados.length === 0) {
+        toast({
+          title: "Atenção",
+          description: "Selecione pelo menos um contrato para gerar o boleto.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      setBatchRunning(true)
+      const initialProgress: Record<string, "pending" | "loading" | "success" | "error"> = {}
+      batchBoletosSelecionados.forEach((num) => {
+        initialProgress[num] = "pending"
+      })
+      setBatchProgress(initialProgress)
+
+      const mesRef = `${batchMesRef}/${batchAnoRef}`
+
+      for (const num of batchBoletosSelecionados) {
+        const contrato = contratos.find((c) => c.numero === num)
+        if (!contrato) continue
+
+        setBatchProgress((prev) => ({ ...prev, [num]: "loading" }))
+
+        try {
+          const noteKey = `${contrato.numero}|${mesRef}`
+          const nota = notasEmitidasContrato[noteKey]
+          if (!nota || !nota.numero_nfse) {
+            setBatchProgress((prev) => ({ ...prev, [num]: "error" }))
+            continue
+          }
+
+          const dueDate = calculateDueDate(contrato.dia_vencimento || 10, batchMesRef, batchAnoRef, feriados)
+          
+          const payload = {
+            cliente_id: String(contrato.cliente_id),
+            numero_nota: String(nota.numero_nfse),
+            data_nota: nota.data_emissao ? new Date(nota.data_emissao).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+            valor_total: Number(contrato.valor_mensal),
+            primeiro_vencimento: dueDate,
+            numero_parcelas: 1,
+            intervalo: 30,
+            forma_pagamento: contrato.forma_pagamento || "boleto",
+            multa_percentual: 2.0,
+            juros_mes_percentual: 2.0,
+            desconto: 0.0,
+            instrucao_linha1: "Pagamento ate o vencimento",
+            instrucao_linha2: "Apos vencimento cobrar multa e juros"
+          }
+
+          const response = await fetch("/api/boletos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          })
+
+          const result = await response.json()
+          if (result.success) {
+            setBatchProgress((prev) => ({ ...prev, [num]: "success" }))
+          } else {
+            console.error(`Erro ao gerar boleto para contrato ${num}:`, result.message)
+            setBatchProgress((prev) => ({ ...prev, [num]: "error" }))
+          }
+        } catch (error) {
+          console.error(`Erro de conexão no contrato ${num}:`, error)
+          setBatchProgress((prev) => ({ ...prev, [num]: "error" }))
+        }
+      }
+
+      setBatchRunning(false)
+      toast({
+        title: "Geração de Boletos Concluída",
+        description: "O processo de geração sequencial dos boletos locais terminou."
+      })
+      loadContratos()
+    } else if (batchTab === "asaas") {
+      if (batchAsaasSelecionados.length === 0) {
+        toast({
+          title: "Atenção",
+          description: "Selecione pelo menos um boleto para enviar ao Asaas.",
+          variant: "destructive"
+        })
+        return
+      }
+
+      setBatchRunning(true)
+      const initialProgress: Record<string, "pending" | "loading" | "success" | "error"> = {}
+      batchAsaasSelecionados.forEach((num) => {
+        initialProgress[num] = "pending"
+      })
+      setBatchProgress(initialProgress)
+
+      const mesRef = `${batchMesRef}/${batchAnoRef}`
+
+      for (const num of batchAsaasSelecionados) {
+        const contrato = contratos.find((c) => c.numero === num)
+        if (!contrato) continue
+
+        setBatchProgress((prev) => ({ ...prev, [num]: "loading" }))
+
+        try {
+          const noteKey = `${contrato.numero}|${mesRef}`
+          const nota = notasEmitidasContrato[noteKey]
+          if (!nota || !nota.numero_nfse) {
+            setBatchProgress((prev) => ({ ...prev, [num]: "error" }))
+            continue
+          }
+
+          const boleto = allBoletos.find(
+            (b) => String(b.cliente_id) === String(contrato.cliente_id) && String(b.numero_nota) === String(nota.numero_nfse)
+          )
+
+          if (!boleto || boleto.asaas_id) {
+            setBatchProgress((prev) => ({ ...prev, [num]: "error" }))
+            continue
+          }
+
+          const response = await fetch(`/api/boletos/${boleto.id}/enviar-asaas`, {
+            method: "POST"
+          })
+
+          const result = await response.json()
+          if (result.success) {
+            setBatchProgress((prev) => ({ ...prev, [num]: "success" }))
+          } else {
+            console.error(`Erro ao enviar boleto ao Asaas para contrato ${num}:`, result.message)
+            setBatchProgress((prev) => ({ ...prev, [num]: "error" }))
+          }
+        } catch (error) {
+          console.error(`Erro de conexão no contrato ${num}:`, error)
+          setBatchProgress((prev) => ({ ...prev, [num]: "error" }))
+        }
+      }
+
+      setBatchRunning(false)
+      toast({
+        title: "Envio ao Asaas Concluído",
+        description: "O processo de envio sequencial dos boletos ao Asaas terminou."
+      })
+      loadContratos()
+    }
   }
 
   const excluirProposta = async (numero: string) => {
@@ -1718,41 +1982,52 @@ export default function ContratosPage() {
           setIsBatchOpen(open)
         }
       }}>
-        <SheetContent side="right" className="w-full sm:max-w-[550px] bg-card text-foreground border-border overflow-y-auto">
-          <SheetHeader>
+        <SheetContent side="right" className="w-full sm:max-w-[600px] bg-card text-foreground border-border overflow-y-auto flex flex-col h-full p-0">
+          <SheetHeader className="p-6 border-b border-border bg-muted/20">
             <SheetTitle className="flex items-center gap-2">
               <FileCheck className="h-5 w-5 text-emerald-600" />
-              Faturamento em Lote (NFS-e)
+              Lote Financeiro (NFS-e, Boletos e Asaas)
             </SheetTitle>
             <SheetDescription>
-              Selecione o período de referência para faturar múltiplos contratos ativos simultaneamente.
+              Gerencie a emissão de notas, geração de boletos locais e sincronização com o Asaas em lote para os contratos ativos.
             </SheetDescription>
           </SheetHeader>
 
           {batchRunning ? (
-            <div className="py-12 space-y-6">
-              <div className="flex flex-col items-center justify-center text-center space-y-4">
+            <div className="flex-1 p-6 space-y-6 overflow-y-auto">
+              <div className="flex flex-col items-center justify-center text-center space-y-4 py-6">
                 <Loader2 className="h-8 w-8 text-emerald-600 animate-spin" />
                 <div>
-                  <h3 className="font-semibold text-lg">Emitindo NFS-e em Lote...</h3>
-                  <p className="text-sm text-muted-foreground mt-1">Por favor, não feche este painel enquanto as notas são geradas.</p>
+                  <h3 className="font-semibold text-lg">
+                    {batchTab === "nfse" && "Emitindo NFS-e em Lote..."}
+                    {batchTab === "boletos" && "Gerando Boletos em Lote..."}
+                    {batchTab === "asaas" && "Sincronizando com Asaas..."}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">Por favor, não feche este painel enquanto a operação é executada.</p>
                 </div>
               </div>
 
               <div className="border border-border rounded-xl bg-muted/30 p-4 max-h-[350px] overflow-y-auto space-y-3">
                 <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">Progresso do Lote</h4>
-                {batchSelecionados.map((num) => {
+                {(batchTab === "nfse" ? batchSelecionados : batchTab === "boletos" ? batchBoletosSelecionados : batchAsaasSelecionados).map((num) => {
                   const c = contratos.find(x => x.numero === num)
                   const prog = batchProgress[num] || 'pending'
                   return (
-                    <div key={num} className="flex items-center justify-between text-xs py-1 border-b border-border/50 last:border-0">
+                    <div key={num} className="flex items-center justify-between text-xs py-2 border-b border-border/50 last:border-0">
                       <div className="truncate pr-4 flex-1">
                         <span className="font-mono font-bold mr-2">{num}</span>
                         <span className="text-muted-foreground">{c?.cliente_nome}</span>
                       </div>
                       <div className="flex-shrink-0">
                         {prog === 'pending' && <span className="text-muted-foreground">Aguardando...</span>}
-                        {prog === 'loading' && <span className="text-emerald-500 font-semibold flex items-center"><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Emitindo...</span>}
+                        {prog === 'loading' && (
+                          <span className="text-emerald-500 font-semibold flex items-center">
+                            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                            {batchTab === "nfse" && "Emitindo..."}
+                            {batchTab === "boletos" && "Gerando..."}
+                            {batchTab === "asaas" && "Enviando..."}
+                          </span>
+                        )}
                         {prog === 'success' && <span className="text-green-500 font-semibold flex items-center"><CheckCircle className="h-3.5 w-3.5 mr-1" /> Sucesso</span>}
                         {prog === 'error' && <span className="text-rose-500 font-semibold flex items-center"><X className="h-3.5 w-3.5 mr-1" /> Falhou</span>}
                       </div>
@@ -1762,203 +2037,469 @@ export default function ContratosPage() {
               </div>
             </div>
           ) : (
-            <div className="grid gap-6 py-6">
-              {/* Seleção do Período */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="batch-mes-ref">Mês de Referência</Label>
-                  <Select value={batchMesRef} onValueChange={(v) => {
-                    setBatchMesRef(v)
-                    const mesRef = `${v}/${batchAnoRef}`
-                    const contratosAtivos = contratos.filter((c) => c.status === "ativo")
-                    const elegiveis = contratosAtivos.filter((c) => {
-                      const chave = `${c.numero}|${mesRef}`
-                      return !notasEmitidasContrato[chave]?.temNfse
-                    }).map((c) => c.numero)
-                    setBatchSelecionados(elegiveis)
-                  }}>
-                    <SelectTrigger id="batch-mes-ref" className="bg-background text-foreground border-border">
-                      <SelectValue placeholder="Mês" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border text-foreground">
-                      {MESES.map((mes) => (
-                        <SelectItem key={mes.value} value={mes.value}>
-                          {mes.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="batch-ano-ref">Ano de Referência</Label>
-                  <Select value={batchAnoRef} onValueChange={(v) => {
-                    setBatchAnoRef(v)
-                    const mesRef = `${batchMesRef}/${v}`
-                    const contratosAtivos = contratos.filter((c) => c.status === "ativo")
-                    const elegiveis = contratosAtivos.filter((c) => {
-                      const chave = `${c.numero}|${mesRef}`
-                      return !notasEmitidasContrato[chave]?.temNfse
-                    }).map((c) => c.numero)
-                    setBatchSelecionados(elegiveis)
-                  }}>
-                    <SelectTrigger id="batch-ano-ref" className="bg-background text-foreground border-border">
-                      <SelectValue placeholder="Ano" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border text-foreground">
-                      {ANOS.map((ano) => (
-                        <SelectItem key={ano} value={ano}>
-                          {ano}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Mês da Preventiva */}
-              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 space-y-3">
-                <Label className="text-sm font-semibold text-blue-600 dark:text-blue-400 block">
-                  Mês da Preventiva (para descrição)
-                </Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Select value={batchMesPreventiva} onValueChange={setBatchMesPreventiva}>
-                    <SelectTrigger className="bg-background text-foreground border-border">
-                      <SelectValue placeholder="Mês" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border text-foreground">
-                      {MESES.map((mes) => (
-                        <SelectItem key={mes.value} value={mes.value}>
-                          {mes.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={batchAnoPreventiva} onValueChange={setBatchAnoPreventiva}>
-                    <SelectTrigger className="bg-background text-foreground border-border">
-                      <SelectValue placeholder="Ano" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border text-foreground">
-                      {ANOS.map((ano) => (
-                        <SelectItem key={ano} value={ano}>
-                          {ano}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                  Descrição modelo: Referente a preventiva realizada em {batchMesPreventiva}/{batchAnoPreventiva} - Contrato...
-                </p>
-              </div>
-
-              {/* Contratos Ativos e Faturamento */}
-              {(() => {
-                const mesRef = `${batchMesRef}/${batchAnoRef}`
-                const contratosAtivos = contratos.filter((c) => c.status === "ativo")
-                
-                const elegiveis = contratosAtivos.filter((c) => {
-                  const chave = `${c.numero}|${mesRef}`
-                  return !notasEmitidasContrato[chave]?.temNfse
-                })
-
-                const jaFaturados = contratosAtivos.filter((c) => {
-                  const chave = `${c.numero}|${mesRef}`
-                  return notasEmitidasContrato[chave]?.temNfse
-                })
-
-                return (
-                  <div className="space-y-4">
-                    {/* Elegíveis */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <Label className="text-sm font-semibold flex items-center gap-1">
-                          Contratos a Faturar ({elegiveis.length})
-                        </Label>
-                        {elegiveis.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (batchSelecionados.length === elegiveis.length) {
-                                setBatchSelecionados([])
-                              } else {
-                                setBatchSelecionados(elegiveis.map((c) => c.numero))
-                              }
-                            }}
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                          >
-                            {batchSelecionados.length === elegiveis.length ? "Desmarcar Todos" : "Selecionar Todos"}
-                          </button>
-                        )}
-                      </div>
-                      
-                      {elegiveis.length === 0 ? (
-                        <div className="p-4 text-center border border-dashed border-border rounded-xl text-xs text-muted-foreground bg-muted/10">
-                          Todos os contratos ativos já foram faturados para este mês de referência.
-                        </div>
-                      ) : (
-                        <div className="border border-border rounded-xl max-h-[220px] overflow-y-auto bg-background divide-y divide-border/50">
-                          {elegiveis.map((c) => {
-                            const isChecked = batchSelecionados.includes(c.numero)
-                            return (
-                              <label
-                                key={c.id}
-                                className="flex items-center gap-3 p-3 text-xs hover:bg-muted/40 cursor-pointer select-none"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    if (isChecked) {
-                                      setBatchSelecionados(prev => prev.filter(x => x !== c.numero))
-                                    } else {
-                                      setBatchSelecionados(prev => [...prev, c.numero])
-                                    }
-                                  }}
-                                  className="h-4 w-4 rounded border-gray-300 text-indigo-650 focus:ring-indigo-650 bg-background border-border"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-foreground truncate">{c.cliente_nome}</p>
-                                  <p className="text-muted-foreground font-mono text-[10px] mt-0.5">
-                                    Contrato: {c.numero} | Valor: {formatCurrency(c.valor_mensal)}
-                                  </p>
-                                </div>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Já faturados (Prevenção de Duplicidade) */}
-                    {jaFaturados.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                          <CheckCircle className="h-4 w-4" />
-                          Já Faturados neste Mês ({jaFaturados.length})
-                        </Label>
-                        <div className="border border-border rounded-xl max-h-[160px] overflow-y-auto bg-muted/10 divide-y divide-border/50">
-                          {jaFaturados.map((c) => (
-                            <div key={c.id} className="p-3 text-xs flex items-center justify-between opacity-80">
-                              <div className="min-w-0 flex-1">
-                                <p className="font-semibold text-foreground truncate">{c.cliente_nome}</p>
-                                <p className="text-muted-foreground font-mono text-[10px] mt-0.5">
-                                  Contrato: {c.numero} | Valor: {formatCurrency(c.valor_mensal)}
-                                </p>
-                              </div>
-                              <Badge className="bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-0 text-[10px] font-bold">
-                                NFS-e Emitida
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-6 border-b border-border bg-card space-y-4">
+                {/* Seleção do Período */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="batch-mes-ref" className="text-xs font-semibold">Mês de Referência</Label>
+                    <Select value={batchMesRef} onValueChange={(v) => {
+                      setBatchMesRef(v)
+                      recalculateBatchSelections(v, batchAnoRef)
+                    }}>
+                      <SelectTrigger id="batch-mes-ref" className="bg-background text-foreground border-border">
+                        <SelectValue placeholder="Mês" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border text-foreground">
+                        {MESES.map((mes) => (
+                          <SelectItem key={mes.value} value={mes.value}>
+                            {mes.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )
-              })()}
+                  <div className="grid gap-2">
+                    <Label htmlFor="batch-ano-ref" className="text-xs font-semibold">Ano de Referência</Label>
+                    <Select value={batchAnoRef} onValueChange={(v) => {
+                      setBatchAnoRef(v)
+                      recalculateBatchSelections(batchMesRef, v)
+                    }}>
+                      <SelectTrigger id="batch-ano-ref" className="bg-background text-foreground border-border">
+                        <SelectValue placeholder="Ano" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border text-foreground">
+                        {ANOS.map((ano) => (
+                          <SelectItem key={ano} value={ano}>
+                            {ano}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-              {/* Botões */}
-              <div className="flex justify-end gap-2 mt-4 border-t border-border pt-4">
+                {batchTab === "nfse" && (
+                  /* Mês da Preventiva */
+                  <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4 space-y-2">
+                    <Label className="text-xs font-semibold text-blue-600 dark:text-blue-400 block">
+                      Mês da Preventiva (para descrição da nota)
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select value={batchMesPreventiva} onValueChange={setBatchMesPreventiva}>
+                        <SelectTrigger className="bg-background text-foreground border-border h-8">
+                          <SelectValue placeholder="Mês" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border text-foreground">
+                          {MESES.map((mes) => (
+                            <SelectItem key={mes.value} value={mes.value}>
+                              {mes.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={batchAnoPreventiva} onValueChange={setBatchAnoPreventiva}>
+                        <SelectTrigger className="bg-background text-foreground border-border h-8">
+                          <SelectValue placeholder="Ano" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-border text-foreground">
+                          {ANOS.map((ano) => (
+                            <SelectItem key={ano} value={ano}>
+                              {ano}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* TABS CONTAINER */}
+              <Tabs value={batchTab} onValueChange={(v) => setBatchTab(v)} className="flex-1 flex flex-col overflow-hidden">
+                <div className="px-6 pt-3 border-b border-border bg-muted/10">
+                  <TabsList className="grid grid-cols-3 bg-muted/40 p-1 h-9 rounded-lg">
+                    <TabsTrigger value="nfse" className="text-xs rounded-md">1. NFS-e</TabsTrigger>
+                    <TabsTrigger value="boletos" className="text-xs rounded-md">2. Boletos</TabsTrigger>
+                    <TabsTrigger value="asaas" className="text-xs rounded-md">3. Asaas</TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 bg-card">
+                  {(() => {
+                    const mesRef = `${batchMesRef}/${batchAnoRef}`
+                    const contratosAtivos = contratos.filter((c) => c.status === "ativo")
+
+                    if (batchTab === "nfse") {
+                      const elegiveis = contratosAtivos.filter((c) => {
+                        const chave = `${c.numero}|${mesRef}`
+                        return !notasEmitidasContrato[chave]?.temNfse
+                      })
+                      const jaFaturados = contratosAtivos.filter((c) => {
+                        const chave = `${c.numero}|${mesRef}`
+                        return notasEmitidasContrato[chave]?.temNfse
+                      })
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <Label className="text-sm font-semibold text-foreground">Contratos a Faturar ({elegiveis.length})</Label>
+                            {elegiveis.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (batchSelecionados.length === elegiveis.length) {
+                                    setBatchSelecionados([])
+                                  } else {
+                                    setBatchSelecionados(elegiveis.map((c) => c.numero))
+                                  }
+                                }}
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                              >
+                                {batchSelecionados.length === elegiveis.length ? "Desmarcar Todos" : "Selecionar Todos"}
+                              </button>
+                            )}
+                          </div>
+
+                          {elegiveis.length === 0 ? (
+                            <div className="p-6 text-center border border-dashed border-border rounded-xl text-xs text-muted-foreground bg-muted/5">
+                              Nenhum contrato pendente de faturamento para este período.
+                            </div>
+                          ) : (
+                            <div className="border border-border rounded-xl divide-y divide-border/50 max-h-[250px] overflow-y-auto bg-background">
+                              {elegiveis.map((c) => {
+                                const isChecked = batchSelecionados.includes(c.numero)
+                                return (
+                                  <label key={c.id} className="flex items-center gap-3 p-3 hover:bg-muted/40 cursor-pointer select-none text-xs">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        if (isChecked) {
+                                          setBatchSelecionados(prev => prev.filter(x => x !== c.numero))
+                                        } else {
+                                          setBatchSelecionados(prev => [...prev, c.numero])
+                                        }
+                                      }}
+                                      className="h-4 w-4 rounded border-gray-300 text-indigo-650 focus:ring-indigo-650 bg-background border-border"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-semibold text-foreground truncate">{c.cliente_nome}</p>
+                                      <p className="text-muted-foreground font-mono text-[10px] mt-0.5">
+                                        Contrato: {c.numero} | Valor: {formatCurrency(c.valor_mensal)}
+                                      </p>
+                                    </div>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          {jaFaturados.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                              <Label className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">Já Faturados neste Mês ({jaFaturados.length})</Label>
+                              <div className="border border-border rounded-xl divide-y divide-border/50 bg-muted/10 max-h-[180px] overflow-y-auto">
+                                {jaFaturados.map((c) => (
+                                  <div key={c.id} className="p-3 text-xs flex items-center justify-between opacity-80">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-semibold text-foreground truncate">{c.cliente_nome}</p>
+                                      <p className="text-muted-foreground font-mono text-[10px] mt-0.5">
+                                        Contrato: {c.numero} | Valor: {formatCurrency(c.valor_mensal)}
+                                      </p>
+                                    </div>
+                                    <Badge className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-0 text-[10px] font-bold">NFS-e Emitida</Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    if (batchTab === "boletos") {
+                      // Elegíveis: tem NFS-e mas não tem boleto associado
+                      const elegiveis = contratosAtivos.filter((c) => {
+                        const chave = `${c.numero}|${mesRef}`
+                        const nota = notasEmitidasContrato[chave]
+                        if (!nota || !nota.numero_nfse) return false
+                        const temBoleto = allBoletos.some(
+                          (b) => String(b.cliente_id) === String(c.cliente_id) && String(b.numero_nota) === String(nota.numero_nfse)
+                        )
+                        return !temBoleto
+                      })
+
+                      // Bloqueados: NFS-e em processo ou sem número
+                      const bloqueadosSemNota = contratosAtivos.filter((c) => {
+                        const chave = `${c.numero}|${mesRef}`
+                        const nota = notasEmitidasContrato[chave]
+                        return !nota || !nota.numero_nfse
+                      })
+
+                      const jaGerados = contratosAtivos.filter((c) => {
+                        const chave = `${c.numero}|${mesRef}`
+                        const nota = notasEmitidasContrato[chave]
+                        if (!nota || !nota.numero_nfse) return false
+                        return allBoletos.some(
+                          (b) => String(b.cliente_id) === String(c.cliente_id) && String(b.numero_nota) === String(nota.numero_nfse)
+                        )
+                      })
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <Label className="text-sm font-semibold text-foreground">Gerar Boletos Locais ({elegiveis.length})</Label>
+                            {elegiveis.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (batchBoletosSelecionados.length === elegiveis.length) {
+                                    setBatchBoletosSelecionados([])
+                                  } else {
+                                    setBatchBoletosSelecionados(elegiveis.map((c) => c.numero))
+                                  }
+                                }}
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                              >
+                                {batchBoletosSelecionados.length === elegiveis.length ? "Desmarcar Todos" : "Selecionar Todos"}
+                              </button>
+                            )}
+                          </div>
+
+                          {elegiveis.length === 0 ? (
+                            <div className="p-6 text-center border border-dashed border-border rounded-xl text-xs text-muted-foreground bg-muted/5">
+                              Nenhum boleto pendente de geração (emita a NFS-e primeiro).
+                            </div>
+                          ) : (
+                            <div className="border border-border rounded-xl divide-y divide-border/50 max-h-[200px] overflow-y-auto bg-background">
+                              {elegiveis.map((c) => {
+                                const isChecked = batchBoletosSelecionados.includes(c.numero)
+                                const chave = `${c.numero}|${mesRef}`
+                                const nota = notasEmitidasContrato[chave]
+                                const originalDueDate = `${batchAnoRef}-${String(parseInt(batchMesRef, 10) === 12 ? 1 : parseInt(batchMesRef, 10) + 1).padStart(2, "0")}-${String(c.dia_vencimento || 10).padStart(2, "0")}`
+                                const calculatedDueDate = calculateDueDate(c.dia_vencimento || 10, batchMesRef, batchAnoRef, feriados)
+                                const wasDelayed = originalDueDate !== calculatedDueDate
+                                
+                                return (
+                                  <label key={c.id} className="flex items-center gap-3 p-3 hover:bg-muted/40 cursor-pointer select-none text-xs">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        if (isChecked) {
+                                          setBatchBoletosSelecionados(prev => prev.filter(x => x !== c.numero))
+                                        } else {
+                                          setBatchBoletosSelecionados(prev => [...prev, c.numero])
+                                        }
+                                      }}
+                                      className="h-4 w-4 rounded border-gray-300 text-indigo-650 focus:ring-indigo-650 bg-background border-border"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between">
+                                        <p className="font-semibold text-foreground truncate">{c.cliente_nome}</p>
+                                        <Badge className="bg-emerald-500/10 text-emerald-600 border-0 font-mono text-[9px]">Nota: {nota?.numero_nfse}</Badge>
+                                      </div>
+                                      <div className="flex justify-between items-center mt-1">
+                                        <p className="text-muted-foreground font-mono text-[10px]">
+                                          Valor: {formatCurrency(c.valor_mensal)}
+                                        </p>
+                                        <p className="text-muted-foreground text-[10px] flex items-center gap-1">
+                                          Vencimento: <span className={`font-semibold ${wasDelayed ? "text-amber-500" : "text-foreground"}`}>{calculatedDueDate.split("-").reverse().join("/")}</span>
+                                          {wasDelayed && <span className="text-[9px] text-amber-500 font-medium">(Prorrogado)</span>}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          {bloqueadosSemNota.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                              <Label className="text-xs font-semibold text-muted-foreground">Faturamento Pendente (Bloqueado) ({bloqueadosSemNota.length})</Label>
+                              <div className="border border-border rounded-xl divide-y divide-border/50 bg-muted/10 max-h-[140px] overflow-y-auto">
+                                {bloqueadosSemNota.map((c) => (
+                                  <div key={c.id} className="p-3 text-xs flex items-center justify-between opacity-60">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-semibold text-foreground truncate">{c.cliente_nome}</p>
+                                      <p className="text-muted-foreground font-mono text-[10px] mt-0.5">
+                                        Contrato: {c.numero} | Valor: {formatCurrency(c.valor_mensal)}
+                                      </p>
+                                    </div>
+                                    <span className="text-[10px] text-rose-500 font-semibold flex items-center gap-1">Sem NFS-e</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {jaGerados.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                              <Label className="text-xs font-semibold text-yellow-600 dark:text-yellow-400">Boletos Já Gerados ({jaGerados.length})</Label>
+                              <div className="border border-border rounded-xl divide-y divide-border/50 bg-muted/10 max-h-[140px] overflow-y-auto">
+                                {jaGerados.map((c) => (
+                                  <div key={c.id} className="p-3 text-xs flex items-center justify-between opacity-80">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-semibold text-foreground truncate">{c.cliente_nome}</p>
+                                      <p className="text-muted-foreground font-mono text-[10px] mt-0.5">
+                                        Contrato: {c.numero} | Valor: {formatCurrency(c.valor_mensal)}
+                                      </p>
+                                    </div>
+                                    <Badge className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-0 text-[10px] font-bold">Boleto Gerado</Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    if (batchTab === "asaas") {
+                      // Elegíveis: boleto existe mas sem asaas_id
+                      const elegiveis = contratosAtivos.filter((c) => {
+                        const chave = `${c.numero}|${mesRef}`
+                        const nota = notasEmitidasContrato[chave]
+                        if (!nota || !nota.numero_nfse) return false
+                        const boleto = allBoletos.find(
+                          (b) => String(b.cliente_id) === String(c.cliente_id) && String(b.numero_nota) === String(nota.numero_nfse)
+                        )
+                        return boleto && !boleto.asaas_id
+                      })
+
+                      const jaSincronizados = contratosAtivos.filter((c) => {
+                        const chave = `${c.numero}|${mesRef}`
+                        const nota = notasEmitidasContrato[chave]
+                        if (!nota || !nota.numero_nfse) return false
+                        const boleto = allBoletos.find(
+                          (b) => String(b.cliente_id) === String(c.cliente_id) && String(b.numero_nota) === String(nota.numero_nfse)
+                        )
+                        return boleto && boleto.asaas_id
+                      })
+
+                      const semBoleto = contratosAtivos.filter((c) => {
+                        const chave = `${c.numero}|${mesRef}`
+                        const nota = notasEmitidasContrato[chave]
+                        if (!nota || !nota.numero_nfse) return true
+                        const temBoleto = allBoletos.some(
+                          (b) => String(b.cliente_id) === String(c.cliente_id) && String(b.numero_nota) === String(nota.numero_nfse)
+                        )
+                        return !temBoleto
+                      })
+
+                      return (
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <Label className="text-sm font-semibold text-foreground">Enviar ao Asaas ({elegiveis.length})</Label>
+                            {elegiveis.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (batchAsaasSelecionados.length === elegiveis.length) {
+                                    setBatchAsaasSelecionados([])
+                                  } else {
+                                    setBatchAsaasSelecionados(elegiveis.map((c) => c.numero))
+                                  }
+                                }}
+                                className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                              >
+                                {batchAsaasSelecionados.length === elegiveis.length ? "Desmarcar Todos" : "Selecionar Todos"}
+                              </button>
+                            )}
+                          </div>
+
+                          {elegiveis.length === 0 ? (
+                            <div className="p-6 text-center border border-dashed border-border rounded-xl text-xs text-muted-foreground bg-muted/5">
+                              Nenhum boleto local pendente de sincronização com o Asaas.
+                            </div>
+                          ) : (
+                            <div className="border border-border rounded-xl divide-y divide-border/50 max-h-[200px] overflow-y-auto bg-background">
+                              {elegiveis.map((c) => {
+                                const isChecked = batchAsaasSelecionados.includes(c.numero)
+                                const chave = `${c.numero}|${mesRef}`
+                                const nota = notasEmitidasContrato[chave]
+                                const boleto = allBoletos.find(
+                                  (b) => String(b.cliente_id) === String(c.cliente_id) && String(b.numero_nota) === String(nota.numero_nfse)
+                                )
+
+                                return (
+                                  <label key={c.id} className="flex items-center gap-3 p-3 hover:bg-muted/40 cursor-pointer select-none text-xs">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        if (isChecked) {
+                                          setBatchAsaasSelecionados(prev => prev.filter(x => x !== c.numero))
+                                        } else {
+                                          setBatchAsaasSelecionados(prev => [...prev, c.numero])
+                                        }
+                                      }}
+                                      className="h-4 w-4 rounded border-gray-300 text-indigo-650 focus:ring-indigo-650 bg-background border-border"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex justify-between items-center">
+                                        <p className="font-semibold text-foreground truncate">{c.cliente_nome}</p>
+                                        <Badge className="bg-blue-500/10 text-blue-600 border-0 font-mono text-[9px]">Boleto Local: {boleto?.numero}</Badge>
+                                      </div>
+                                      <p className="text-muted-foreground font-mono text-[10px] mt-1">
+                                        Valor: {formatCurrency(c.valor_mensal)} | Venc.: {boleto?.data_vencimento ? new Date(boleto.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR") : ""}
+                                      </p>
+                                    </div>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          {semBoleto.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                              <Label className="text-xs font-semibold text-muted-foreground">Boletos Pendentes de Geração ({semBoleto.length})</Label>
+                              <div className="border border-border rounded-xl divide-y divide-border/50 bg-muted/10 max-h-[140px] overflow-y-auto">
+                                {semBoleto.map((c) => (
+                                  <div key={c.id} className="p-3 text-xs flex items-center justify-between opacity-60">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-semibold text-foreground truncate">{c.cliente_nome}</p>
+                                      <p className="text-muted-foreground font-mono text-[10px] mt-0.5">
+                                        Contrato: {c.numero} | Valor: {formatCurrency(c.valor_mensal)}
+                                      </p>
+                                    </div>
+                                    <span className="text-[10px] text-amber-500 font-semibold flex items-center gap-1">Aguardando Boleto</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {jaSincronizados.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                              <Label className="text-xs font-semibold text-green-600 dark:text-green-400">Já Enviados ao Asaas ({jaSincronizados.length})</Label>
+                              <div className="border border-border rounded-xl divide-y divide-border/50 bg-muted/10 max-h-[140px] overflow-y-auto">
+                                {jaSincronizados.map((c) => (
+                                  <div key={c.id} className="p-3 text-xs flex items-center justify-between opacity-80">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-semibold text-foreground truncate">{c.cliente_nome}</p>
+                                      <p className="text-muted-foreground font-mono text-[10px] mt-0.5">
+                                        Contrato: {c.numero} | Valor: {formatCurrency(c.valor_mensal)}
+                                      </p>
+                                    </div>
+                                    <Badge className="bg-green-500/10 text-green-600 dark:text-green-400 border-0 text-[10px] font-bold">Asaas Ok</Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    return null
+                  })()}
+                </div>
+              </Tabs>
+
+              {/* Botões do Rodapé */}
+              <div className="flex justify-end gap-2 p-6 border-t border-border bg-muted/20">
                 <Button
                   variant="outline"
                   onClick={() => setIsBatchOpen(false)}
@@ -1966,14 +2507,39 @@ export default function ContratosPage() {
                 >
                   Fechar
                 </Button>
-                <Button
-                  onClick={handleExecutarBatch}
-                  disabled={batchSelecionados.length === 0}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl"
-                >
-                  <FileCheck className="h-4 w-4 mr-2" />
-                  Emitir {batchSelecionados.length} NFS-e
-                </Button>
+                
+                {batchTab === "nfse" && (
+                  <Button
+                    onClick={handleExecutarBatch}
+                    disabled={batchSelecionados.length === 0}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl"
+                  >
+                    <FileCheck className="h-4 w-4 mr-2" />
+                    Emitir {batchSelecionados.length} NFS-e
+                  </Button>
+                )}
+
+                {batchTab === "boletos" && (
+                  <Button
+                    onClick={handleExecutarBatch}
+                    disabled={batchBoletosSelecionados.length === 0}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Gerar {batchBoletosSelecionados.length} Boletos
+                  </Button>
+                )}
+
+                {batchTab === "asaas" && (
+                  <Button
+                    onClick={handleExecutarBatch}
+                    disabled={batchAsaasSelecionados.length === 0}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl"
+                  >
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Enviar {batchAsaasSelecionados.length} ao Asaas
+                  </Button>
+                )}
               </div>
             </div>
           )}
