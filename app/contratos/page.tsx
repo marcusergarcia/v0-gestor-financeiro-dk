@@ -14,6 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -1432,32 +1439,32 @@ export default function ContratosPage() {
         </Tabs>
       
 
-      {/* Dialog de Mes de Referencia */}
-      <Dialog open={mesRefDialogOpen} onOpenChange={(open) => {
+      {/* Drawer de Mes de Referencia */}
+      <Sheet open={mesRefDialogOpen} onOpenChange={(open) => {
         setMesRefDialogOpen(open)
         if (!open) {
           setMesRefContrato(null)
         }
       }}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+        <SheetContent side="right" className="w-full sm:max-w-[450px] bg-card text-foreground border-border overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-emerald-600" />
-              Mes de Referencia
-            </DialogTitle>
-            <DialogDescription>
-              Selecione o mes e ano de referencia para a NFS-e do contrato{" "}
+              Mês de Referência
+            </SheetTitle>
+            <SheetDescription>
+              Selecione o mês e ano de referência para a NFS-e do contrato{" "}
               <span className="font-semibold">{mesRefContrato?.numero}</span>
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="mes-ref">Mes</Label>
+              <Label htmlFor="mes-ref">Mês</Label>
               <Select value={mesRefSelecionado} onValueChange={setMesRefSelecionado}>
-                <SelectTrigger id="mes-ref">
-                  <SelectValue placeholder="Selecione o mes" />
+                <SelectTrigger id="mes-ref" className="bg-background text-foreground border-border">
+                  <SelectValue placeholder="Selecione o mês" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-card border-border text-foreground">
                   {MESES.map((mes) => (
                     <SelectItem key={mes.value} value={mes.value}>
                       {mes.label}
@@ -1469,10 +1476,10 @@ export default function ContratosPage() {
             <div className="grid gap-2">
               <Label htmlFor="ano-ref">Ano</Label>
               <Select value={anoRefSelecionado} onValueChange={setAnoRefSelecionado}>
-                <SelectTrigger id="ano-ref">
+                <SelectTrigger id="ano-ref" className="bg-background text-foreground border-border">
                   <SelectValue placeholder="Selecione o ano" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-card border-border text-foreground">
                   {ANOS.map((ano) => (
                     <SelectItem key={ano} value={ano}>
                       {ano}
@@ -1483,16 +1490,16 @@ export default function ContratosPage() {
             </div>
 
             {/* Mes da Preventiva */}
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-              <Label className="text-sm font-semibold text-blue-700 mb-2 block">
-                Mes da Preventiva (para descricao)
+            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+              <Label className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2 block">
+                Mês da Preventiva (para descrição)
               </Label>
               <div className="grid grid-cols-2 gap-2">
                 <Select value={mesPreventivaRef} onValueChange={setMesPreventivaRef}>
                   <SelectTrigger className="bg-background text-foreground border-border">
-                    <SelectValue placeholder="Mes" />
+                    <SelectValue placeholder="Mês" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-card border-border text-foreground">
                     {MESES.map((mes) => (
                       <SelectItem key={mes.value} value={mes.value}>
                         {mes.label}
@@ -1504,7 +1511,7 @@ export default function ContratosPage() {
                   <SelectTrigger className="bg-background text-foreground border-border">
                     <SelectValue placeholder="Ano" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-card border-border text-foreground">
                     {ANOS.map((ano) => (
                       <SelectItem key={ano} value={ano}>
                         {ano}
@@ -1513,8 +1520,8 @@ export default function ContratosPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <p className="text-xs text-blue-600 mt-2">
-                Descricao: {mesPreventivaRef && anoPreventivaRef 
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 font-medium">
+                Descrição: {mesPreventivaRef && anoPreventivaRef 
                   ? `Referente a preventiva realizada em ${mesPreventivaRef}/${anoPreventivaRef} - Contrato ...`
                   : "Contrato ..."}
               </p>
@@ -1528,52 +1535,54 @@ export default function ContratosPage() {
               return (
                 <div className="space-y-3">
                   {jaEmitidaMes && (
-                    <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-3">
-                      <p className="text-xs font-semibold text-yellow-700 flex items-center gap-1">
+                    <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4">
+                      <p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
                         <FileCheck className="h-3.5 w-3.5" />
-                        NFS-e ja emitida para {MESES.find(m => m.value === mesRefSelecionado)?.label}/{anoRefSelecionado}
+                        NFS-e já emitida para {MESES.find(m => m.value === mesRefSelecionado)?.label}/{anoRefSelecionado}
                       </p>
-                      <p className="text-xs text-yellow-600 mt-1">
-                        Selecione outro mes ou continue para emitir novamente.
+                      <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
+                        Selecione outro mês ou continue para emitir novamente.
                       </p>
                     </div>
                   )}
                   {equipamentos.length > 0 && (
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                      <p className="text-xs font-semibold text-gray-600 mb-2 flex items-center gap-1">
-                        <Package className="h-3.5 w-3.5" />
+                    <div className="rounded-xl border border-border bg-muted/30 p-4">
+                      <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                        <Package className="h-3.5 w-3.5 text-primary" />
                         Equipamentos do Contrato
                       </p>
-                      {equipamentos.map((eq, idx) => (
-                        <div key={idx} className="text-xs text-gray-600 flex items-center gap-1">
-                          <span>- {eq.nome}</span>
-                          {eq.quantidade > 1 && <span className="text-gray-400">(Qtd: {eq.quantidade})</span>}
-                        </div>
-                      ))}
+                      <div className="space-y-1.5">
+                        {equipamentos.map((eq, idx) => (
+                          <div key={idx} className="text-xs text-muted-foreground flex items-center gap-1">
+                            <span>- {eq.nome}</span>
+                            {eq.quantidade > 1 && <span className="text-muted-foreground/75 font-semibold">(Qtd: {eq.quantidade})</span>}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
               )
             })()}
           </div>
-          <DialogFooter>
+          <div className="flex justify-end gap-2 mt-6 border-t border-border pt-4">
             <Button variant="outline" onClick={() => {
               setMesRefDialogOpen(false)
               setMesRefContrato(null)
-            }}>
+            }} className="border-border text-foreground hover:bg-muted">
               Cancelar
             </Button>
             <Button
               onClick={handleConfirmarMesRef}
               disabled={!mesRefSelecionado || !anoRefSelecionado}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl"
             >
               <FileCheck className="h-4 w-4 mr-2" />
               Continuar para NFS-e
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Dialog de Emissao NFS-e */}
       {nfseContrato && (
