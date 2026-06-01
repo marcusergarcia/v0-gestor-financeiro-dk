@@ -560,16 +560,17 @@ export default function ContratosPage() {
 
   const handleIniciarBatch = () => {
     const now = new Date()
-    const currentMonth = String(now.getMonth() + 1).padStart(2, "0")
-    const currentYr = String(now.getFullYear())
     
     const mesAnterior = now.getMonth() === 0 ? 12 : now.getMonth()
     const anoAnterior = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
     
-    setBatchMesRef(currentMonth)
-    setBatchAnoRef(currentYr)
-    setBatchMesPreventiva(String(mesAnterior).padStart(2, "0"))
-    setBatchAnoPreventiva(String(anoAnterior))
+    const mesAnteriorStr = String(mesAnterior).padStart(2, "0")
+    const anoAnteriorStr = String(anoAnterior)
+
+    setBatchMesRef(mesAnteriorStr)
+    setBatchAnoRef(anoAnteriorStr)
+    setBatchMesPreventiva(mesAnteriorStr)
+    setBatchAnoPreventiva(anoAnteriorStr)
     setBatchTab("nfse")
     
     setBatchProgress({})
@@ -578,7 +579,7 @@ export default function ContratosPage() {
 
     // Run selections recalculation
     setTimeout(() => {
-      recalculateBatchSelections(currentMonth, currentYr)
+      recalculateBatchSelections(mesAnteriorStr, anoAnteriorStr)
     }, 100)
   }
 
