@@ -18,12 +18,33 @@ export async function GET() {
     `)
 
     // 3. Fetch Financial Transactions (Statements) joined with Account info
-    const [transacoes]: any = await pool.execute(`
+    const [transacoesOriginal]: any = await pool.execute(`
       SELECT t.id, t.data, t.valor, t.tipo, t.descricao, c.nome as conta_nome, t.conta_id, c.tipo as conta_tipo
       FROM transacoes_financeiras t
       JOIN contas_financeiras c ON t.conta_id = c.id
       WHERE t.ativo = 1
     `)
+
+    // Deduplicate identical transactions (same date, value, type, description) across different accounts
+    const transacoes: any[] = []
+    const seenTx = new Set()
+    for (const t of transacoesOriginal) {
+      let dStr = "0000-00-00"
+      if (t.data) {
+        try {
+          const parsed = t.data instanceof Date ? t.data : new Date(t.data)
+          if (!isNaN(parsed.getTime())) {
+            dStr = parsed.toISOString().split("T")[0]
+          }
+        } catch {}
+      }
+      const valStr = parseFloat(t.valor || 0).toFixed(2)
+      const key = `${dStr}_${valStr}_${t.tipo}_${t.descricao || ""}`
+      if (!seenTx.has(key)) {
+        seenTx.add(key)
+        transacoes.push(t)
+      }
+    }
 
     const hoje = new Date()
     const currentMonthKey = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`

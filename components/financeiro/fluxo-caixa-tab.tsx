@@ -595,22 +595,34 @@ export function FluxoCaixaTab() {
 
     const chartDataWithBalances = chartData.map((d) => {
       const saldoAnterior = runningBalance
-      const resultadoMes = (d.entradas + ((d as any).entradasProjetadas || 0)) - (d.saidas + ((d as any).saidasProjetadas || 0))
-      const saldoFinal = saldoAnterior + resultadoMes
+      // running balance accumulates ONLY realized entries to match actual accounts balance
+      const resultadoRealizado = d.entradas - d.saidas
+      const saldoFinal = saldoAnterior + resultadoRealizado
       runningBalance = saldoFinal
+      
+      const resultadoMes = (d.entradas + ((d as any).entradasProjetadas || 0)) - (d.saidas + ((d as any).saidasProjetadas || 0))
+      
       return {
         ...d,
         saldoAnterior,
         resultadoMes,
+        resultadoRealizado,
         saldoFinal,
       }
     })
 
     if (selectedPeriod === "all") {
+      const totalEntradasRealizadas = chartDataWithBalances.reduce((acc, d) => acc + d.entradas, 0)
+      const totalEntradasProjetadas = chartDataWithBalances.reduce((acc, d) => acc + ((d as any).entradasProjetadas || 0), 0)
+      const totalSaidasRealizadas = chartDataWithBalances.reduce((acc, d) => acc + d.saidas, 0)
+      const totalSaidasProjetadas = chartDataWithBalances.reduce((acc, d) => acc + ((d as any).saidasProjetadas || 0), 0)
+      
       return {
-        entradas: chartDataWithBalances.reduce((acc, d) => acc + d.entradas + ((d as any).entradasProjetadas || 0), 0),
-        saidas: chartDataWithBalances.reduce((acc, d) => acc + d.saidas + ((d as any).saidasProjetadas || 0), 0),
-        saldo: chartDataWithBalances.reduce((acc, d) => acc + d.resultadoMes, 0),
+        entradas: totalEntradasRealizadas,
+        entradasProjetadas: totalEntradasProjetadas,
+        saidas: totalSaidasRealizadas,
+        saidasProjetadas: totalSaidasProjetadas,
+        saldo: totalEntradasRealizadas - totalSaidasRealizadas, // Realized liquid result
         saldoAnterior: initialBalanceTotal,
         saldoFinal: runningBalance,
         rendimentos: chartDataWithBalances.reduce((acc, d) => acc + (d.rendimentos || 0), 0),
@@ -619,15 +631,26 @@ export function FluxoCaixaTab() {
       const found = chartDataWithBalances.find((d) => d.mes === selectedPeriod || (d as any).periodo === selectedPeriod)
       if (found) {
         return {
-          entradas: found.entradas + ((found as any).entradasProjetadas || 0),
-          saidas: found.saidas + ((found as any).saidasProjetadas || 0),
-          saldo: found.resultadoMes,
+          entradas: found.entradas,
+          entradasProjetadas: (found as any).entradasProjetadas || 0,
+          saidas: found.saidas,
+          saidasProjetadas: (found as any).saidasProjetadas || 0,
+          saldo: found.entradas - found.saidas, // Realized monthly balance
           saldoAnterior: found.saldoAnterior,
           saldoFinal: found.saldoFinal,
           rendimentos: found.rendimentos || 0,
         }
       }
-      return { entradas: 0, saidas: 0, saldo: 0, saldoAnterior: initialBalanceTotal, saldoFinal: initialBalanceTotal, rendimentos: 0 }
+      return {
+        entradas: 0,
+        entradasProjetadas: 0,
+        saidas: 0,
+        saidasProjetadas: 0,
+        saldo: 0,
+        saldoAnterior: initialBalanceTotal,
+        saldoFinal: initialBalanceTotal,
+        rendimentos: 0
+      }
     }
   })()
 
@@ -812,30 +835,58 @@ export function FluxoCaixaTab() {
         <Card className="border border-border bg-card shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
-              <span>Total Entradas</span>
+              <span>Receitas</span>
               <ArrowUpRight className="h-4 w-4 text-emerald-500" />
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {formatCurrency(currentPeriodData.entradas)}
+          <CardContent className="space-y-2 pt-0.5">
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+                <span>Boletos a pagar + Créditos a receber:</span>
+                <span className="font-semibold text-foreground">{formatCurrency(currentPeriodData.entradasProjetadas)}</span>
+              </div>
+              {currentPeriodData.entradas > 0 && (
+                <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+                  <span>Boletos pagos + Créditos Recebidos:</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(currentPeriodData.entradas)}</span>
+                </div>
+              )}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Boletos pagos + Recibos + Créditos</p>
+            <div className="border-t border-border pt-2 mt-1">
+              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                {formatCurrency(currentPeriodData.entradas + currentPeriodData.entradasProjetadas)}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Total de Receitas</p>
+            </div>
           </CardContent>
         </Card>
 
         <Card className="border border-border bg-card shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
-              <span>Total Saídas</span>
+              <span>Despesas</span>
               <ArrowDownRight className="h-4 w-4 text-red-500" />
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {formatCurrency(currentPeriodData.saidas)}
+          <CardContent className="space-y-2 pt-0.5">
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+                <span>Cartão a Pagar:</span>
+                <span className="font-semibold text-foreground">{formatCurrency(currentPeriodData.saidasProjetadas)}</span>
+              </div>
+              {currentPeriodData.saidas > 0 && (
+                <div className="flex justify-between items-center text-[11px] text-muted-foreground">
+                  <span>Despesas Pagas:</span>
+                  <span className="font-semibold text-red-600 dark:text-red-400">{formatCurrency(currentPeriodData.saidas)}</span>
+                </div>
+              )}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Despesas e débitos importados</p>
+            <div className="border-t border-border pt-2 mt-1">
+              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                {formatCurrency(currentPeriodData.saidas + currentPeriodData.saidasProjetadas)}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Total de Despesas</p>
+            </div>
           </CardContent>
         </Card>
 
